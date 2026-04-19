@@ -43,7 +43,6 @@
         <h2 class="footer__heading">À propos</h2>
         <ul class="footer__links">
           <li><NuxtLink to="/infos/qui-sommes-nous">Qui sommes-nous ?</NuxtLink></li>
-          <li><NuxtLink to="/edito">Magazine</NuxtLink></li>
           <li><NuxtLink to="/infos/contact">Nous contacter</NuxtLink></li>
         </ul>
       </div>

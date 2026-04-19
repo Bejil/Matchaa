@@ -8,8 +8,8 @@
 
       <nav class="header__nav header__nav--primary" aria-label="Navigation principale">
         <NuxtLink to="/edito" class="header__link">Conseils & actualités</NuxtLink>
-        <NuxtLink to="/acheter" class="header__link">Acheter</NuxtLink>
-        <NuxtLink to="/louer" class="header__link">Louer</NuxtLink>
+        <NuxtLink to="/annonces?projet=acheter" class="header__link">Acheter</NuxtLink>
+        <NuxtLink to="/annonces?projet=louer" class="header__link">Louer</NuxtLink>
       </nav>
 
       <span class="header__divider" aria-hidden="true" />

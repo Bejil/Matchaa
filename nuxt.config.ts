@@ -16,6 +16,7 @@ export default defineNuxtConfig({
     '~/assets/css/article-card.css',
     '~/assets/css/content-page.css',
     '~/assets/css/edito.css',
+    '~/assets/css/annonces.css',
   ],
   app: {
     head: {

@@ -132,7 +132,7 @@ watch(
 )
 
 useHead({
-  title: 'Magazine — Matchaa',
+  title: 'Conseils & actualités — Matchaa',
   meta: [
     {
       name: 'description',

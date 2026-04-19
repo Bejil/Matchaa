@@ -48,13 +48,13 @@
             </div>
             <div class="hero__actions">
               <NuxtLink
-                :to="{ path: '/acheter', query: locationRouteQuery }"
+                :to="{ path: '/annonces', query: { ...locationRouteQuery, projet: 'acheter' } }"
                 class="hero__btn hero__btn--primary"
               >
                 Acheter
               </NuxtLink>
               <NuxtLink
-                :to="{ path: '/louer', query: locationRouteQuery }"
+                :to="{ path: '/annonces', query: { ...locationRouteQuery, projet: 'louer' } }"
                 class="hero__btn hero__btn--secondary"
               >
                 Louer
@@ -90,25 +90,63 @@
             <h2 id="home-listings-title" class="home-section__title">Annonces à la une</h2>
             <p class="home-section__lead">Quelques biens fictifs pour illustrer la mise en page — filtres et favoris arriveront plus tard.</p>
           </div>
-          <NuxtLink to="/acheter" class="home-section__link">Voir toutes les annonces</NuxtLink>
+          <NuxtLink to="/annonces" class="home-section__link">Voir toutes les annonces</NuxtLink>
         </div>
 
         <ul class="listing-grid">
           <li v-for="item in featuredListings" :key="item.id" class="listing-card">
-            <article>
-              <div class="listing-card__media">
-                <img :src="item.image" :alt="item.title" class="listing-card__img" width="640" height="480" loading="lazy" decoding="async">
-                <span class="listing-card__badge">{{ item.tag }}</span>
+            <article class="listing-card__shell">
+              <div class="listing-card__media-col">
+                <ListingCardMedia :images="[item.image]" :title="item.title" :badge="item.tag" />
+                <ListingCardFavoriteBtn :listing-id="item.id" />
               </div>
-              <div class="listing-card__body">
-                <p class="listing-card__price">{{ item.price }}</p>
-                <h3 class="listing-card__title">{{ item.title }}</h3>
-                <p class="listing-card__loc">{{ item.city }}</p>
-                <ul class="listing-card__meta">
-                  <li>{{ item.surface }}</li>
-                  <li>{{ item.rooms }}</li>
-                  <li>{{ item.extra }}</li>
-                </ul>
+              <div class="listing-card__middle">
+                <div class="listing-card__body">
+                  <p class="listing-card__price">{{ item.price }}</p>
+                  <h3 class="listing-card__title">{{ item.title }}</h3>
+                  <p class="listing-card__loc">{{ item.city }}</p>
+                </div>
+                <div class="listing-card__footer">
+                  <ul class="listing-card__meta">
+                    <li>
+                      <svg class="listing-card__meta-ic" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <line x1="3" y1="9" x2="21" y2="9" />
+                        <line x1="9" y1="21" x2="9" y2="9" />
+                      </svg>
+                      <span>{{ item.surface }}</span>
+                    </li>
+                    <li>
+                      <svg class="listing-card__meta-ic" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                        <polyline points="9 22 9 12 15 12 15 22" />
+                      </svg>
+                      <span>{{ item.rooms }}</span>
+                    </li>
+                    <li>
+                      <svg class="listing-card__meta-ic" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="16" x2="12" y2="12" />
+                        <line x1="12" y1="8" x2="12.01" y2="8" />
+                      </svg>
+                      <span>{{ item.extra }}</span>
+                    </li>
+                  </ul>
+                  <div class="listing-card__actions">
+                    <NuxtLink
+                      :to="`/annonces/${item.id}`"
+                      class="listing-card__btn listing-card__btn--secondary"
+                    >
+                      Voir
+                    </NuxtLink>
+                    <NuxtLink
+                      :to="{ path: '/infos/contact', query: { annonce: String(item.id) } }"
+                      class="listing-card__btn listing-card__btn--primary"
+                    >
+                      Contacter
+                    </NuxtLink>
+                  </div>
+                </div>
               </div>
             </article>
           </li>
@@ -169,8 +207,8 @@
             </p>
           </div>
           <div class="home-cta__actions">
-            <NuxtLink to="/acheter" class="home-cta__btn home-cta__btn--primary">Parcourir les ventes</NuxtLink>
-            <NuxtLink to="/louer" class="home-cta__btn home-cta__btn--ghost">Voir les locations</NuxtLink>
+            <NuxtLink to="/annonces?projet=acheter" class="home-cta__btn home-cta__btn--primary">Parcourir les ventes</NuxtLink>
+            <NuxtLink to="/annonces?projet=louer" class="home-cta__btn home-cta__btn--ghost">Voir les locations</NuxtLink>
           </div>
         </div>
       </section>
