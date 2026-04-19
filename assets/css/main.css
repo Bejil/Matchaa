@@ -1,0 +1,50 @@
+:root {
+  --color-bg: #faf9f7;
+  --color-surface: #ffffff;
+  --color-text: #1a1a1a;
+  --color-text-muted: #5c5c5c;
+  --color-accent: #2d6a4f;
+  --color-accent-hover: #1b4332;
+  /* Fond pâle dérivé du vert principal (avis, encadrés) */
+  --color-accent-soft: #e8f2ec;
+  --color-accent-soft-mid: #d4e8de;
+  --color-accent-soft-border: rgba(45, 106, 79, 0.28);
+  --color-border: #e8e6e3;
+  --header-height: 4rem;
+  --footer-padding: 3rem 1.5rem 2rem;
+  --max-width: 1200px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}

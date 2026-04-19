@@ -1,0 +1,123 @@
+/* Grille d’annonces (accueil et réutilisable ailleurs) */
+.listing-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
+}
+
+.listing-card {
+  min-width: 0;
+}
+
+.listing-card article {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-radius: 0.875rem;
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 8px 28px rgba(26, 26, 26, 0.06);
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.listing-card article:hover {
+  box-shadow: 0 14px 40px rgba(26, 26, 26, 0.1);
+  transform: translateY(-2px);
+}
+
+.listing-card__media {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: #e8e6e3;
+}
+
+.listing-card__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.listing-card__badge {
+  position: absolute;
+  top: 0.65rem;
+  left: 0.65rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--color-accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.listing-card__body {
+  padding: 1rem 1.1rem 1.15rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.listing-card__price {
+  margin: 0 0 0.35rem;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.listing-card__title {
+  margin: 0 0 0.25rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-text);
+}
+
+.listing-card__loc {
+  margin: 0 0 0.65rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.listing-card__meta {
+  list-style: none;
+  margin: auto 0 0;
+  padding: 0.65rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.listing-card__meta li {
+  display: inline-flex;
+  align-items: center;
+}
+
+.listing-card__meta li + li::before {
+  content: '·';
+  margin-right: 0.5rem;
+  color: var(--color-text-muted);
+  opacity: 0.65;
+  font-weight: 700;
+}
+
+@media (max-width: 1024px) {
+  .listing-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .listing-grid {
+    grid-template-columns: 1fr;
+  }
+}
