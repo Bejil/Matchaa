@@ -3,6 +3,7 @@
     ref="btnRef"
     type="button"
     class="listing-card__favorite"
+    v-bind="$attrs"
     :class="{ 'is-active': isFavorite }"
     :aria-pressed="isFavorite"
     :aria-label="isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'"

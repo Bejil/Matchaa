@@ -17,6 +17,7 @@
 }
 
 .listing-card__shell {
+  position: relative;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -26,6 +27,30 @@
   border: 1px solid var(--color-border);
   box-shadow: 0 8px 28px rgba(26, 26, 26, 0.06);
   transition: box-shadow 0.2s, transform 0.2s;
+}
+
+/* Clic sur toute la carte → fiche annonce ; les contrôles réactivent pointer-events */
+.listing-card__hit {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  text-decoration: none;
+  color: inherit;
+}
+
+.listing-card__media-col,
+.listing-card__middle {
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.listing-card__favorite,
+.listing-card__carousel-nav,
+.listing-card__carousel-viewport,
+.listing-card__actions {
+  pointer-events: auto;
 }
 
 .listing-card__shell:hover {
@@ -99,6 +124,16 @@
 
 .listing-card__favorite.is-active {
   color: #c62828;
+}
+
+.listing-card__favorite--toolbar {
+  position: static;
+  inset: unset;
+  top: auto;
+  right: auto;
+  left: auto;
+  bottom: auto;
+  z-index: auto;
 }
 
 .listing-card__favorite:focus-visible {
@@ -429,20 +464,36 @@
 }
 
 .listing-card__loc {
-  margin: 0 0 0.65rem;
+  margin: 0 0 0.45rem;
   font-size: 0.8125rem;
   color: var(--color-text-muted);
 }
 
-.listing-card__desc {
-  margin: 0 0 0.75rem;
-  font-size: 0.8125rem;
-  line-height: 1.55;
+.listing-card__agency {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.65rem;
+  min-width: 0;
+}
+
+.listing-card__agency-logo {
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 0.3rem;
+  object-fit: cover;
+  background: var(--color-accent-soft);
+  flex-shrink: 0;
+}
+
+.listing-card__agency-name {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
   color: var(--color-text-muted);
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .listing-card__meta {

@@ -1,5 +1,8 @@
+import { MOCK_AGENCIES } from './agencies'
 import type { ListingFeatureId, PropertyTypeSlug } from './property-types'
 import { ALL_PROPERTY_TYPE_SLUGS } from './property-types'
+
+export type EnergyLetter = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G'
 
 export type SearchListing = {
   id: number
@@ -11,7 +14,9 @@ export type SearchListing = {
   surface: number
   rooms: number
   bedrooms: number
-  dpe: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G'
+  dpe: EnergyLetter
+  /** Estimation GES (kg CO₂ / m² / an) — lettre officielle. */
+  ges: EnergyLetter
   features: ListingFeatureId[]
   /** URLs des photos (ordre d’affichage dans le carousel). */
   images: string[]
@@ -19,6 +24,32 @@ export type SearchListing = {
   description: string
   publishedAt: string
   relevanceScore: number
+  /** Référence annonce (maquette). */
+  ref: string
+  /** Étage du bien (0 = RDC). Null si non applicable. */
+  floor: number | null
+  /** Nombre d’étages du bâtiment. */
+  totalFloors: number | null
+  /** Année de construction ou rénovation majeure. */
+  buildingYear: number
+  /** Charges locatives mensuelles (location uniquement). */
+  chargesMonthly: number | null
+  /** Taxe foncière annuelle estimée (vente uniquement). */
+  propertyTaxAnnual: number | null
+  /** Nombre de lots en copropriété. */
+  coproLots: number | null
+  /** Charges annuelles de copropriété (propriétaire). */
+  coproAnnualCharges: number | null
+  /** Quote-part du bien dans la copropriété (‰). */
+  coproSharePerMille: number | null
+  exposure: string
+  heatingType: string
+  hotWaterType: string
+  generalCondition: string
+  /** Meublé (location) — null si non renseigné. */
+  furnished: boolean | null
+  /** Agence mandataire (données démo). */
+  agencyId: number
 }
 
 const IMAGES = [
@@ -52,7 +83,44 @@ const CITIES = [
   'Dijon',
 ]
 
-const DPES: SearchListing['dpe'][] = ['A', 'B', 'B', 'C', 'C', 'C', 'D', 'D', 'E', 'F', 'G']
+const DPES: EnergyLetter[] = ['A', 'B', 'B', 'C', 'C', 'C', 'D', 'D', 'E', 'F', 'G']
+
+const EXPOSURES = ['Nord', 'Sud', 'Est', 'Ouest', 'Sud-Est', 'Sud-Ouest', 'Nord-Ouest', 'Traversant']
+const HEATINGS = [
+  'Gaz individuel',
+  'Électrique',
+  'Pompe à chaleur air / eau',
+  'Réseau de chaleur urbain',
+  'Fioul',
+  'Bois (insert ou poêle)',
+]
+const HOT_WATER = [
+  'Cumulus électrique',
+  'Chaudière gaz',
+  'Ballon thermodynamique',
+  'Chauffe-eau solaire',
+]
+const CONDITIONS = ['Excellent état', 'Bon état général', 'Quelques rafraîchissements à prévoir', 'Rénovation récente']
+
+function pickGesFromDpe(seed: number, dpe: EnergyLetter): EnergyLetter {
+  const idx = DPES.indexOf(dpe)
+  const delta = Math.floor(pseudoRand(seed + 99) * 3) - 1
+  const ni = Math.max(0, Math.min(DPES.length - 1, idx + delta))
+  return DPES[ni] ?? dpe
+}
+
+function buildFloorInfo(
+  id: number,
+  type: PropertyTypeSlug,
+): { floor: number | null; totalFloors: number | null } {
+  const noFloor: PropertyTypeSlug[] = ['terrain', 'parking', 'bateau', 'peniche']
+  if (noFloor.includes(type)) {
+    return { floor: null, totalFloors: null }
+  }
+  const totalFloors = 2 + Math.floor(pseudoRand(id + 61) * 6)
+  const floor = Math.floor(pseudoRand(id + 63) * totalFloors)
+  return { floor, totalFloors }
+}
 
 const FEATURE_POOL: ListingFeatureId[] = [
   'parking',
@@ -115,17 +183,18 @@ function buildDescription(
   rooms: number,
   projet: SearchListing['projet'],
 ): string {
-  const s1 = `Bien situé à ${city}, ${surface} m², ${rooms} pièce${rooms > 1 ? 's' : ''}.`
+  const s1 = `Bien situé à ${city}, ${surface} m², ${rooms} pièce${rooms > 1 ? 's' : ''}, volumes bien distribués et agencement fonctionnel.`
   const s2 =
     projet === 'louer'
-      ? 'Disponible à la location — idéal pour emménager rapidement ou en colocation.'
-      : 'Cadre agréable, belle luminosité ; adapté à la famille ou en résidence principale.'
+      ? 'Disponible à la location — idéal pour emménager rapidement, en colocation ou en pied-à-terre selon la configuration des pièces.'
+      : 'Cadre agréable, belle luminosité et potentiel d’aménagement ; adapté à la famille, en résidence principale ou secondaire selon vos projets.'
   const s3 =
-    (id % 2 === 0
-      ? 'Charges et prestations à confirmer lors de la visite.'
-      : 'Quartier calme, commerces et transports à proximité.') +
-    ' Visites sur rendez-vous.'
-  return `${s1} ${s2} ${s3}`
+    id % 2 === 0
+      ? 'Les charges et prestations précises sont à confirmer lors de la visite et avec le règlement de copropriété le cas échéant.'
+      : 'Quartier calme, commerces de proximité et accès transports : demandez la fiche complète pour les détails pratiques.'
+  const s4 = `L’état général est cohérent avec l’âge du bien ; prévoir une visite pour valider vos critères (bruit, luminosité, rangements). Référence interne MA-${String(id).padStart(5, '0')}.`
+  const s5 = 'Visites et informations complémentaires sur rendez-vous avec l’agence partenaire.'
+  return `${s1} ${s2} ${s3} ${s4} ${s5}`
 }
 
 export function buildMockListings(count: number): SearchListing[] {
@@ -163,6 +232,31 @@ export function buildMockListings(count: number): SearchListing[] {
 
     const nPhotos = 3 + Math.floor(pseudoRand(id + 47) * 3)
 
+    const dpe = pick(DPES, id + 41)
+    const ges = pickGesFromDpe(id, dpe)
+    const { floor, totalFloors } = buildFloorInfo(id, propertyType)
+    const buildingYear = 1890 + Math.floor(pseudoRand(id + 71) * 135)
+    const ref = `MA-${String(id).padStart(5, '0')}`
+
+    const chargesMonthly =
+      projet === 'louer' ? Math.round(40 + pseudoRand(id + 73) * 320) : null
+    const propertyTaxAnnual =
+      projet === 'acheter' ? Math.round(350 + pseudoRand(id + 75) * 3200) : null
+
+    const coproLots =
+      propertyType === 'maison' || propertyType === 'villa' || propertyType === 'chalet'
+        ? null
+        : 8 + Math.floor(pseudoRand(id + 77) * 180)
+    const coproAnnualCharges =
+      coproLots !== null ? Math.round(600 + pseudoRand(id + 79) * 5400) : null
+    const coproSharePerMille =
+      coproLots !== null ? Math.round(5 + pseudoRand(id + 81) * 85) : null
+
+    const furnished =
+      projet === 'louer' ? pseudoRand(id + 83) < 0.28 : null
+
+    const agencyId = 1 + ((id - 1) % MOCK_AGENCIES.length)
+
     out.push({
       id,
       projet,
@@ -173,12 +267,28 @@ export function buildMockListings(count: number): SearchListing[] {
       surface,
       rooms,
       bedrooms,
-      dpe: pick(DPES, id + 41),
+      dpe,
+      ges,
       features,
       images: pickListingImages(id, nPhotos),
       description: buildDescription(id, city, surface, rooms, projet),
       publishedAt: pub.toISOString(),
       relevanceScore: Math.round(40 + pseudoRand(id + 43) * 60),
+      ref,
+      floor,
+      totalFloors,
+      buildingYear,
+      chargesMonthly,
+      propertyTaxAnnual,
+      coproLots,
+      coproAnnualCharges,
+      coproSharePerMille,
+      exposure: pick(EXPOSURES, id + 85),
+      heatingType: pick(HEATINGS, id + 87),
+      hotWaterType: pick(HOT_WATER, id + 89),
+      generalCondition: pick(CONDITIONS, id + 91),
+      furnished,
+      agencyId,
     })
   }
   return out

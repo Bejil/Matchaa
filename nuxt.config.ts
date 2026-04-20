@@ -5,6 +5,7 @@ export default defineNuxtConfig({
   modules: ['@pinia/nuxt'],
   css: [
     '~/assets/css/main.css',
+    '~/assets/css/app-modal.css',
     '~/assets/css/header.css',
     '~/assets/css/footer.css',
     '~/assets/css/layout.css',
@@ -17,6 +18,7 @@ export default defineNuxtConfig({
     '~/assets/css/content-page.css',
     '~/assets/css/edito.css',
     '~/assets/css/annonces.css',
+    '~/assets/css/annonce-detail.css',
   ],
   app: {
     head: {

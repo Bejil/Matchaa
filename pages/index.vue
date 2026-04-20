@@ -96,6 +96,12 @@
         <ul class="listing-grid">
           <li v-for="item in featuredListings" :key="item.id" class="listing-card">
             <article class="listing-card__shell">
+              <NuxtLink
+                :to="`/annonces/${item.id}`"
+                class="listing-card__hit"
+                tabindex="-1"
+                :aria-label="`Voir l’annonce : ${item.title}`"
+              />
               <div class="listing-card__media-col">
                 <ListingCardMedia :images="[item.image]" :title="item.title" :badge="item.tag" />
                 <ListingCardFavoriteBtn :listing-id="item.id" />
@@ -139,12 +145,13 @@
                     >
                       Voir
                     </NuxtLink>
-                    <NuxtLink
-                      :to="{ path: '/infos/contact', query: { annonce: String(item.id) } }"
+                    <button
+                      type="button"
                       class="listing-card__btn listing-card__btn--primary"
+                      @click.stop="openContactModal(item)"
                     >
                       Contacter
-                    </NuxtLink>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -213,11 +220,33 @@
         </div>
       </section>
     </div>
+
+    <AppCenterModal
+      v-model="contactModalOpen"
+      title="Contacter l’annonceur"
+      size="form"
+    >
+      <ListingContactAnnouncerForm
+        v-if="contactListing"
+        :form-id="`contact-card-${contactListing.id}`"
+        :field-id-prefix="`lc-card-${contactListing.id}`"
+        hide-title
+        @request-close-container="contactModalOpen = false"
+        :listing-id="contactListing.id"
+        :agency-name="getAgencyById(contactListing.agencyId)?.name ?? 'Agence'"
+        :agency-phone-display="getAgencyById(contactListing.agencyId)?.phoneDisplay"
+        :agency-phone-tel="getAgencyById(contactListing.agencyId)?.phoneTel"
+      />
+    </AppCenterModal>
   </div>
 </template>
 
 <script setup lang="ts">
+import AppCenterModal from '~/components/ui/AppCenterModal.vue'
 import { editoArticles } from '~/data/articles'
+import { getAgencyById } from '~/data/agencies'
+import type { SearchListing } from '~/data/mock-listings'
+import { MOCK_LISTINGS } from '~/data/mock-listings'
 
 const locationQuery = ref('')
 const locationListOpen = ref(false)
@@ -279,6 +308,18 @@ type Listing = {
 }
 
 const featuredArticles = editoArticles.slice(0, 6)
+
+const contactModalOpen = ref(false)
+const contactListing = ref<SearchListing | null>(null)
+
+function openContactModal(item: Listing) {
+  const full = MOCK_LISTINGS.find((l) => l.id === item.id)
+  if (!full) {
+    return
+  }
+  contactListing.value = full
+  contactModalOpen.value = true
+}
 
 const featuredListings: Listing[] = [
   {

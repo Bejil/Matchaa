@@ -75,6 +75,12 @@
             class="listing-card__shell"
             :class="{ 'listing-card__shell--list': viewMode === 'list' }"
           >
+            <NuxtLink
+              :to="`/annonces/${item.id}`"
+              class="listing-card__hit"
+              tabindex="-1"
+              :aria-label="`Voir l’annonce : ${item.title}`"
+            />
             <ListingCardFavoriteBtn
               v-if="viewMode === 'list'"
               :listing-id="item.id"
@@ -96,11 +102,17 @@
                 <p class="listing-card__price">{{ formatListingPrice(item) }}</p>
                 <h3 class="listing-card__title">{{ item.title }}</h3>
                 <p class="listing-card__loc">{{ item.city }} · {{ labelForPropertyType(item.propertyType) }}</p>
-                <p
-                  v-if="viewMode === 'list'"
-                  class="listing-card__desc"
-                >
-                  {{ item.description }}
+                <p v-if="getAgencyById(item.agencyId)" class="listing-card__agency">
+                  <img
+                    :src="getAgencyById(item.agencyId)!.logo"
+                    alt=""
+                    class="listing-card__agency-logo"
+                    width="28"
+                    height="28"
+                    loading="lazy"
+                    decoding="async"
+                  >
+                  <span class="listing-card__agency-name">{{ getAgencyById(item.agencyId)!.name }}</span>
                 </p>
               </div>
               <div class="listing-card__footer">
@@ -143,12 +155,13 @@
                   >
                     Voir
                   </NuxtLink>
-                  <NuxtLink
-                    :to="{ path: '/infos/contact', query: { annonce: String(item.id) } }"
+                  <button
+                    type="button"
                     class="listing-card__btn listing-card__btn--primary"
+                    @click.stop="openContactModal(item)"
                   >
                     Contacter
-                  </NuxtLink>
+                  </button>
                 </div>
               </div>
             </div>
@@ -194,11 +207,32 @@
         </div>
       </nav>
     </div>
+
+    <AppCenterModal
+      v-model="contactModalOpen"
+      title="Contacter l’annonceur"
+      size="form"
+    >
+      <ListingContactAnnouncerForm
+        v-if="contactListing"
+        :form-id="`contact-card-${contactListing.id}`"
+        :field-id-prefix="`lc-card-${contactListing.id}`"
+        hide-title
+        @request-close-container="contactModalOpen = false"
+        :listing-id="contactListing.id"
+        :agency-name="getAgencyById(contactListing.agencyId)?.name ?? 'Agence'"
+        :agency-phone-display="getAgencyById(contactListing.agencyId)?.phoneDisplay"
+        :agency-phone-tel="getAgencyById(contactListing.agencyId)?.phoneTel"
+      />
+    </AppCenterModal>
   </div>
 </template>
 
 <script setup lang="ts">
+import AppCenterModal from '~/components/ui/AppCenterModal.vue'
 import { buildRecapCriteriaLine } from '~/composables/useAnnoncesSearch'
+import { getAgencyById } from '~/data/agencies'
+import type { SearchListing } from '~/data/mock-listings'
 import { labelForPropertyType } from '~/data/property-types'
 
 const route = useRoute()
@@ -216,6 +250,14 @@ const {
 const VIEW_STORAGE_KEY = 'matchaa-annonces-view'
 
 const viewMode = ref<'grid' | 'list'>('grid')
+
+const contactModalOpen = ref(false)
+const contactListing = ref<SearchListing | null>(null)
+
+function openContactModal(item: SearchListing) {
+  contactListing.value = item
+  contactModalOpen.value = true
+}
 
 onMounted(() => {
   try {
