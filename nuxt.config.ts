@@ -13,6 +13,7 @@ export default defineNuxtConfig({
     '~/assets/css/home-hero.css',
     '~/assets/css/infos.css',
     '~/assets/css/home.css',
+    '~/assets/css/profil.css',
     '~/assets/css/listing-card.css',
     '~/assets/css/article-card.css',
     '~/assets/css/content-page.css',

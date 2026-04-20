@@ -103,14 +103,30 @@
                 :aria-label="`Voir l’annonce : ${item.title}`"
               />
               <div class="listing-card__media-col">
-                <ListingCardMedia :images="[item.image]" :title="item.title" :badge="item.tag" />
+                <ListingCardMedia
+                  :images="item.images"
+                  :title="item.title"
+                  :badge="item.projet === 'louer' ? 'À louer' : 'À vendre'"
+                />
                 <ListingCardFavoriteBtn :listing-id="item.id" />
               </div>
               <div class="listing-card__middle">
                 <div class="listing-card__body">
-                  <p class="listing-card__price">{{ item.price }}</p>
+                  <p class="listing-card__price">{{ formatListingPrice(item) }}</p>
                   <h3 class="listing-card__title">{{ item.title }}</h3>
-                  <p class="listing-card__loc">{{ item.city }}</p>
+                  <p class="listing-card__loc">{{ item.city }} · {{ labelForPropertyType(item.propertyType) }}</p>
+                  <p v-if="getAgencyById(item.agencyId)" class="listing-card__agency">
+                    <img
+                      :src="getAgencyById(item.agencyId)!.logo"
+                      alt=""
+                      class="listing-card__agency-logo"
+                      width="28"
+                      height="28"
+                      loading="lazy"
+                      decoding="async"
+                    >
+                    <span class="listing-card__agency-name">{{ getAgencyById(item.agencyId)!.name }}</span>
+                  </p>
                 </div>
                 <div class="listing-card__footer">
                   <ul class="listing-card__meta">
@@ -120,22 +136,29 @@
                         <line x1="3" y1="9" x2="21" y2="9" />
                         <line x1="9" y1="21" x2="9" y2="9" />
                       </svg>
-                      <span>{{ item.surface }}</span>
+                      <span>{{ item.surface }} m²</span>
                     </li>
                     <li>
                       <svg class="listing-card__meta-ic" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
                         <polyline points="9 22 9 12 15 12 15 22" />
                       </svg>
-                      <span>{{ item.rooms }}</span>
+                      <span>T{{ item.rooms }}</span>
                     </li>
                     <li>
                       <svg class="listing-card__meta-ic" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="12" y1="16" x2="12" y2="12" />
-                        <line x1="12" y1="8" x2="12.01" y2="8" />
+                        <path d="M2 4v16" />
+                        <path d="M2 8h18a2 2 0 0 1 2 2v10" />
+                        <path d="M2 17h20" />
+                        <path d="M6 8v9" />
                       </svg>
-                      <span>{{ item.extra }}</span>
+                      <span>{{ item.bedrooms }} ch.</span>
+                    </li>
+                    <li>
+                      <svg class="listing-card__meta-ic" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                      </svg>
+                      <span>DPE {{ item.dpe }}</span>
                     </li>
                   </ul>
                   <div class="listing-card__actions">
@@ -243,10 +266,12 @@
 
 <script setup lang="ts">
 import AppCenterModal from '~/components/ui/AppCenterModal.vue'
+import { formatListingPrice } from '~/composables/useAnnoncesSearch'
 import { editoArticles } from '~/data/articles'
 import { getAgencyById } from '~/data/agencies'
 import type { SearchListing } from '~/data/mock-listings'
 import { MOCK_LISTINGS } from '~/data/mock-listings'
+import { labelForPropertyType } from '~/data/property-types'
 
 const locationQuery = ref('')
 const locationListOpen = ref(false)
@@ -295,122 +320,17 @@ function selectCommune(c: CommuneResult) {
   clearSuggestions()
 }
 
-type Listing = {
-  id: number
-  title: string
-  city: string
-  price: string
-  surface: string
-  rooms: string
-  extra: string
-  tag: string
-  image: string
-}
-
 const featuredArticles = editoArticles.slice(0, 6)
 
 const contactModalOpen = ref(false)
 const contactListing = ref<SearchListing | null>(null)
 
-function openContactModal(item: Listing) {
-  const full = MOCK_LISTINGS.find((l) => l.id === item.id)
-  if (!full) {
-    return
-  }
-  contactListing.value = full
+function openContactModal(item: SearchListing) {
+  contactListing.value = item
   contactModalOpen.value = true
 }
 
-const featuredListings: Listing[] = [
-  {
-    id: 1,
-    title: 'Duplex lumineux avec terrasse',
-    city: 'Bordeaux centre',
-    price: '498 000 €',
-    surface: '96 m²',
-    rooms: 'T4',
-    extra: 'Parking',
-    tag: 'À vendre',
-    image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80',
-  },
-  {
-    id: 2,
-    title: 'Loft industriel rénové',
-    city: 'Lyon 3ᵉ',
-    price: '1 250 € / mois',
-    surface: '58 m²',
-    rooms: 'T2',
-    extra: 'Meublé',
-    tag: 'À louer',
-    image: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80',
-  },
-  {
-    id: 3,
-    title: 'Maison avec jardin arboré',
-    city: 'Nantes sud',
-    price: '385 000 €',
-    surface: '112 m²',
-    rooms: 'T5',
-    extra: 'Jardin 300 m²',
-    tag: 'À vendre',
-    image: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80',
-  },
-  {
-    id: 4,
-    title: 'Appartement vue dégagée',
-    city: 'Paris 11ᵉ',
-    price: '2 150 € / mois',
-    surface: '45 m²',
-    rooms: 'T2',
-    extra: 'Balcon',
-    tag: 'À louer',
-    image: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=800&q=80',
-  },
-  {
-    id: 5,
-    title: 'Studio vue sur le Vieux-Port',
-    city: 'Marseille 1ᵉʳ',
-    price: '780 € / mois',
-    surface: '28 m²',
-    rooms: 'T1',
-    extra: 'Cave',
-    tag: 'À louer',
-    image: 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80',
-  },
-  {
-    id: 6,
-    title: 'Villa contemporaine piscine',
-    city: 'Toulouse nord',
-    price: '675 000 €',
-    surface: '165 m²',
-    rooms: 'T6',
-    extra: 'Piscine',
-    tag: 'À vendre',
-    image: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=800&q=80',
-  },
-  {
-    id: 7,
-    title: 'T3 traversant Petite France',
-    city: 'Strasbourg centre',
-    price: '1 080 € / mois',
-    surface: '72 m²',
-    rooms: 'T3',
-    extra: 'Parking vélo',
-    tag: 'À louer',
-    image: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80',
-  },
-  {
-    id: 8,
-    title: 'Maison de ville rénovée',
-    city: 'Lille Vauban',
-    price: '342 000 €',
-    surface: '88 m²',
-    rooms: 'T4',
-    extra: 'Cour',
-    tag: 'À vendre',
-    image: 'https://images.unsplash.com/photo-1605276374104-dee2a0ed3cd6?auto=format&fit=crop&w=800&q=80',
-  },
-]
+const featuredListings = computed(() => MOCK_LISTINGS.slice(0, 8))
 
 useHead({
   title: 'Accueil — Matchaa',

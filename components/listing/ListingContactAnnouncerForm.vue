@@ -165,40 +165,40 @@
           En attendant le retour de l’agence, voici des biens similaires susceptibles de vous plaire.
         </p>
 
-        <ul v-if="similarSuggestions.length" class="listing-grid listing-contact-form__suggestion-grid">
-          <li v-for="item in similarSuggestions" :key="item.id" class="listing-card">
-            <article class="listing-card__shell">
-              <NuxtLink
-                :to="`/annonces/${item.id}`"
-                class="listing-card__hit"
-                tabindex="-1"
-                :aria-label="`Voir l’annonce : ${item.title}`"
-                @click="showSentModal = false"
-              />
-              <div class="listing-card__media-col">
-                <ListingCardMedia
-                  :images="item.images"
-                  :title="item.title"
-                  :badge="item.projet === 'louer' ? 'À louer' : 'À vendre'"
-                />
-              </div>
-              <div class="listing-card__middle">
-                <div class="listing-card__body">
-                  <p class="listing-card__price">{{ formatSuggestionPrice(item) }}</p>
-                  <h3 class="listing-card__title">{{ item.title }}</h3>
-                  <p class="listing-card__loc">{{ item.city }} · {{ labelForPropertyType(item.propertyType) }}</p>
-                </div>
-                <div class="listing-card__footer">
-                  <ul class="listing-card__meta">
-                    <li><span>{{ item.surface }} m²</span></li>
-                    <li><span>T{{ item.rooms }}</span></li>
-                    <li><span>{{ item.bedrooms }} ch.</span></li>
-                  </ul>
-                </div>
-              </div>
-            </article>
+        <ul v-if="similarSuggestions.length" class="listing-contact-form__suggestion-list">
+          <li v-for="item in similarSuggestions" :key="item.id">
+            <label class="listing-contact-form__suggestion-row">
+              <input
+                v-model="selectedSuggestionIds"
+                type="checkbox"
+                class="listing-contact-form__suggestion-radio"
+                :value="item.id"
+              >
+              <img
+                :src="item.images[0]"
+                :alt="item.title"
+                class="listing-contact-form__suggestion-thumb"
+                loading="lazy"
+                decoding="async"
+              >
+              <span class="listing-contact-form__suggestion-content">
+                <strong>{{ item.title }}</strong>
+                <span>{{ item.city }} · {{ labelForPropertyType(item.propertyType) }}</span>
+                <span>{{ formatSuggestionPrice(item) }} · {{ item.surface }} m² · T{{ item.rooms }}</span>
+              </span>
+            </label>
           </li>
         </ul>
+        <div v-if="similarSuggestions.length" class="listing-contact-form__suggestion-actions">
+          <button
+            type="button"
+            class="listing-contact-form__submit"
+            :disabled="!selectedSuggestionIds.length"
+            @click="contactSelectedSuggestion"
+          >
+            Envoyer un message ({{ selectedSuggestionIds.length }})
+          </button>
+        </div>
       </div>
     </AppCenterModal>
   </form>
@@ -206,7 +206,7 @@
 
 <script setup lang="ts">
 import AppCenterModal from '~/components/ui/AppCenterModal.vue'
-import ListingCardMedia from '~/components/listing/ListingCardMedia.vue'
+import { getAgencyById } from '~/data/agencies'
 import type { SearchListing } from '~/data/mock-listings'
 import { MOCK_LISTINGS } from '~/data/mock-listings'
 import { labelForPropertyType } from '~/data/property-types'
@@ -242,6 +242,7 @@ function fid(base: string): string {
 
 const showPhoneModal = ref(false)
 const showSentModal = ref(false)
+const siteStore = useSiteStore()
 
 const phoneCountries = [
   { dial: '+33', flag: '🇫🇷' },
@@ -259,6 +260,7 @@ const showMessage = ref(false)
 const message = ref('')
 const optOutSimilar = ref(false)
 const optInPartners = ref(false)
+const selectedSuggestionIds = ref<number[]>([])
 
 const currentListing = computed(() =>
   MOCK_LISTINGS.find((l) => l.id === props.listingId),
@@ -268,10 +270,21 @@ const similarSuggestions = computed<SearchListing[]>(() => {
   if (!currentListing.value) {
     return []
   }
-  return pickSimilarListings(currentListing.value, MOCK_LISTINGS, 6)
+  return pickSimilarListings(currentListing.value, MOCK_LISTINGS, 5)
 })
 
+watch(similarSuggestions, (items) => {
+  selectedSuggestionIds.value = items.map((item) => item.id)
+}, { immediate: true })
+
 function onSubmit() {
+  siteStore.hydrateSession()
+  siteStore.addSentMessage({
+    agency: props.agencyName,
+    listingTitle: currentListing.value?.title ?? 'Annonce immobiliere',
+    listingId: currentListing.value?.id ?? null,
+    messageBody: message.value || `Bonjour, je souhaite obtenir plus d'informations sur l'annonce.`,
+  })
   if (props.hideTitle) {
     emit('request-close-container')
     if (import.meta.client) {
@@ -289,5 +302,24 @@ function formatSuggestionPrice(l: SearchListing): string {
     return `${l.price.toLocaleString('fr-FR')} € / mois`
   }
   return `${l.price.toLocaleString('fr-FR')} €`
+}
+
+function contactSelectedSuggestion() {
+  if (!selectedSuggestionIds.value.length) {
+    return
+  }
+  const selectedListings = similarSuggestions.value.filter((item) =>
+    selectedSuggestionIds.value.includes(item.id),
+  )
+  for (const listing of selectedListings) {
+    siteStore.addSentMessage({
+      agency: getAgencyById(listing.agencyId)?.name ?? 'Agence',
+      listingTitle: listing.title,
+      listingId: listing.id,
+      messageBody: `Bonjour, je souhaite obtenir plus d'informations sur l'annonce.`,
+    })
+  }
+  showSentModal.value = false
+  navigateTo('/compte?tab=messages')
 }
 </script>

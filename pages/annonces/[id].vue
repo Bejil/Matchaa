@@ -32,6 +32,7 @@
               class="annonce-detail__badge annonce-detail__badge--accent"
             >{{ listing.projet === 'louer' ? 'À louer' : 'À vendre' }}</span>
             <span class="annonce-detail__badge">Réf. {{ listing.ref }}</span>
+            <span class="annonce-detail__badge"><strong>Mise en ligne&nbsp;</strong> {{ formatPublished(listing.publishedAt) }}</span>
             <span v-if="listing.furnished === true" class="annonce-detail__badge">Meublé</span>
             <span v-else-if="listing.furnished === false" class="annonce-detail__badge">Non meublé</span>
           </div>
@@ -205,17 +206,10 @@
             />
 
             <div class="annonce-detail__aside-footer">
-              <NuxtLink class="annonce-detail__cta annonce-detail__cta--secondary" to="/annonces">
-                Autres biens
-              </NuxtLink>
               <div class="annonce-detail__meta-list">
                 <p><strong>Référence</strong> {{ listing.ref }}</p>
                 <p><strong>Mise en ligne</strong> {{ formatPublished(listing.publishedAt) }}</p>
-                <p><strong>Localisation</strong> {{ listing.city }}</p>
               </div>
-              <p class="annonce-detail__notice">
-                Annonce de démonstration — informations et montants fictifs.
-              </p>
             </div>
           </div>
         </aside>

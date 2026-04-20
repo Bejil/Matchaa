@@ -63,7 +63,10 @@
         </div>
       </div>
 
-      <AnnoncesSaveCta />
+      <AnnoncesSaveCta
+        v-if="hasActiveSearchCriteria && !hasAlertForCurrentSearch"
+        @create-alert="onCreateSearchAlert"
+      />
 
       <ul
         v-if="pageItems.length"
@@ -169,9 +172,11 @@
         </li>
       </ul>
 
-      <p v-else class="annonces-empty">
-        Aucune annonce ne correspond à ces critères. Élargissez la localisation, le budget ou les types de bien.
-      </p>
+      <AccountEmptyState
+        v-else
+        title="Aucun resultat pour cette recherche"
+        text="Aucune annonce ne correspond a vos criteres pour le moment. Ajustez vos filtres ou lancez une nouvelle recherche."
+      />
 
       <nav v-if="totalPages > 1" class="annonces-pagination" aria-label="Pagination des annonces">
         <p class="annonces-pagination__info">
@@ -230,12 +235,15 @@
 
 <script setup lang="ts">
 import AppCenterModal from '~/components/ui/AppCenterModal.vue'
+import AccountEmptyState from '~/components/account/AccountEmptyState.vue'
 import { buildRecapCriteriaLine } from '~/composables/useAnnoncesSearch'
 import { getAgencyById } from '~/data/agencies'
 import type { SearchListing } from '~/data/mock-listings'
 import { labelForPropertyType } from '~/data/property-types'
+import { useSiteStore } from '~/stores/site'
 
 const route = useRoute()
+const siteStore = useSiteStore()
 
 const {
   parsed,
@@ -260,6 +268,8 @@ function openContactModal(item: SearchListing) {
 }
 
 onMounted(() => {
+  siteStore.hydrateSession()
+  saveCurrentSearchForUser()
   try {
     const saved = localStorage.getItem(VIEW_STORAGE_KEY)
     if (saved === 'list' || saved === 'grid') {
@@ -293,6 +303,70 @@ function pageLink(target: number) {
   return { path: '/annonces', query: q }
 }
 
+function normalizeSearchQuery(query: typeof route.query): Record<string, string> {
+  const result: Record<string, string> = {}
+  for (const [key, value] of Object.entries(query)) {
+    if (key === 'page' || key === 'tri') {
+      continue
+    }
+    if (typeof value === 'string' && value.trim()) {
+      result[key] = value
+      continue
+    }
+    if (Array.isArray(value)) {
+      const first = value.find((v) => typeof v === 'string' && v.trim())
+      if (first) {
+        result[key] = first
+      }
+    }
+  }
+  return result
+}
+
+const hasActiveSearchCriteria = computed(() => {
+  const query = normalizeSearchQuery(route.query)
+  const hasProjet = query.projet === 'acheter' || query.projet === 'louer'
+  const hasAnotherCriteria = Object.keys(query).some((key) => key !== 'projet')
+  return hasProjet && hasAnotherCriteria
+})
+
+const hasAlertForCurrentSearch = computed(() => {
+  const query = normalizeSearchQuery(route.query)
+  if (!Object.keys(query).length) {
+    return false
+  }
+  const currentSignature = JSON.stringify({ path: '/annonces', query })
+  return siteStore.savedSearches.some(
+    (search) => JSON.stringify(search.to) === currentSignature,
+  )
+})
+
+function saveCurrentSearchForUser() {
+  if (!siteStore.currentUser) {
+    return
+  }
+  const query = normalizeSearchQuery(route.query)
+  const hasProjet = query.projet === 'acheter' || query.projet === 'louer'
+  const hasAnotherCriteria = Object.keys(query).some((key) => key !== 'projet')
+  if (!hasProjet || !hasAnotherCriteria) {
+    return
+  }
+  siteStore.saveLatestSearch({
+    title: `${parsed.value.projet === 'louer' ? 'Location' : 'Achat'}${parsed.value.ville ? ` · ${parsed.value.ville}` : ''}`,
+    description: buildRecapCriteriaLine(parsed.value),
+    to: { path: '/annonces', query },
+  })
+}
+
+function onCreateSearchAlert() {
+  if (!siteStore.currentUser) {
+    navigateTo('/profil')
+    return
+  }
+  saveCurrentSearchForUser()
+  siteStore.createAlertFromLatestSearch()
+}
+
 watch(
   [totalPages, () => route.query.page],
   () => {
@@ -313,6 +387,14 @@ watch(
     if (raw < 1) {
       mergeQuery({ page: undefined })
     }
+  },
+  { immediate: true },
+)
+
+watch(
+  () => route.fullPath,
+  () => {
+    saveCurrentSearchForUser()
   },
   { immediate: true },
 )

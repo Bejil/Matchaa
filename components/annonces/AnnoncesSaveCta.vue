@@ -10,11 +10,17 @@
         Sauvegardez cette recherche
       </h2>
       <p class="annonces-save__desc">
-        Retrouvez vos critères en un clic et recevez une alerte lorsque de nouvelles annonces correspondent à votre recherche (fonctionnalité à brancher sur votre compte).
+        Retrouvez vos critères en un clic et recevez une alerte lorsque de nouvelles annonces correspondent à votre recherche.
       </p>
     </div>
-    <button type="button" class="annonces-save__btn" disabled>
+    <button type="button" class="annonces-save__btn" @click="emit('create-alert')">
       Créer une alerte
     </button>
   </aside>
 </template>
+
+<script setup lang="ts">
+const emit = defineEmits<{
+  'create-alert': []
+}>()
+</script>

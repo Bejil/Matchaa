@@ -80,6 +80,48 @@
 .header__link--muted {
   color: var(--color-text-muted);
   font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.header__account-ic {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex-shrink: 0;
+}
+
+.header__account-menu {
+  position: relative;
+  padding-bottom: 0.45rem;
+  margin-bottom: -0.45rem;
+}
+
+.header__account-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  min-width: 13rem;
+  padding: 0.45rem;
+  border-radius: 0.6rem;
+  border: 1px solid var(--color-border);
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(26, 26, 26, 0.12);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 60;
+}
+
+.header__account-dropdown.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.header__account-dropdown .account-nav {
+  gap: 0.2rem;
 }
 
 .header__link--cta {
