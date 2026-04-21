@@ -16,6 +16,13 @@
           Tableau de bord
         </NuxtLink>
         <NuxtLink
+          to="/espace-pro/agence"
+          class="pro-header__link"
+          active-class="is-active"
+        >
+          Agence
+        </NuxtLink>
+        <NuxtLink
           to="/espace-pro/annonces"
           class="pro-header__link"
           active-class="is-active"

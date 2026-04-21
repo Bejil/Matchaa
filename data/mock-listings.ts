@@ -1,4 +1,10 @@
 import { MOCK_AGENCIES } from './agencies'
+import {
+  LISTING_EXPOSURE_OPTIONS,
+  LISTING_GENERAL_CONDITION_OPTIONS,
+  LISTING_HEATING_TYPE_OPTIONS,
+  LISTING_HOT_WATER_TYPE_OPTIONS,
+} from './listing-comfort-options'
 import type { ListingFeatureId, PropertyTypeSlug } from './property-types'
 import { ALL_PROPERTY_TYPE_SLUGS } from './property-types'
 
@@ -14,9 +20,9 @@ export type SearchListing = {
   surface: number
   rooms: number
   bedrooms: number
-  dpe: EnergyLetter
+  dpe: EnergyLetter | null
   /** Estimation GES (kg CO₂ / m² / an) — lettre officielle. */
-  ges: EnergyLetter
+  ges: EnergyLetter | null
   features: ListingFeatureId[]
   /** URLs des photos (ordre d’affichage dans le carousel). */
   images: string[]
@@ -31,7 +37,7 @@ export type SearchListing = {
   /** Nombre d’étages du bâtiment. */
   totalFloors: number | null
   /** Année de construction ou rénovation majeure. */
-  buildingYear: number
+  buildingYear: number | null
   /** Charges locatives mensuelles (location uniquement). */
   chargesMonthly: number | null
   /** Taxe foncière annuelle estimée (vente uniquement). */
@@ -85,22 +91,10 @@ const CITIES = [
 
 const DPES: EnergyLetter[] = ['A', 'B', 'B', 'C', 'C', 'C', 'D', 'D', 'E', 'F', 'G']
 
-const EXPOSURES = ['Nord', 'Sud', 'Est', 'Ouest', 'Sud-Est', 'Sud-Ouest', 'Nord-Ouest', 'Traversant']
-const HEATINGS = [
-  'Gaz individuel',
-  'Électrique',
-  'Pompe à chaleur air / eau',
-  'Réseau de chaleur urbain',
-  'Fioul',
-  'Bois (insert ou poêle)',
-]
-const HOT_WATER = [
-  'Cumulus électrique',
-  'Chaudière gaz',
-  'Ballon thermodynamique',
-  'Chauffe-eau solaire',
-]
-const CONDITIONS = ['Excellent état', 'Bon état général', 'Quelques rafraîchissements à prévoir', 'Rénovation récente']
+const EXPOSURES = [...LISTING_EXPOSURE_OPTIONS]
+const HEATINGS = [...LISTING_HEATING_TYPE_OPTIONS]
+const HOT_WATER = [...LISTING_HOT_WATER_TYPE_OPTIONS]
+const CONDITIONS = [...LISTING_GENERAL_CONDITION_OPTIONS]
 
 function pickGesFromDpe(seed: number, dpe: EnergyLetter): EnergyLetter {
   const idx = DPES.indexOf(dpe)

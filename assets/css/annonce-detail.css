@@ -364,30 +364,28 @@
   background: #6b6b6b;
 }
 
-.annonce-detail__energy-badge--A {
-  background: #319834;
+.annonce-detail__energy-badge--empty {
+  background: var(--color-surface-muted, #f0f0f0);
+  color: var(--color-text-muted);
+  font-weight: 600;
+  border: 1px solid var(--color-border);
 }
-.annonce-detail__energy-badge--B {
-  background: #52b44f;
-}
-.annonce-detail__energy-badge--C {
-  background: #c7d301;
-  color: #1a1a1a;
-}
-.annonce-detail__energy-badge--D {
-  background: #fde100;
-  color: #1a1a1a;
-}
-.annonce-detail__energy-badge--E {
-  background: #f7b500;
-  color: #1a1a1a;
-}
-.annonce-detail__energy-badge--F {
-  background: #ec6f00;
-}
-.annonce-detail__energy-badge--G {
-  background: #d81a1a;
-}
+
+.annonce-detail__energy-badge--dpe.annonce-detail__energy-badge--A { background: #009245; }
+.annonce-detail__energy-badge--dpe.annonce-detail__energy-badge--B { background: #52b848; color: #163a1f; }
+.annonce-detail__energy-badge--dpe.annonce-detail__energy-badge--C { background: #c7d300; color: #1a1a1a; }
+.annonce-detail__energy-badge--dpe.annonce-detail__energy-badge--D { background: #ffe600; color: #1a1a1a; }
+.annonce-detail__energy-badge--dpe.annonce-detail__energy-badge--E { background: #f6a11a; color: #1a1a1a; }
+.annonce-detail__energy-badge--dpe.annonce-detail__energy-badge--F { background: #f27c22; color: #1a1a1a; }
+.annonce-detail__energy-badge--dpe.annonce-detail__energy-badge--G { background: #e3001b; color: #fff; }
+
+.annonce-detail__energy-badge--ges.annonce-detail__energy-badge--A { background: #f6ecff; color: #32184f; }
+.annonce-detail__energy-badge--ges.annonce-detail__energy-badge--B { background: #e9d6ff; color: #32184f; }
+.annonce-detail__energy-badge--ges.annonce-detail__energy-badge--C { background: #d7b6ff; color: #31114f; }
+.annonce-detail__energy-badge--ges.annonce-detail__energy-badge--D { background: #c08dff; color: #2a0b47; }
+.annonce-detail__energy-badge--ges.annonce-detail__energy-badge--E { background: #aa6dff; color: #fff; }
+.annonce-detail__energy-badge--ges.annonce-detail__energy-badge--F { background: #8e44ff; color: #fff; }
+.annonce-detail__energy-badge--ges.annonce-detail__energy-badge--G { background: #6b00d7; color: #fff; }
 
 .annonce-detail__chips {
   display: flex;

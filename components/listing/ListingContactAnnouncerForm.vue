@@ -201,11 +201,19 @@
         </div>
       </div>
     </AppCenterModal>
+
+    <AppToast
+      :visible="sendToastVisible"
+      title="Message envoyé"
+      message="Votre message a bien été transmis."
+      variant="success"
+    />
   </form>
 </template>
 
 <script setup lang="ts">
 import AppCenterModal from '~/components/ui/AppCenterModal.vue'
+import AppToast from '~/components/ui/AppToast.vue'
 import { getAgencyById } from '~/data/agencies'
 import type { SearchListing } from '~/data/mock-listings'
 import { MOCK_LISTINGS } from '~/data/mock-listings'
@@ -242,6 +250,8 @@ function fid(base: string): string {
 
 const showPhoneModal = ref(false)
 const showSentModal = ref(false)
+const sendToastVisible = ref(false)
+let sendToastTimer: ReturnType<typeof setTimeout> | null = null
 const siteStore = useSiteStore()
 
 const phoneCountries = [
@@ -295,6 +305,14 @@ function onSubmit() {
     }
   }
   showSentModal.value = true
+  sendToastVisible.value = true
+  if (sendToastTimer) {
+    clearTimeout(sendToastTimer)
+  }
+  sendToastTimer = setTimeout(() => {
+    sendToastVisible.value = false
+    sendToastTimer = null
+  }, 3200)
 }
 
 function formatSuggestionPrice(l: SearchListing): string {
@@ -320,6 +338,13 @@ function contactSelectedSuggestion() {
     })
   }
   showSentModal.value = false
-  navigateTo('/compte?tab=messages')
+  sendToastVisible.value = true
+  if (sendToastTimer) {
+    clearTimeout(sendToastTimer)
+  }
+  sendToastTimer = setTimeout(() => {
+    sendToastVisible.value = false
+    sendToastTimer = null
+  }, 3200)
 }
 </script>

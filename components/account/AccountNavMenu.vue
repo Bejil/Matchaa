@@ -63,8 +63,8 @@ const emit = defineEmits<{
 
 const items = computed(() => [
   { id: 'recherches' as const, label: 'Recherches', icon: '🔎', count: props.recherchesCount, showBadge: true },
-  { id: 'favoris' as const, label: 'Favoris', icon: '★', count: props.favorisCount, showBadge: true },
-  { id: 'messages' as const, label: 'Messages', icon: '✉️', count: props.messagesCount, showBadge: true },
+  { id: 'favoris' as const, label: 'Favoris', icon: '❤️', count: props.favorisCount, showBadge: true },
+  { id: 'messages' as const, label: 'Messages', icon: '📩', count: props.messagesCount, showBadge: true },
   { id: 'parametres' as const, label: 'Paramètres', icon: '⚙️', count: 0, showBadge: false },
 ])
 

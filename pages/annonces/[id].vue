@@ -67,15 +67,15 @@
               </div>
               <div class="annonce-detail__spec">
                 <dt>Année</dt>
-                <dd>{{ listing.buildingYear }}</dd>
+                <dd>{{ listing.buildingYear ?? '—' }}</dd>
               </div>
               <div class="annonce-detail__spec">
                 <dt>Exposition</dt>
-                <dd>{{ listing.exposure }}</dd>
+                <dd>{{ listing.exposure || '—' }}</dd>
               </div>
               <div class="annonce-detail__spec">
                 <dt>État général</dt>
-                <dd>{{ listing.generalCondition }}</dd>
+                <dd>{{ listing.generalCondition || '—' }}</dd>
               </div>
             </dl>
           </section>
@@ -90,16 +90,20 @@
               <div class="annonce-detail__energy-item">
                 <span class="annonce-detail__energy-label">DPE — Consommation</span>
                 <span
+                  v-if="listing.dpe"
                   class="annonce-detail__energy-badge"
-                  :class="`annonce-detail__energy-badge--${listing.dpe}`"
+                  :class="[`annonce-detail__energy-badge--dpe`, `annonce-detail__energy-badge--${listing.dpe}`]"
                 >{{ listing.dpe }}</span>
+                <span v-else class="annonce-detail__energy-badge annonce-detail__energy-badge--empty">—</span>
               </div>
               <div class="annonce-detail__energy-item">
                 <span class="annonce-detail__energy-label">GES — Émissions</span>
                 <span
+                  v-if="listing.ges"
                   class="annonce-detail__energy-badge"
-                  :class="`annonce-detail__energy-badge--${listing.ges}`"
+                  :class="[`annonce-detail__energy-badge--ges`, `annonce-detail__energy-badge--${listing.ges}`]"
                 >{{ listing.ges }}</span>
+                <span v-else class="annonce-detail__energy-badge annonce-detail__energy-badge--empty">—</span>
               </div>
             </div>
           </section>
@@ -109,11 +113,11 @@
             <dl class="annonce-detail__specs">
               <div class="annonce-detail__spec">
                 <dt>Chauffage</dt>
-                <dd>{{ listing.heatingType }}</dd>
+                <dd>{{ listing.heatingType || '—' }}</dd>
               </div>
               <div class="annonce-detail__spec">
                 <dt>Eau chaude</dt>
-                <dd>{{ listing.hotWaterType }}</dd>
+                <dd>{{ listing.hotWaterType || '—' }}</dd>
               </div>
             </dl>
           </section>
@@ -293,7 +297,7 @@
                           <svg class="listing-card__meta-ic" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
                           </svg>
-                          <span>DPE {{ item.dpe }}</span>
+                          <span>DPE {{ item.dpe ?? '—' }}</span>
                         </li>
                       </ul>
                       <div class="listing-card__actions">
@@ -398,13 +402,25 @@ import { getAgencyById } from '~/data/agencies'
 import { editoArticles } from '~/data/articles'
 import type { SearchListing } from '~/data/mock-listings'
 import { MOCK_LISTINGS } from '~/data/mock-listings'
-import { labelForPropertyType, LISTING_FEATURE_OPTIONS } from '~/data/property-types'
+import { ALL_PROPERTY_TYPE_SLUGS, labelForPropertyType, LISTING_FEATURE_OPTIONS, type PropertyTypeSlug } from '~/data/property-types'
 import { pickRelatedEditoArticles, pickSimilarListings } from '~/utils/annonce-detail-related'
 
 const route = useRoute()
-const id = computed(() => Number(route.params.id))
+const siteStore = useSiteStore()
+const routeListingId = computed(() => String(route.params.id ?? ''))
+const numericListingId = computed(() => Number(routeListingId.value))
 
-const listing = computed(() => MOCK_LISTINGS.find((l) => l.id === id.value))
+const listing = computed(() => {
+  const fromMock = MOCK_LISTINGS.find((l) => l.id === numericListingId.value)
+  if (fromMock) {
+    return fromMock
+  }
+  const pro = siteStore.currentProAgencyListings.find((l) => l.id === routeListingId.value)
+  if (!pro) {
+    return undefined
+  }
+  return proToSearchListing(pro)
+})
 
 const agency = computed(() => (listing.value ? getAgencyById(listing.value.agencyId) : undefined))
 
@@ -423,6 +439,10 @@ function openContactSimilarModal(item: SearchListing) {
   contactSimilarListing.value = item
   contactSimilarModalOpen.value = true
 }
+
+onMounted(() => {
+  siteStore.hydrateProSession()
+})
 
 function featureLabel(idFeat: string): string {
   const o = LISTING_FEATURE_OPTIONS.find((f) => f.id === idFeat)
@@ -453,6 +473,131 @@ function pricePerSqm(l: SearchListing): string {
   }
   const m = Math.round(l.price / l.surface)
   return `${m.toLocaleString('fr-FR')} € / m²`
+}
+
+function normalizePropertyType(input: string): SearchListing['propertyType'] {
+  const value = input.trim().toLowerCase()
+  if ((ALL_PROPERTY_TYPE_SLUGS as readonly string[]).includes(value)) {
+    return value as PropertyTypeSlug
+  }
+  if (value.includes('studio')) {
+    return 'studio'
+  }
+  if (value.includes('loft')) {
+    return 'loft'
+  }
+  if (value.includes('duplex')) {
+    return 'duplex'
+  }
+  if (value.includes('villa')) {
+    return 'villa'
+  }
+  if (value.includes('chalet')) {
+    return 'chalet'
+  }
+  if (value.includes('terrain')) {
+    return 'terrain'
+  }
+  if (value.includes('parking')) {
+    return 'parking'
+  }
+  if (value.includes('peniche')) {
+    return 'peniche'
+  }
+  if (value.includes('bateau')) {
+    return 'bateau'
+  }
+  if (value.includes('chateau')) {
+    return 'chateau'
+  }
+  if (value.includes('moulin')) {
+    return 'moulin'
+  }
+  if (value.includes('maison')) {
+    return 'maison'
+  }
+  return 'appartement'
+}
+
+function listingSeedFromId(id: string): number {
+  let hash = 0
+  for (let i = 0; i < id.length; i += 1) {
+    hash = ((hash << 5) - hash) + id.charCodeAt(i)
+    hash |= 0
+  }
+  return Math.abs(hash)
+}
+
+function proToSearchListing(input: {
+  id: string
+  projectType: 'acheter' | 'louer'
+  bedrooms: number
+  dpe: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | null
+  ges: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | null
+  features: string[]
+  images: string[]
+  description: string
+  publishedAt: string
+  relevanceScore: number
+  ref: string
+  floor: number | null
+  totalFloors: number | null
+  buildingYear: number | null
+  chargesMonthly: number | null
+  propertyTaxAnnual: number | null
+  coproLots: number | null
+  coproAnnualCharges: number | null
+  coproSharePerMille: number | null
+  exposure: string
+  heatingType: string
+  hotWaterType: string
+  generalCondition: string
+  furnished: boolean | null
+  title: string
+  city: string
+  propertyType: string
+  price: number
+  surface: number
+  rooms: number
+}): SearchListing {
+  const seed = listingSeedFromId(input.id)
+  return {
+    id: 100000 + (seed % 899999),
+    projet: input.projectType,
+    propertyType: normalizePropertyType(input.propertyType),
+    title: input.title,
+    city: input.city,
+    price: input.price,
+    surface: input.surface,
+    rooms: input.rooms,
+    bedrooms: input.bedrooms,
+    dpe: input.dpe,
+    ges: input.ges,
+    features: input.features.filter((f): f is SearchListing['features'][number] => typeof f === 'string') as SearchListing['features'],
+    images: input.images.length
+      ? input.images
+      : [
+        'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
+      ],
+    description: input.description,
+    publishedAt: input.publishedAt,
+    relevanceScore: input.relevanceScore ?? 1,
+    ref: input.ref || `PRO-${seed.toString().slice(0, 6)}`,
+    floor: input.floor,
+    totalFloors: input.totalFloors,
+    buildingYear: input.buildingYear,
+    chargesMonthly: input.chargesMonthly,
+    propertyTaxAnnual: input.propertyTaxAnnual,
+    coproLots: input.coproLots,
+    coproAnnualCharges: input.coproAnnualCharges,
+    coproSharePerMille: input.coproSharePerMille,
+    exposure: input.exposure,
+    heatingType: input.heatingType,
+    hotWaterType: input.hotWaterType,
+    generalCondition: input.generalCondition,
+    furnished: input.furnished,
+    agencyId: 1,
+  }
 }
 
 useHead({

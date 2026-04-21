@@ -30,7 +30,7 @@
               placeholder="Laisser vide pour ne pas changer"
             >
 
-            <button type="submit" class="profil-account__btn profil-account__btn--ghost">Enregistrer</button>
+            <button type="submit" class="profil-account__btn profil-account__btn--primary">Enregistrer</button>
           </form>
           <p v-if="settingsFeedback" class="compte-settings__feedback" role="status">{{ settingsFeedback }}</p>
           <div class="profil-account__actions">
@@ -89,6 +89,7 @@ watch(
   },
   { immediate: true },
 )
+
 
 function onSaveProSettings() {
   if (!pro.value) {

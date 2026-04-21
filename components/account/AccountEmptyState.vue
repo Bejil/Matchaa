@@ -13,16 +13,43 @@
     </div>
     <h3 class="account-empty__title">{{ title }}</h3>
     <p class="account-empty__text">{{ text }}</p>
-    <NuxtLink to="/annonces" class="account-empty__cta">
-      Nouvelle recherche
-    </NuxtLink>
+    <template v-if="!hideCta">
+      <button
+        v-if="ctaAsButton"
+        type="button"
+        class="account-empty__cta"
+        :disabled="ctaDisabled"
+        @click="emit('cta')"
+      >
+        {{ ctaLabel }}
+      </button>
+      <NuxtLink v-else :to="ctaTo" class="account-empty__cta">
+        {{ ctaLabel }}
+      </NuxtLink>
+    </template>
   </section>
 </template>
 
 <script setup lang="ts">
-defineProps<{
+withDefaults(defineProps<{
   title: string
   text: string
+  ctaLabel?: string
+  ctaTo?: string
+  ctaAsButton?: boolean
+  ctaDisabled?: boolean
+  /** Masque le bouton / lien d’action (texte + illustration seuls). */
+  hideCta?: boolean
+}>(), {
+  ctaLabel: 'Nouvelle recherche',
+  ctaTo: '/annonces',
+  ctaAsButton: false,
+  ctaDisabled: false,
+  hideCta: false,
+})
+
+const emit = defineEmits<{
+  cta: []
 }>()
 </script>
 
@@ -58,15 +85,26 @@ defineProps<{
   justify-content: center;
   padding: 0.62rem 0.95rem;
   border-radius: 0.5rem;
+  border: 1px solid var(--color-accent-soft-border);
   background: var(--color-accent);
   color: #fff;
+  font: inherit;
+  line-height: 1;
   text-decoration: none;
   font-weight: 700;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .account-empty__cta:hover {
   background: var(--color-accent-hover);
   color: #fff;
   text-decoration: none;
+}
+
+.account-empty__cta:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

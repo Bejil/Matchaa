@@ -158,7 +158,7 @@
                       <svg class="listing-card__meta-ic" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
                       </svg>
-                      <span>DPE {{ item.dpe }}</span>
+                      <span>DPE {{ item.dpe ?? '—' }}</span>
                     </li>
                   </ul>
                   <div class="listing-card__actions">

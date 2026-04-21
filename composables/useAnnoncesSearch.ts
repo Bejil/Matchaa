@@ -123,6 +123,9 @@ export function parseAnnoncesQuery(q: LocationQuery): AnnoncesParsedQuery {
 }
 
 function dpeAtMost(listingDpe: SearchListing['dpe'], maxAcceptable: (typeof DPE_ORDER)[number]): boolean {
+  if (listingDpe === null) {
+    return false
+  }
   return DPE_ORDER.indexOf(listingDpe) <= DPE_ORDER.indexOf(maxAcceptable)
 }
 

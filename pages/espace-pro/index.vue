@@ -99,8 +99,30 @@
           <article class="profil-auth__card" aria-labelledby="pro-register-title">
             <h2 id="pro-register-title" class="profil-auth__card-title">Créer un compte professionnel</h2>
             <form class="profil-auth__form" @submit.prevent="onProRegisterSubmit">
-              <label class="profil-auth__label" for="pro-register-company">Raison sociale</label>
-              <input id="pro-register-company" v-model.trim="registerCompany" class="profil-auth__input" type="text" autocomplete="organization" required>
+              <span class="profil-auth__label">Je suis</span>
+              <div class="pro-register-role">
+                <label class="pro-register-role__option">
+                  <input v-model="registerRole" type="radio" value="agent">
+                  Agent d'agence
+                </label>
+                <label class="pro-register-role__option">
+                  <input v-model="registerRole" type="radio" value="manager">
+                  Gestionnaire d'agence
+                </label>
+              </div>
+
+              <template v-if="registerRole === 'manager'">
+                <label class="profil-auth__label" for="pro-register-company">Raison sociale</label>
+                <input id="pro-register-company" v-model.trim="registerCompany" class="profil-auth__input" type="text" autocomplete="organization" required>
+              </template>
+              <template v-else>
+                <label class="profil-auth__label" for="pro-register-agency">Agence de rattachement</label>
+                <select id="pro-register-agency" v-model="registerAgencyId" class="profil-auth__input" required>
+                  <option v-for="agency in agencies" :key="agency.id" :value="agency.id">
+                    {{ agency.name }}
+                  </option>
+                </select>
+              </template>
 
               <label class="profil-auth__label" for="pro-register-name">Nom du contact</label>
               <input id="pro-register-name" v-model.trim="registerName" class="profil-auth__input" type="text" autocomplete="name" required>
@@ -159,8 +181,11 @@ const registerCompany = ref('')
 const registerName = ref('')
 const registerEmail = ref('')
 const registerPassword = ref('')
+const registerRole = ref<'agent' | 'manager'>('agent')
+const registerAgencyId = ref('')
 
 const feedback = ref('')
+const agencies = computed(() => siteStore.proAgencies)
 
 function onProLoginSubmit() {
   const ok = siteStore.loginPro(loginEmail.value, loginPassword.value)
@@ -181,12 +206,18 @@ function onProRegisterSubmit() {
     feedback.value = 'Choisissez un mot de passe d’au moins 4 caractères (maquette).'
     return
   }
-  siteStore.createDemoProAccount(
-    registerCompany.value,
-    registerName.value,
-    registerEmail.value,
-    registerPassword.value,
-  )
+  if (registerRole.value === 'agent' && !registerAgencyId.value) {
+    feedback.value = 'Sélectionnez une agence pour créer un compte agent.'
+    return
+  }
+  siteStore.createDemoProAccount({
+    role: registerRole.value,
+    agencyName: registerRole.value === 'manager' ? registerCompany.value : undefined,
+    agencyId: registerRole.value === 'agent' ? registerAgencyId.value : undefined,
+    contactName: registerName.value,
+    email: registerEmail.value,
+    password: registerPassword.value,
+  })
   feedback.value = `Espace créé pour ${siteStore.currentProUser?.companyName}. Redirection…`
   router.push('/espace-pro/dashboard')
 }
@@ -198,6 +229,9 @@ useHead({
 onMounted(() => {
   siteStore.hydrateSession()
   siteStore.hydrateProSession()
+  if (!registerAgencyId.value) {
+    registerAgencyId.value = agencies.value[0]?.id ?? ''
+  }
   if (siteStore.currentProUser) {
     router.replace('/espace-pro/dashboard')
   }

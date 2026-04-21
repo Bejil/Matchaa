@@ -165,7 +165,7 @@
                           <svg class="listing-card__meta-ic" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
                           </svg>
-                          <span>DPE {{ item.dpe }}</span>
+                          <span>DPE {{ item.dpe ?? '—' }}</span>
                         </li>
                       </ul>
                       <div class="listing-card__actions">
@@ -311,10 +311,8 @@
               <label class="compte-settings__label" for="settings-password">Nouveau mot de passe</label>
               <input id="settings-password" v-model="settingsPassword" class="compte-settings__input" type="password" placeholder="Laisser vide pour ne pas changer">
 
-              <button type="submit" class="profil-account__btn profil-account__btn--ghost">Enregistrer</button>
+              <button type="submit" class="profil-account__btn profil-account__btn--primary">Enregistrer</button>
             </form>
-            <p v-if="settingsFeedback" class="compte-settings__feedback" role="status">{{ settingsFeedback }}</p>
-
             <div class="profil-account__actions">
               <button type="button" class="profil-account__btn profil-account__btn--danger" @click="onLogout">
                 Se deconnecter
@@ -386,12 +384,20 @@
           :agency-phone-tel="getAgencyById(contactListing.agencyId)?.phoneTel"
         />
       </AppCenterModal>
+
+      <AppToast
+        :visible="settingsToastVisible"
+        title="Profil mis à jour"
+        message="Paramètres mis à jour."
+        variant="success"
+      />
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
 import AppCenterModal from '~/components/ui/AppCenterModal.vue'
+import AppToast from '~/components/ui/AppToast.vue'
 import AccountEmptyState from '~/components/account/AccountEmptyState.vue'
 import AccountNavMenu from '~/components/account/AccountNavMenu.vue'
 import ListingCardFavoriteBtn from '~/components/listing/ListingCardFavoriteBtn.vue'
@@ -422,7 +428,8 @@ const showDeleteSearchesConfirm = ref(false)
 const showDeleteMessagesConfirm = ref(false)
 const searchToDeleteId = ref<string | null>(null)
 const messageToDeleteId = ref<string | null>(null)
-const settingsFeedback = ref('')
+const settingsToastVisible = ref(false)
+let settingsToastTimer: ReturnType<typeof setTimeout> | null = null
 const contactModalOpen = ref(false)
 const contactListing = ref<SearchListing | null>(null)
 
@@ -525,7 +532,14 @@ function onLogout() {
 function onSaveSettings() {
   siteStore.updateProfile(settingsName.value, settingsEmail.value)
   settingsPassword.value = ''
-  settingsFeedback.value = 'Paramètres mis à jour.'
+  settingsToastVisible.value = true
+  if (settingsToastTimer) {
+    clearTimeout(settingsToastTimer)
+  }
+  settingsToastTimer = setTimeout(() => {
+    settingsToastVisible.value = false
+    settingsToastTimer = null
+  }, 3200)
 }
 
 function onDeleteAccount() {
