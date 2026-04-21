@@ -7,9 +7,9 @@
       </NuxtLink>
 
       <nav class="header__nav header__nav--primary" aria-label="Navigation principale">
-        <NuxtLink to="/edito" class="header__link">Conseils & actualités</NuxtLink>
-        <NuxtLink to="/annonces?projet=acheter" class="header__link">Acheter</NuxtLink>
-        <NuxtLink to="/annonces?projet=louer" class="header__link">Louer</NuxtLink>
+        <NuxtLink to="/edito" class="header__link" :class="{ 'is-active': navEditoActive }">Conseils & actualités</NuxtLink>
+        <NuxtLink to="/annonces?projet=acheter" class="header__link" :class="{ 'is-active': navAcheterActive }">Acheter</NuxtLink>
+        <NuxtLink to="/annonces?projet=louer" class="header__link" :class="{ 'is-active': navLouerActive }">Louer</NuxtLink>
       </nav>
 
       <span class="header__divider" aria-hidden="true" />
@@ -24,6 +24,7 @@
           <NuxtLink
             :to="accountLink"
             class="header__link header__link--muted"
+            :class="{ 'is-active': accountNavActive }"
             @focus="openAccountMenu"
           >
             <svg class="header__account-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -48,10 +49,15 @@
             />
           </div>
         </div>
-        <NuxtLink v-else :to="accountLink" class="header__link header__link--muted">
+        <NuxtLink
+          v-else
+          :to="accountLink"
+          class="header__link header__link--muted"
+          :class="{ 'is-active': accountNavActive }"
+        >
           Se connecter
         </NuxtLink>
-        <NuxtLink to="/espace-pro" class="header__link header__link--cta">Espace Pro</NuxtLink>
+        <NuxtLink :to="espaceProLink" class="header__link header__link--cta">Espace Pro</NuxtLink>
       </nav>
     </div>
   </header>
@@ -60,9 +66,58 @@
 <script setup lang="ts">
 import AccountNavMenu from '~/components/account/AccountNavMenu.vue'
 import logoSrc from '~/assets/images/logo.svg'
+import { MOCK_LISTINGS } from '~/data/mock-listings'
 
+const route = useRoute()
 const siteStore = useSiteStore()
 const favoritesStore = useFavoritesStore()
+
+function queryProjetValue(): string | undefined {
+  const raw = route.query.projet
+  if (typeof raw === 'string') {
+    return raw
+  }
+  if (Array.isArray(raw) && typeof raw[0] === 'string') {
+    return raw[0]
+  }
+  return undefined
+}
+
+const navEditoActive = computed(() => route.path.startsWith('/edito'))
+
+function annonceDetailProjet(): 'acheter' | 'louer' | undefined {
+  if (route.path === '/annonces' || !route.path.startsWith('/annonces/')) {
+    return undefined
+  }
+  const raw = route.params.id
+  const idStr = Array.isArray(raw) ? raw[0] : raw
+  if (typeof idStr !== 'string') {
+    return undefined
+  }
+  const id = Number(idStr)
+  if (!Number.isFinite(id)) {
+    return undefined
+  }
+  return MOCK_LISTINGS.find((l) => l.id === id)?.projet
+}
+
+const navAcheterActive = computed(() => {
+  if (route.path === '/annonces') {
+    return queryProjetValue() === 'acheter'
+  }
+  return annonceDetailProjet() === 'acheter'
+})
+
+const navLouerActive = computed(() => {
+  if (route.path === '/annonces') {
+    return queryProjetValue() === 'louer'
+  }
+  return annonceDetailProjet() === 'louer'
+})
+
+const accountNavActive = computed(
+  () => route.path.startsWith('/profil') || route.path.startsWith('/compte'),
+)
 const siteName = computed(() => siteStore.siteName)
 const currentUser = computed(() => siteStore.currentUser)
 const accountLink = computed(() => (currentUser.value ? '/compte' : '/profil'))
@@ -83,8 +138,13 @@ function onSelectAccountMenuItem() {
   closeAccountMenu()
 }
 
+const espaceProLink = computed(() =>
+  siteStore.currentProUser ? '/espace-pro/dashboard' : '/espace-pro',
+)
+
 onMounted(() => {
   siteStore.hydrateSession()
+  siteStore.hydrateProSession()
   favoritesStore.loadFromStorage()
 })
 </script>

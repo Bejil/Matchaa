@@ -9,6 +9,7 @@ export default defineNuxtConfig({
     '~/assets/css/header.css',
     '~/assets/css/footer.css',
     '~/assets/css/layout.css',
+    '~/assets/css/pro-layout.css',
     '~/assets/css/hero.css',
     '~/assets/css/home-hero.css',
     '~/assets/css/infos.css',

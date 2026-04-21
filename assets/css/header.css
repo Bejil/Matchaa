@@ -53,6 +53,26 @@
   flex-shrink: 0;
 }
 
+.header__nav--primary .header__link {
+  padding: 0.15rem 0;
+  border-bottom: 2px solid transparent;
+}
+
+.header__nav--primary .header__link.is-active {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+}
+
+.header__nav--account .header__link--muted {
+  padding: 0.15rem 0;
+  border-bottom: 2px solid transparent;
+}
+
+.header__nav--account .header__link--muted.is-active {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+}
+
 .header__divider {
   flex: 1;
   min-width: 1rem;

@@ -23,18 +23,60 @@ export const useSiteStore = defineStore('site', () => {
     password: string
   }
 
+  type DemoProUser = {
+    /** Raison sociale affichée dans l’espace pro. */
+    companyName: string
+    /** Personne de contact. */
+    name: string
+    email: string
+    password: string
+  }
+
   const DEMO_USERS: DemoUser[] = [
     { name: 'Thomas Blutard', email: 'tblutard@yopmail.com', password: 'demo' },
     { name: 'Sylvie Esse', email: 'sesse@yopmail.com', password: 'demo' },
     { name: 'Martin Tamard', email: 'ttamard@yopmail.com', password: 'demo' },
   ]
+
+  /** Comptes démo réservés à l’espace pro (emails distincts des comptes publics). */
+  const DEMO_PRO_USERS: DemoProUser[] = [
+    {
+      companyName: 'Agence Test Matchaa',
+      name: 'Compte Test',
+      email: 'test.pro@matchaa.demo',
+      password: 'matchaa-pro-test',
+    },
+    {
+      companyName: 'Agence Les Toits Verts',
+      name: 'Camille Marchand',
+      email: 'pro.toitsverts@matchaa.demo',
+      password: 'pro-demo',
+    },
+    {
+      companyName: 'Immobilier Central',
+      name: 'Julien Paret',
+      email: 'julien.paret@immo-central.demo',
+      password: 'pro-demo',
+    },
+  ]
+
   const SESSION_KEY = 'matchaa-demo-session'
+  const PRO_SESSION_KEY = 'matchaa-pro-demo-session'
+  const PRO_REGISTRATIONS_KEY = 'matchaa-pro-demo-registrations'
+
+  type ProRegistration = {
+    companyName: string
+    name: string
+    email: string
+    password: string
+  }
   const SEARCHES_KEY_PREFIX = 'matchaa-saved-searches'
   const LATEST_SEARCH_KEY_PREFIX = 'matchaa-latest-search'
   const MESSAGES_KEY_PREFIX = 'matchaa-sent-messages'
 
   const siteName = ref('Matchaa')
   const currentUser = ref<Pick<DemoUser, 'name' | 'email'> | null>(null)
+  const currentProUser = ref<Pick<DemoProUser, 'name' | 'email' | 'companyName'> | null>(null)
   const savedSearches = ref<SavedSearch[]>([])
   const latestSearch = ref<SavedSearch | null>(null)
   const sentMessages = ref<SentMessage[]>([])
@@ -177,6 +219,12 @@ export const useSiteStore = defineStore('site', () => {
   function login(email: string, password: string): boolean {
     const e = email.trim().toLowerCase()
     const p = password.trim()
+    const isProCredential = DEMO_PRO_USERS.some(
+      (u) => u.email.toLowerCase() === e && u.password === p,
+    )
+    if (isProCredential) {
+      return false
+    }
     const found = DEMO_USERS.find((u) => u.email.toLowerCase() === e && u.password === p)
     if (!found) {
       return false
@@ -203,6 +251,122 @@ export const useSiteStore = defineStore('site', () => {
     loadSentMessages()
   }
 
+  function loadProRegistrations(): ProRegistration[] {
+    if (!import.meta.client) {
+      return []
+    }
+    try {
+      const raw = localStorage.getItem(PRO_REGISTRATIONS_KEY)
+      if (!raw) {
+        return []
+      }
+      const parsed = JSON.parse(raw) as unknown
+      if (!Array.isArray(parsed)) {
+        return []
+      }
+      return parsed.filter(
+        (r): r is ProRegistration =>
+          Boolean(
+            r
+            && typeof (r as ProRegistration).companyName === 'string'
+            && typeof (r as ProRegistration).name === 'string'
+            && typeof (r as ProRegistration).email === 'string'
+            && typeof (r as ProRegistration).password === 'string',
+          ),
+      )
+    } catch {
+      return []
+    }
+  }
+
+  function persistProRegistrations(list: ProRegistration[]) {
+    if (!import.meta.client) {
+      return
+    }
+    try {
+      localStorage.setItem(PRO_REGISTRATIONS_KEY, JSON.stringify(list))
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function loginPro(email: string, password: string): boolean {
+    const e = email.trim().toLowerCase()
+    const p = password.trim()
+    const isPublicCredential = DEMO_USERS.some(
+      (u) => u.email.toLowerCase() === e && u.password === p,
+    )
+    if (isPublicCredential) {
+      return false
+    }
+    const fromDemo = DEMO_PRO_USERS.find((u) => u.email.toLowerCase() === e && u.password === p)
+    if (fromDemo) {
+      currentProUser.value = {
+        companyName: fromDemo.companyName,
+        name: fromDemo.name,
+        email: fromDemo.email,
+      }
+      if (import.meta.client) {
+        localStorage.setItem(PRO_SESSION_KEY, JSON.stringify(currentProUser.value))
+      }
+      return true
+    }
+    const registered = loadProRegistrations().find(
+      (u) => u.email.toLowerCase() === e && u.password === p,
+    )
+    if (!registered) {
+      return false
+    }
+    currentProUser.value = {
+      companyName: registered.companyName,
+      name: registered.name,
+      email: registered.email,
+    }
+    if (import.meta.client) {
+      localStorage.setItem(PRO_SESSION_KEY, JSON.stringify(currentProUser.value))
+    }
+    return true
+  }
+
+  function createDemoProAccount(companyName: string, contactName: string, email: string, password: string) {
+    const nextCompany = companyName.trim() || 'Structure professionnelle'
+    const nextName = contactName.trim() || 'Contact'
+    const nextEmail = email.trim().toLowerCase()
+    const nextPassword = password.trim()
+    currentProUser.value = {
+      companyName: nextCompany,
+      name: nextName,
+      email: nextEmail,
+    }
+    if (import.meta.client) {
+      localStorage.setItem(PRO_SESSION_KEY, JSON.stringify(currentProUser.value))
+      const list = loadProRegistrations().filter((r) => r.email.toLowerCase() !== nextEmail)
+      list.push({
+        companyName: nextCompany,
+        name: nextName,
+        email: nextEmail,
+        password: nextPassword,
+      })
+      persistProRegistrations(list)
+    }
+  }
+
+  function logoutPro() {
+    currentProUser.value = null
+    if (import.meta.client) {
+      localStorage.removeItem(PRO_SESSION_KEY)
+    }
+  }
+
+  function deleteProAccount() {
+    if (currentProUser.value && import.meta.client) {
+      const email = currentProUser.value.email.toLowerCase()
+      const next = loadProRegistrations().filter((r) => r.email.toLowerCase() !== email)
+      persistProRegistrations(next)
+    }
+    logoutPro()
+  }
+
   function logout() {
     currentUser.value = null
     savedSearches.value = []
@@ -225,6 +389,36 @@ export const useSiteStore = defineStore('site', () => {
     }
   }
 
+  function updateProProfile(companyName: string, name: string, email: string, password: string) {
+    if (!currentProUser.value) {
+      return
+    }
+    const prevEmail = currentProUser.value.email.toLowerCase()
+    const nextCompany = companyName.trim() || currentProUser.value.companyName
+    const nextName = name.trim() || currentProUser.value.name
+    const nextEmail = email.trim().toLowerCase() || currentProUser.value.email
+    const nextPassword = password.trim()
+
+    currentProUser.value = {
+      companyName: nextCompany,
+      name: nextName,
+      email: nextEmail,
+    }
+
+    if (import.meta.client) {
+      localStorage.setItem(PRO_SESSION_KEY, JSON.stringify(currentProUser.value))
+      const list = loadProRegistrations().filter((r) => r.email.toLowerCase() !== prevEmail)
+      const existing = loadProRegistrations().find((r) => r.email.toLowerCase() === prevEmail)
+      list.push({
+        companyName: nextCompany,
+        name: nextName,
+        email: nextEmail,
+        password: nextPassword || existing?.password || 'pro-demo',
+      })
+      persistProRegistrations(list)
+    }
+  }
+
   function deleteAccount() {
     logout()
   }
@@ -244,6 +438,43 @@ export const useSiteStore = defineStore('site', () => {
         loadSavedSearches()
         loadLatestSearch()
         loadSentMessages()
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function matchesProDemoCredentials(email: string, password: string): boolean {
+    const e = email.trim().toLowerCase()
+    const p = password.trim()
+    return DEMO_PRO_USERS.some((u) => u.email.toLowerCase() === e && u.password === p)
+  }
+
+  function matchesPublicDemoCredentials(email: string, password: string): boolean {
+    const e = email.trim().toLowerCase()
+    const p = password.trim()
+    return DEMO_USERS.some((u) => u.email.toLowerCase() === e && u.password === p)
+  }
+
+  function hydrateProSession() {
+    if (!import.meta.client || currentProUser.value) {
+      return
+    }
+    try {
+      const raw = localStorage.getItem(PRO_SESSION_KEY)
+      if (!raw) {
+        return
+      }
+      const parsed = JSON.parse(raw) as Partial<Pick<DemoProUser, 'name' | 'email' | 'companyName'>>
+      if (parsed?.name && parsed?.email) {
+        currentProUser.value = {
+          name: parsed.name,
+          email: parsed.email,
+          companyName:
+            typeof parsed.companyName === 'string' && parsed.companyName.trim()
+              ? parsed.companyName.trim()
+              : parsed.name,
+        }
       }
     } catch {
       /* ignore */
@@ -308,12 +539,21 @@ export const useSiteStore = defineStore('site', () => {
   return {
     siteName,
     currentUser,
+    currentProUser,
     login,
+    loginPro,
     createDemoAccount,
+    createDemoProAccount,
     updateProfile,
+    updateProProfile,
     logout,
+    logoutPro,
+    deleteProAccount,
     deleteAccount,
     hydrateSession,
+    hydrateProSession,
+    matchesProDemoCredentials,
+    matchesPublicDemoCredentials,
     savedSearches,
     latestSearch,
     saveLatestSearch,

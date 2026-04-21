@@ -10,41 +10,78 @@
           </p>
         </header>
 
-        <section class="profil-auth__usp" aria-label="Avantages utilisateur">
-          <article class="profil-auth__usp-card">
-            <p class="profil-auth__usp-kicker">Expérience personnalisée</p>
-            <ul class="profil-auth__usp-list">
-              <li>
-                <span class="profil-auth__usp-ic" aria-hidden="true">🧭</span>
-                Reprenez votre navigation exactement la ou vous l'avez laissee.
-              </li>
-              <li>
-                <span class="profil-auth__usp-ic" aria-hidden="true">📬</span>
-                Suivez vos demandes de contact depuis un seul espace.
-              </li>
-              <li>
-                <span class="profil-auth__usp-ic" aria-hidden="true">⏱️</span>
-                Gagnez du temps avec vos criteres memorises automatiquement.
-              </li>
-            </ul>
-          </article>
-          <article class="profil-auth__usp-card">
-            <p class="profil-auth__usp-kicker">Pourquoi creer un compte ?</p>
-            <ul class="profil-auth__usp-list">
-              <li>
-                <span class="profil-auth__usp-ic" aria-hidden="true">★</span>
-                Sauvegarde instantanee de vos annonces favorites.
-              </li>
-              <li>
-                <span class="profil-auth__usp-ic" aria-hidden="true">⚡</span>
-                Alertes ciblees selon votre budget et vos criteres.
-              </li>
-              <li>
-                <span class="profil-auth__usp-ic" aria-hidden="true">🔒</span>
-                Espace prive pour suivre vos demandes envoyees.
-              </li>
-            </ul>
-          </article>
+        <section class="profil-auth__usp" aria-label="Avantages Matchaa">
+          <ul class="profil-auth__usp-grid">
+            <li class="profil-auth__usp-item">
+              <div class="profil-auth__usp-item-icon" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
+                </svg>
+              </div>
+              <div class="profil-auth__usp-item-body">
+                <span class="profil-auth__usp-item-title">Reprise de navigation</span>
+                <span class="profil-auth__usp-item-text">Reprenez votre recherche exactement là où vous l’avez laissée.</span>
+              </div>
+            </li>
+            <li class="profil-auth__usp-item">
+              <div class="profil-auth__usp-item-icon" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                  <polyline points="22,6 12,13 2,6" />
+                </svg>
+              </div>
+              <div class="profil-auth__usp-item-body">
+                <span class="profil-auth__usp-item-title">Messages centralisés</span>
+                <span class="profil-auth__usp-item-text">Suivez vos demandes de contact depuis un seul tableau de bord.</span>
+              </div>
+            </li>
+            <li class="profil-auth__usp-item">
+              <div class="profil-auth__usp-item-icon" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                </svg>
+              </div>
+              <div class="profil-auth__usp-item-body">
+                <span class="profil-auth__usp-item-title">Critères mémorisés</span>
+                <span class="profil-auth__usp-item-text">Vos filtres sont sauvegardés automatiquement entre les visites.</span>
+              </div>
+            </li>
+            <li class="profil-auth__usp-item">
+              <div class="profil-auth__usp-item-icon" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                </svg>
+              </div>
+              <div class="profil-auth__usp-item-body">
+                <span class="profil-auth__usp-item-title">Favoris</span>
+                <span class="profil-auth__usp-item-text">Mettez de côté les annonces qui comptent, retrouvez-les en un clic.</span>
+              </div>
+            </li>
+            <li class="profil-auth__usp-item">
+              <div class="profil-auth__usp-item-icon" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+              </div>
+              <div class="profil-auth__usp-item-body">
+                <span class="profil-auth__usp-item-title">Alertes sur mesure</span>
+                <span class="profil-auth__usp-item-text">Soyez averti lorsque de nouvelles annonces correspondent à votre projet.</span>
+              </div>
+            </li>
+            <li class="profil-auth__usp-item">
+              <div class="profil-auth__usp-item-icon" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+              </div>
+              <div class="profil-auth__usp-item-body">
+                <span class="profil-auth__usp-item-title">Espace personnel</span>
+                <span class="profil-auth__usp-item-text">Un lieu privé pour piloter vos échanges et vos recherches.</span>
+              </div>
+            </li>
+          </ul>
         </section>
 
         <div class="profil-auth__grid">
@@ -148,6 +185,10 @@ const feedback = ref('')
 function onLoginSubmit() {
   const ok = siteStore.login(loginEmail.value, loginPassword.value)
   if (!ok) {
+    if (siteStore.matchesProDemoCredentials(loginEmail.value, loginPassword.value)) {
+      feedback.value = 'Ce compte est réservé aux professionnels. Connectez-vous depuis Espace Pro.'
+      return
+    }
     feedback.value = 'Identifiants invalides. Utilisez un compte de démonstration.'
     return
   }

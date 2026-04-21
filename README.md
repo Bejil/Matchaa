@@ -28,6 +28,15 @@ Vous pouvez utiliser les comptes suivants pour tester la connexion :
    - Email : `ttamard@yopmail.com`
    - Mot de passe : `demo`
 
+## Compte professionnel (Espace Pro)
+
+Connexion sur `/espace-pro` (session distincte des comptes particuliers ci-dessus) :
+
+- **Email** : `test.pro@matchaa.demo`
+- **Mot de passe** : `matchaa-pro-test`
+
+D’autres comptes de démonstration pro sont définis dans `stores/site.ts` (`DEMO_PRO_USERS`).
+
 ## Notes
 
 - Les donnees sont fictives et destinees a la demonstration.
