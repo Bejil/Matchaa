@@ -98,6 +98,14 @@
   width: min(45vw, calc(100vw - 2rem));
 }
 
+.app-center-modal--preview {
+  width: min(70vw, calc(100vw - 2rem));
+}
+
+.app-center-modal--preview .app-center-modal__body {
+  padding: 0;
+}
+
 @media (max-width: 480px) {
   .app-center-modal {
     width: calc(100vw - 1.25rem);

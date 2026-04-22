@@ -80,14 +80,22 @@
             <label class="annonces-sort pro-listing-toolbar__sort">
               <span class="annonces-sort__label">Trier par</span>
               <select v-model="sortBy" class="annonces-sort__select">
-                <option value="pertinence">Pertinence</option>
-                <option value="prix_asc">Prix — croissant</option>
-                <option value="prix_desc">Prix — décroissant</option>
-                <option value="date">Date de publication</option>
-                <option value="surface_asc">Surface — croissant</option>
-                <option value="surface_desc">Surface — décroissant</option>
-                <option value="pieces_asc">Pièces — croissant</option>
-                <option value="pieces_desc">Pièces — décroissant</option>
+                <optgroup label="Classique">
+                  <option value="pertinence">Pertinence</option>
+                  <option value="prix_asc">Prix — croissant</option>
+                  <option value="prix_desc">Prix — décroissant</option>
+                  <option value="date">Date de publication</option>
+                  <option value="surface_asc">Surface — croissant</option>
+                  <option value="surface_desc">Surface — décroissant</option>
+                  <option value="pieces_asc">Pièces — croissant</option>
+                  <option value="pieces_desc">Pièces — décroissant</option>
+                </optgroup>
+                <optgroup label="Stats">
+                  <option value="stats_views_desc">Vues</option>
+                  <option value="stats_favorites_desc">Favoris</option>
+                  <option value="stats_messages_desc">Messages</option>
+                  <option value="stats_phone_desc">Téléphone</option>
+                </optgroup>
               </select>
             </label>
           </div>
@@ -121,6 +129,42 @@
                       {{ statusLabel(item.status) }}
                     </span>
                   </p>
+                  <div class="pro-listing__sep" aria-hidden="true" />
+                  <div class="pro-listing__stats" :aria-label="`Statistiques pour ${item.title}`">
+                    <span class="pro-listing__stat" title="Date de création">
+                      <svg class="pro-listing__stat-ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                        <path d="M16 2v4M8 2v4M3 10h18" />
+                      </svg>
+                      <span class="pro-listing__stat-val">{{ formatListingCreatedAt(item) }}</span>
+                    </span>
+                    <span class="pro-listing__stat" title="Nombre de vues">
+                      <svg class="pro-listing__stat-ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                      <span class="pro-listing__stat-val">{{ formatListingStatNumber(item.viewCount) }}</span>
+                    </span>
+                    <span class="pro-listing__stat" title="Nombre de favoris">
+                      <svg class="pro-listing__stat-ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M12 21s-6.716-4.1-9-8.5C.5 9.36 2 6 6 6c2.5 0 4.5 2 6 3.5C13.5 8 15.5 6 18 6c4 0 5.5 3.36 3 6.5C18.716 16.9 12 21 12 21z" />
+                      </svg>
+                      <span class="pro-listing__stat-val">{{ formatListingStatNumber(item.favoriteCount) }}</span>
+                    </span>
+                    <span class="pro-listing__stat" title="Nombre de demandes de contact">
+                      <svg class="pro-listing__stat-ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                        <path d="m22 6-10 7L2 6" />
+                      </svg>
+                      <span class="pro-listing__stat-val">{{ formatListingStatNumber(item.leadCount) }}</span>
+                    </span>
+                    <span class="pro-listing__stat" title="Nombre d'affichages du numéro de téléphone">
+                      <svg class="pro-listing__stat-ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.86 19.86 0 0 1-3.08-8.65A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                      </svg>
+                      <span class="pro-listing__stat-val">{{ formatListingStatNumber(item.phoneRevealCount) }}</span>
+                    </span>
+                  </div>
                 </div>
               </div>
               <details name="pro-listing-actions" class="pro-listing__menu" @click.stop>
@@ -162,15 +206,13 @@
                     </div>
                   </template>
                   <p class="pro-listing__menu-heading">Actions</p>
-                  <NuxtLink
+                  <button
+                    type="button"
                     class="pro-listing__menu-item"
-                    :to="previewListingUrl(item.id)"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    @click="closeListingActionsMenu"
+                    @click="onMenuPreviewListing($event, item.id)"
                   >
                     Aperçu
-                  </NuxtLink>
+                  </button>
                   <button
                     v-if="isManager"
                     type="button"
@@ -525,6 +567,22 @@
     </AppCenterModal>
 
     <AppCenterModal
+      v-model="previewModalOpen"
+      title="Aperçu de l'annonce"
+      size="preview"
+    >
+      <div class="pro-listing-preview">
+        <iframe
+          v-if="previewModalSrc"
+          :src="previewModalSrc"
+          class="pro-listing-preview__frame"
+          loading="lazy"
+          referrerpolicy="strict-origin-when-cross-origin"
+        />
+      </div>
+    </AppCenterModal>
+
+    <AppCenterModal
       v-model="deleteModalOpen"
       title="Supprimer l'annonce"
     >
@@ -621,7 +679,20 @@ const isManager = computed(() => siteStore.currentProUser?.role === 'manager')
 const agencyListings = computed(() => siteStore.currentProAgencyListings)
 const activeStatusTab = ref<ListingStatusTab>('all')
 const currentPage = ref(1)
-const sortBy = ref<'pertinence' | 'prix_asc' | 'prix_desc' | 'date' | 'surface_asc' | 'surface_desc' | 'pieces_asc' | 'pieces_desc'>('date')
+const sortBy = ref<
+  | 'pertinence'
+  | 'prix_asc'
+  | 'prix_desc'
+  | 'date'
+  | 'surface_asc'
+  | 'surface_desc'
+  | 'pieces_asc'
+  | 'pieces_desc'
+  | 'stats_views_desc'
+  | 'stats_favorites_desc'
+  | 'stats_messages_desc'
+  | 'stats_phone_desc'
+>('date')
 const filterPriceMin = ref<number | null>(null)
 const filterPriceMax = ref<number | null>(null)
 const filterQuery = ref('')
@@ -638,8 +709,10 @@ function normalizeListingGeneralCondition(value: string): string {
 }
 
 const listingModalOpen = ref(false)
+const previewModalOpen = ref(false)
 const deleteModalOpen = ref(false)
 const selectedListingId = ref<string | null>(null)
+const previewListingId = ref<string | null>(null)
 const editLocationOpen = ref(false)
 const mainSearchLocationOpen = ref(false)
 const listingPhotoInputRef = ref<HTMLInputElement | null>(null)
@@ -772,6 +845,18 @@ const filteredListings = computed(() => {
     }
     if (sortBy.value === 'pieces_desc') {
       return b.rooms - a.rooms
+    }
+    if (sortBy.value === 'stats_views_desc') {
+      return (b.viewCount ?? 0) - (a.viewCount ?? 0)
+    }
+    if (sortBy.value === 'stats_favorites_desc') {
+      return (b.favoriteCount ?? 0) - (a.favoriteCount ?? 0)
+    }
+    if (sortBy.value === 'stats_messages_desc') {
+      return (b.leadCount ?? 0) - (a.leadCount ?? 0)
+    }
+    if (sortBy.value === 'stats_phone_desc') {
+      return (b.phoneRevealCount ?? 0) - (a.phoneRevealCount ?? 0)
     }
     if (sortBy.value === 'pertinence') {
       return 0
@@ -971,6 +1056,23 @@ function formatPrice(price: number): string {
   }).format(price)
 }
 
+function formatListingCreatedAt(item: { createdAt?: string; publishedAt: string }): string {
+  const iso = item.createdAt || item.publishedAt
+  try {
+    return new Date(iso).toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    })
+  } catch {
+    return '—'
+  }
+}
+
+function formatListingStatNumber(n?: number): string {
+  return Math.max(0, Math.round(n ?? 0)).toLocaleString('fr-FR')
+}
+
 function listingPlaceholderThumb(listingId: string): string {
   const label = listingId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4) || 'pro'
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='128' height='96' viewBox='0 0 128 96'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='#eaf4ef'/><stop offset='100%' stop-color='#d9ece2'/></linearGradient></defs><rect width='128' height='96' rx='14' fill='url(#g)'/><path d='M24 56 64 26l40 30' fill='none' stroke='#2d6a4f' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><rect x='36' y='54' width='56' height='26' rx='4' fill='#fff' stroke='#2d6a4f' stroke-width='3'/><rect x='60' y='61' width='10' height='19' rx='2' fill='#dcece4'/><text x='64' y='18' text-anchor='middle' fill='#2d6a4f' font-family='Arial,sans-serif' font-size='9' font-weight='700'>Matchaa ${label}</text></svg>`
@@ -1073,8 +1175,12 @@ function onEditProjectTypeChange() {
 }
 
 function previewListingUrl(listingId: string): string {
-  return `/annonces/${encodeURIComponent(listingId)}`
+  return `/annonces/${encodeURIComponent(listingId)}?embed=1`
 }
+
+const previewModalSrc = computed(() =>
+  previewListingId.value ? previewListingUrl(previewListingId.value) : '',
+)
 
 function closeListingActionsMenu(ev: Event) {
   const t = ev.currentTarget as HTMLElement | null
@@ -1101,9 +1207,7 @@ function onListingCardHit(listingId: string) {
     openEditModal(listingId)
     return
   }
-  if (import.meta.client) {
-    window.open(previewListingUrl(listingId), '_blank', 'noopener,noreferrer')
-  }
+  openPreviewModal(listingId)
 }
 
 function onListingCardKeydown(e: KeyboardEvent, listingId: string) {
@@ -1127,6 +1231,11 @@ function onMenuEditListing(ev: Event, listingId: string) {
 function onMenuDeleteListing(ev: Event, listingId: string) {
   closeListingActionsMenu(ev)
   openDeleteModal(listingId)
+}
+
+function onMenuPreviewListing(ev: Event, listingId: string) {
+  closeListingActionsMenu(ev)
+  openPreviewModal(listingId)
 }
 
 function openCreateModal() {
@@ -1185,6 +1294,11 @@ function openEditModal(listingId: string) {
   editFeatureInput.value = ''
   editLocationOpen.value = false
   listingModalOpen.value = true
+}
+
+function openPreviewModal(listingId: string) {
+  previewListingId.value = listingId
+  previewModalOpen.value = true
 }
 
 function closeListingModal() {

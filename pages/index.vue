@@ -270,8 +270,9 @@ import { formatListingPrice } from '~/composables/useAnnoncesSearch'
 import { editoArticles } from '~/data/articles'
 import { getAgencyById } from '~/data/agencies'
 import type { SearchListing } from '~/data/mock-listings'
-import { MOCK_LISTINGS } from '~/data/mock-listings'
 import { labelForPropertyType } from '~/data/property-types'
+
+const siteStore = useSiteStore()
 
 const locationQuery = ref('')
 const locationListOpen = ref(false)
@@ -330,7 +331,10 @@ function openContactModal(item: SearchListing) {
   contactModalOpen.value = true
 }
 
-const featuredListings = computed(() => MOCK_LISTINGS.slice(0, 8))
+const featuredListings = computed(() => {
+  siteStore.ensureProListingsLoadedForPublic()
+  return siteStore.publicActiveSearchListings.slice(0, 8)
+})
 
 useHead({
   title: 'Accueil — Matchaa',

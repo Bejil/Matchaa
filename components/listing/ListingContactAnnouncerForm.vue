@@ -12,7 +12,7 @@
       <button
         type="button"
         class="listing-contact-form__phone-reveal"
-        @click="showPhoneModal = true"
+        @click="onRevealPhone"
       >
         Voir le numéro de téléphone
       </button>
@@ -216,7 +216,6 @@ import AppCenterModal from '~/components/ui/AppCenterModal.vue'
 import AppToast from '~/components/ui/AppToast.vue'
 import { getAgencyById } from '~/data/agencies'
 import type { SearchListing } from '~/data/mock-listings'
-import { MOCK_LISTINGS } from '~/data/mock-listings'
 import { labelForPropertyType } from '~/data/property-types'
 import { pickSimilarListings } from '~/utils/annonce-detail-related'
 
@@ -226,7 +225,7 @@ const emit = defineEmits<{
 
 const props = withDefaults(
   defineProps<{
-    listingId: number
+    listingId: string
     agencyName: string
     /** id du <form> (unique si plusieurs formulaires sur la page) */
     formId?: string
@@ -270,22 +269,28 @@ const showMessage = ref(false)
 const message = ref('')
 const optOutSimilar = ref(false)
 const optInPartners = ref(false)
-const selectedSuggestionIds = ref<number[]>([])
+const selectedSuggestionIds = ref<string[]>([])
 
-const currentListing = computed(() =>
-  MOCK_LISTINGS.find((l) => l.id === props.listingId),
-)
+const currentListing = computed(() => {
+  siteStore.ensureProListingsLoadedForPublic()
+  return siteStore.publicActiveSearchListings.find((l) => l.id === props.listingId)
+})
 
 const similarSuggestions = computed<SearchListing[]>(() => {
   if (!currentListing.value) {
     return []
   }
-  return pickSimilarListings(currentListing.value, MOCK_LISTINGS, 5)
+  return pickSimilarListings(currentListing.value, siteStore.publicActiveSearchListings, 5)
 })
 
 watch(similarSuggestions, (items) => {
   selectedSuggestionIds.value = items.map((item) => item.id)
 }, { immediate: true })
+
+function onRevealPhone() {
+  showPhoneModal.value = true
+  siteStore.recordListingPhoneReveal(props.listingId)
+}
 
 function onSubmit() {
   siteStore.hydrateSession()

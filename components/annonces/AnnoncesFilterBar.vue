@@ -322,6 +322,9 @@ const props = defineProps<{
   mergeQuery: (updates: Record<string, string | undefined>) => void
 }>()
 
+const siteStore = useSiteStore()
+siteStore.ensureProListingsLoadedForPublic()
+
 const { suggestions, debouncedFetch, clearSuggestions } = useCommuneSearch()
 
 const propertyGroups = PROPERTY_TYPE_GROUPS
@@ -431,7 +434,10 @@ const draft = reactive({
 })
 
 const draftPreviewCount = computed(() =>
-  countListingsForParsed(buildParsedQueryFromFilterDraft(draft, props.parsed.tri)),
+  countListingsForParsed(
+    buildParsedQueryFromFilterDraft(draft, props.parsed.tri),
+    siteStore.publicActiveSearchListings,
+  ),
 )
 
 function syncDraftFromParsed() {

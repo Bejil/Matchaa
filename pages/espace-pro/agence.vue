@@ -89,8 +89,38 @@
               <label class="compte-settings__label" for="agency-phone">Téléphone</label>
               <input id="agency-phone" v-model.trim="agencyPhone" class="compte-settings__input" type="text" :readonly="!isAgencyManager">
 
+              <label class="compte-settings__label" for="agency-description">Description</label>
+              <textarea
+                id="agency-description"
+                v-model.trim="agencyDescription"
+                class="compte-settings__input compte-settings__input--textarea"
+                rows="4"
+                :readonly="!isAgencyManager"
+                placeholder="Présentez votre agence, vos spécialités ou votre secteur d’intervention."
+              />
+
               <label class="compte-settings__label" for="agency-city">Ville</label>
-              <input id="agency-city" v-model.trim="agencyCity" class="compte-settings__input" type="text" :readonly="!isAgencyManager">
+              <div class="pro-location-input">
+                <input
+                  id="agency-city"
+                  v-model.trim="agencyCity"
+                  class="compte-settings__input"
+                  type="search"
+                  placeholder="Ex. Lyon, 69001…"
+                  autocomplete="off"
+                  :readonly="!isAgencyManager"
+                  @input="onAgencyCityInput"
+                  @focus="onAgencyCityFocus"
+                  @blur="onAgencyCityBlur"
+                >
+                <ul v-if="agencyCityOpen && agencyCitySuggestionList.length" class="pro-location-input__suggestions" role="listbox">
+                  <li v-for="c in agencyCitySuggestionList" :key="c.code" role="presentation">
+                    <button type="button" class="pro-location-input__suggestion" @mousedown.prevent="pickAgencyCity(c)">
+                      {{ communeLabel(c) }}
+                    </button>
+                  </li>
+                </ul>
+              </div>
 
               <label class="compte-settings__label" for="agency-address">Adresse</label>
               <input id="agency-address" v-model.trim="agencyAddress" class="compte-settings__input" type="text" :readonly="!isAgencyManager">
@@ -247,8 +277,14 @@ useProRouteGuard()
 
 import AppCenterModal from '~/components/ui/AppCenterModal.vue'
 import AppToast from '~/components/ui/AppToast.vue'
+import type { CommuneResult } from '~/composables/useCommuneSearch'
 
 const siteStore = useSiteStore()
+const {
+  suggestions: agencyCitySuggestions,
+  debouncedFetch: debouncedFetchAgencyCity,
+  clearSuggestions: clearAgencyCitySuggestions,
+} = useCommuneSearch()
 
 const pro = computed(() => siteStore.currentProUser)
 const agency = computed(() => siteStore.currentProAgency)
@@ -263,6 +299,8 @@ const agencyEmail = ref('')
 const agencyPhone = ref('')
 const agencyCity = ref('')
 const agencyAddress = ref('')
+const agencyDescription = ref('')
+const agencyCityOpen = ref(false)
 const agencyLogoError = ref('')
 
 const newMemberName = ref('')
@@ -296,6 +334,8 @@ function showToast(input: { title: string; message: string; variant?: 'success' 
 watch(
   agency,
   (value) => {
+    clearAgencyCitySuggestions()
+    agencyCityOpen.value = false
     if (!value) {
       return
     }
@@ -306,9 +346,48 @@ watch(
     agencyPhone.value = value.contactPhone
     agencyCity.value = value.city
     agencyAddress.value = value.address
+    agencyDescription.value = value.description
   },
   { immediate: true },
 )
+
+const agencyCitySuggestionList = computed(() =>
+  agencyCityOpen.value ? agencyCitySuggestions.value : [],
+)
+
+function communeLabel(c: CommuneResult) {
+  const cp = c.codesPostaux?.[0]
+  return cp ? `${c.nom} · ${cp}` : c.nom
+}
+
+function onAgencyCityInput() {
+  if (!isAgencyManager.value) {
+    return
+  }
+  debouncedFetchAgencyCity(agencyCity.value)
+  agencyCityOpen.value = agencyCity.value.trim().length >= 2
+}
+
+function onAgencyCityFocus() {
+  if (!isAgencyManager.value) {
+    return
+  }
+  if (agencyCity.value.trim().length >= 2 && agencyCitySuggestions.value.length) {
+    agencyCityOpen.value = true
+  }
+}
+
+function onAgencyCityBlur() {
+  window.setTimeout(() => {
+    agencyCityOpen.value = false
+  }, 180)
+}
+
+function pickAgencyCity(c: CommuneResult) {
+  agencyCity.value = c.nom
+  agencyCityOpen.value = false
+  clearAgencyCitySuggestions()
+}
 
 function onSaveAgency() {
   if (!isAgencyManager.value) {
@@ -321,6 +400,7 @@ function onSaveAgency() {
     contactPhone: agencyPhone.value,
     city: agencyCity.value,
     address: agencyAddress.value,
+    description: agencyDescription.value,
   })
   showToast({
     title: 'Agence mise à jour',

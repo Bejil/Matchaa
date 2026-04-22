@@ -1,7 +1,7 @@
 const STORAGE_KEY = 'matchaa-favorites'
 
 export const useFavoritesStore = defineStore('favorites', () => {
-  const ids = ref<number[]>([])
+  const ids = ref<string[]>([])
   let loaded = false
 
   function loadFromStorage() {
@@ -14,7 +14,9 @@ export const useFavoritesStore = defineStore('favorites', () => {
       if (raw) {
         const parsed = JSON.parse(raw) as unknown
         if (Array.isArray(parsed)) {
-          ids.value = parsed.filter((n): n is number => typeof n === 'number')
+          ids.value = parsed
+            .map((x) => (typeof x === 'number' ? String(x) : typeof x === 'string' ? x : ''))
+            .filter(Boolean)
         }
       }
     } catch {
@@ -33,12 +35,12 @@ export const useFavoritesStore = defineStore('favorites', () => {
     }
   }
 
-  function has(id: number): boolean {
+  function has(id: string): boolean {
     loadFromStorage()
     return ids.value.includes(id)
   }
 
-  function toggle(id: number) {
+  function toggle(id: string) {
     loadFromStorage()
     const i = ids.value.indexOf(id)
     if (i === -1) {

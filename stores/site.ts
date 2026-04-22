@@ -1,5 +1,6 @@
-import type { EnergyLetter } from '~/data/mock-listings'
+import type { EnergyLetter, SearchListing } from '~/data/mock-listings'
 import { ALL_PROPERTY_TYPE_SLUGS, PROPERTY_TYPE_GROUPS, type PropertyTypeSlug } from '~/data/property-types'
+import { proListingToSearchListing } from '~/utils/pro-listing-to-search'
 
 function normalizeProListingPropertyType(raw: string | undefined | null): PropertyTypeSlug {
   const input = (raw ?? '').trim()
@@ -80,7 +81,7 @@ export const useSiteStore = defineStore('site', () => {
     agency: string
     text: string
     messageBody: string
-    listingId: number | null
+    listingId: string | null
     listingTitle: string
   }
 
@@ -99,6 +100,8 @@ export const useSiteStore = defineStore('site', () => {
     contactPhone: string
     city: string
     address: string
+    /** Présentation courte de l’agence (vitrine / contact) */
+    description: string
   }
   type ProMember = {
     id: string
@@ -145,6 +148,14 @@ export const useSiteStore = defineStore('site', () => {
     rooms: number
     status: 'active' | 'draft' | 'archived'
     updatedAt: string
+    /** ISO — date de création de l’annonce côté pro */
+    createdAt: string
+    viewCount: number
+    favoriteCount: number
+    /** Messages / demandes de contact enregistrés (compteur agrégé local) */
+    leadCount: number
+    /** Affichages du numéro de téléphone depuis la fiche annonce */
+    phoneRevealCount: number
   }
 
   const DEMO_USERS: DemoUser[] = [
@@ -162,6 +173,7 @@ export const useSiteStore = defineStore('site', () => {
       contactPhone: '01 80 00 00 01',
       city: 'Paris',
       address: '12 rue de la Paix',
+      description: 'Agence de démonstration Matchaa pour tester la publication et le suivi des annonces.',
     },
     {
       id: 'agency-demo-toits',
@@ -171,6 +183,7 @@ export const useSiteStore = defineStore('site', () => {
       contactPhone: '01 80 00 00 02',
       city: 'Lyon',
       address: '8 avenue des Acacias',
+      description: 'Spécialiste des biens avec extérieur et maisons familiales en métropole lyonnaise.',
     },
     {
       id: 'agency-demo-central',
@@ -180,6 +193,7 @@ export const useSiteStore = defineStore('site', () => {
       contactPhone: '01 80 00 00 03',
       city: 'Bordeaux',
       address: '31 quai des Chartrons',
+      description: 'Transactions et locations au cœur de Bordeaux et en Nouvelle-Aquitaine.',
     },
   ]
   /** Comptes démo réservés à l’espace pro (emails distincts des comptes publics). */
@@ -209,127 +223,18 @@ export const useSiteStore = defineStore('site', () => {
       role: 'agent',
     },
   ]
-  const DEMO_PRO_LISTINGS: ProListing[] = [
-    {
-      id: 'pro-listing-test-1',
-      agencyId: 'agency-demo-test',
-      projectType: 'acheter',
-      bedrooms: 3,
-      dpe: 'C',
-      ges: 'C',
-      features: ['balcon', 'ascenseur'],
-      images: [
-        'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80',
-      ],
-      description: 'Appartement familial lumineux avec balcon et double exposition.',
-      publishedAt: '2026-04-21T09:00:00.000Z',
-      relevanceScore: 88,
-      ref: 'PRO-0001',
-      floor: 3,
-      totalFloors: 6,
-      buildingYear: 2006,
-      chargesMonthly: null,
-      propertyTaxAnnual: 1400,
-      coproLots: 44,
-      coproAnnualCharges: 2100,
-      coproSharePerMille: 34,
-      exposure: 'Sud-Ouest',
-      heatingType: 'Gaz individuel',
-      hotWaterType: 'Chaudière gaz',
-      generalCondition: 'Bon état général',
-      furnished: null,
-      title: 'Appartement familial avec balcon',
-      city: 'Paris',
-      propertyType: 'appartement',
-      price: 595000,
-      surface: 86,
-      rooms: 4,
-      status: 'active',
-      updatedAt: '2026-04-21',
-    },
-    {
-      id: 'pro-listing-toits-1',
-      agencyId: 'agency-demo-toits',
-      projectType: 'acheter',
-      bedrooms: 4,
-      dpe: 'B',
-      ges: 'B',
-      features: ['jardin', 'parking'],
-      images: [
-        'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=1200&q=80',
-      ],
-      description: 'Maison contemporaine avec jardin, beaux volumes et stationnement.',
-      publishedAt: '2026-04-19T09:00:00.000Z',
-      relevanceScore: 90,
-      ref: 'PRO-0002',
-      floor: null,
-      totalFloors: null,
-      buildingYear: 2014,
-      chargesMonthly: null,
-      propertyTaxAnnual: 1900,
-      coproLots: null,
-      coproAnnualCharges: null,
-      coproSharePerMille: null,
-      exposure: 'Sud',
-      heatingType: 'Pompe à chaleur air / eau',
-      hotWaterType: 'Ballon thermodynamique',
-      generalCondition: 'Excellent état',
-      furnished: null,
-      title: 'Maison contemporaine avec jardin',
-      city: 'Lyon',
-      propertyType: 'maison',
-      price: 740000,
-      surface: 132,
-      rooms: 6,
-      status: 'active',
-      updatedAt: '2026-04-19',
-    },
-    {
-      id: 'pro-listing-central-1',
-      agencyId: 'agency-demo-central',
-      projectType: 'louer',
-      bedrooms: 0,
-      dpe: 'D',
-      ges: 'D',
-      features: ['ascenseur'],
-      images: [
-        'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80',
-      ],
-      description: 'Studio meublé idéal pied-à-terre, proche transports.',
-      publishedAt: '2026-04-16T09:00:00.000Z',
-      relevanceScore: 72,
-      ref: 'PRO-0003',
-      floor: 2,
-      totalFloors: 5,
-      buildingYear: 1998,
-      chargesMonthly: 95,
-      propertyTaxAnnual: null,
-      coproLots: 58,
-      coproAnnualCharges: 1650,
-      coproSharePerMille: 16,
-      exposure: 'Est',
-      heatingType: 'Électrique',
-      hotWaterType: 'Cumulus électrique',
-      generalCondition: 'Bon état général',
-      furnished: true,
-      title: 'Studio meublé centre-ville',
-      city: 'Bordeaux',
-      propertyType: 'studio',
-      price: 980,
-      surface: 24,
-      rooms: 1,
-      status: 'archived',
-      updatedAt: '2026-04-16',
-    },
-  ]
 
   const SESSION_KEY = 'matchaa-demo-session'
   const PRO_SESSION_KEY = 'matchaa-pro-demo-session'
   const PRO_MEMBERS_KEY = 'matchaa-pro-members'
   const PRO_AGENCIES_KEY = 'matchaa-pro-agencies'
   const PRO_LISTINGS_KEY = 'matchaa-pro-listings'
+  /** Anciennes annonces injectées par le seed démo (retiré du code) — encore présentes chez certains navigateurs. */
+  const LEGACY_SEEDED_PRO_LISTING_IDS = new Set([
+    'pro-listing-test-1',
+    'pro-listing-toits-1',
+    'pro-listing-central-1',
+  ])
   const SEARCHES_KEY_PREFIX = 'matchaa-saved-searches'
   const LATEST_SEARCH_KEY_PREFIX = 'matchaa-latest-search'
   const MESSAGES_KEY_PREFIX = 'matchaa-sent-messages'
@@ -454,7 +359,12 @@ export const useSiteStore = defineStore('site', () => {
             agency: m.agency,
             text: m.text,
             messageBody: m.messageBody ?? '',
-            listingId: typeof m.listingId === 'number' ? m.listingId : null,
+            listingId:
+              typeof m.listingId === 'string' && m.listingId
+                ? m.listingId
+                : typeof m.listingId === 'number'
+                  ? String(m.listingId)
+                  : null,
             listingTitle: m.listingTitle ?? '',
           }))
       } else {
@@ -557,6 +467,29 @@ export const useSiteStore = defineStore('site', () => {
     }
   }
 
+  function normalizeStoredAgency(raw: unknown): ProAgency | null {
+    if (!raw || typeof raw !== 'object') {
+      return null
+    }
+    const a = raw as Record<string, unknown>
+    if (
+      typeof a.id !== 'string'
+      || typeof a.name !== 'string'
+    ) {
+      return null
+    }
+    return {
+      id: a.id,
+      name: a.name,
+      logo: typeof a.logo === 'string' ? a.logo : '',
+      contactEmail: typeof a.contactEmail === 'string' ? a.contactEmail : '',
+      contactPhone: typeof a.contactPhone === 'string' ? a.contactPhone : '',
+      city: typeof a.city === 'string' ? a.city : '',
+      address: typeof a.address === 'string' ? a.address : '',
+      description: typeof a.description === 'string' ? a.description : '',
+    }
+  }
+
   function loadStoredProAgencies(): ProAgency[] {
     if (!import.meta.client) {
       return []
@@ -570,19 +503,9 @@ export const useSiteStore = defineStore('site', () => {
       if (!Array.isArray(parsed)) {
         return []
       }
-      return parsed.filter(
-        (a): a is ProAgency =>
-          Boolean(
-            a
-            && typeof (a as ProAgency).id === 'string'
-            && typeof (a as ProAgency).name === 'string'
-            && typeof (a as ProAgency).logo === 'string'
-            && typeof (a as ProAgency).contactEmail === 'string'
-            && typeof (a as ProAgency).contactPhone === 'string'
-            && typeof (a as ProAgency).city === 'string'
-            && typeof (a as ProAgency).address === 'string',
-          ),
-      )
+      return parsed
+        .map((item) => normalizeStoredAgency(item))
+        .filter((a): a is ProAgency => a !== null)
     } catch {
       return []
     }
@@ -603,6 +526,7 @@ export const useSiteStore = defineStore('site', () => {
       }
       const toFullListing = (raw: Partial<ProListing> & { id: string; agencyId: string }): ProListing => {
         const nowIso = new Date().toISOString()
+        const r = raw as Partial<ProListing>
         return {
           id: raw.id,
           agencyId: raw.agencyId,
@@ -646,6 +570,28 @@ export const useSiteStore = defineStore('site', () => {
           rooms: Math.max(1, Math.round(raw.rooms ?? 1)),
           status: raw.status === 'active' || raw.status === 'draft' || raw.status === 'archived' ? raw.status : 'draft',
           updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : nowIso.slice(0, 10),
+          createdAt:
+            typeof r.createdAt === 'string'
+              ? r.createdAt
+              : typeof raw.publishedAt === 'string'
+                ? raw.publishedAt
+                : nowIso,
+          viewCount:
+            typeof r.viewCount === 'number' && Number.isFinite(r.viewCount)
+              ? Math.max(0, Math.round(r.viewCount))
+              : 0,
+          favoriteCount:
+            typeof r.favoriteCount === 'number' && Number.isFinite(r.favoriteCount)
+              ? Math.max(0, Math.round(r.favoriteCount))
+              : 0,
+          leadCount:
+            typeof r.leadCount === 'number' && Number.isFinite(r.leadCount)
+              ? Math.max(0, Math.round(r.leadCount))
+              : 0,
+          phoneRevealCount:
+            typeof r.phoneRevealCount === 'number' && Number.isFinite(r.phoneRevealCount)
+              ? Math.max(0, Math.round(r.phoneRevealCount))
+              : 0,
         }
       }
       return parsed
@@ -700,13 +646,111 @@ export const useSiteStore = defineStore('site', () => {
         mergedMembers.push(member)
       }
     }
-    // Important: quand un stockage existe, il devient la source de vérité
-    // pour éviter qu'une annonce supprimée réapparaisse après reload.
-    const mergedListings = storedListings === null ? [...DEMO_PRO_LISTINGS] : [...storedListings]
+    // Pas d'annonces fictives au premier chargement : uniquement ce qui est en localStorage
+    // (créé / modifié depuis l'espace pro), aligné avec le catalogue public.
+    const fromStorage = storedListings === null ? [] : [...storedListings]
+    const mergedListings = fromStorage.filter((l) => !LEGACY_SEEDED_PRO_LISTING_IDS.has(l.id))
+    const removedLegacySeed = fromStorage.length !== mergedListings.length
     proAgencies.value = mergedAgencies
     proMembers.value = mergedMembers
     proListings.value = mergedListings
+    if (import.meta.client && removedLegacySeed) {
+      persistProData()
+    }
   }
+
+  let proPublicCatalogLoaded = false
+
+  function ensureProListingsLoadedForPublic() {
+    if (!import.meta.client || proPublicCatalogLoaded) {
+      return
+    }
+    proPublicCatalogLoaded = true
+    loadProData()
+  }
+
+  function recordListingView(listingId: string) {
+    if (!import.meta.client || !listingId) {
+      return
+    }
+    ensureProListingsLoadedForPublic()
+    try {
+      const key = `matchaa-listing-view-once:${listingId}`
+      if (sessionStorage.getItem(key)) {
+        return
+      }
+      sessionStorage.setItem(key, '1')
+    } catch {
+      /* ignore */
+    }
+    const idx = proListings.value.findIndex((l) => l.id === listingId)
+    if (idx < 0) {
+      return
+    }
+    const cur = proListings.value[idx]
+    proListings.value[idx] = {
+      ...cur,
+      viewCount: Math.max(0, (cur.viewCount ?? 0) + 1),
+    }
+    persistProData()
+  }
+
+  function applyListingFavoriteDelta(listingId: string, delta: number) {
+    if (!import.meta.client || !listingId || delta === 0) {
+      return
+    }
+    ensureProListingsLoadedForPublic()
+    const idx = proListings.value.findIndex((l) => l.id === listingId)
+    if (idx < 0) {
+      return
+    }
+    const cur = proListings.value[idx]
+    proListings.value[idx] = {
+      ...cur,
+      favoriteCount: Math.max(0, (cur.favoriteCount ?? 0) + delta),
+    }
+    persistProData()
+  }
+
+  function recordListingLead(listingId: string) {
+    if (!import.meta.client || !listingId) {
+      return
+    }
+    ensureProListingsLoadedForPublic()
+    const idx = proListings.value.findIndex((l) => l.id === listingId)
+    if (idx < 0) {
+      return
+    }
+    const cur = proListings.value[idx]
+    proListings.value[idx] = {
+      ...cur,
+      leadCount: Math.max(0, (cur.leadCount ?? 0) + 1),
+    }
+    persistProData()
+  }
+
+  function recordListingPhoneReveal(listingId: string) {
+    if (!import.meta.client || !listingId) {
+      return
+    }
+    ensureProListingsLoadedForPublic()
+    const idx = proListings.value.findIndex((l) => l.id === listingId)
+    if (idx < 0) {
+      return
+    }
+    const cur = proListings.value[idx]
+    proListings.value[idx] = {
+      ...cur,
+      phoneRevealCount: Math.max(0, (cur.phoneRevealCount ?? 0) + 1),
+    }
+    persistProData()
+  }
+
+  const publicActiveSearchListings = computed<SearchListing[]>(() =>
+    proListings.value
+      .filter((l) => l.status === 'active')
+      .map((p) => proListingToSearchListing(p)),
+  )
 
   function loginPro(email: string, password: string): boolean {
     loadProData()
@@ -755,6 +799,7 @@ export const useSiteStore = defineStore('site', () => {
         contactPhone: '',
         city: '',
         address: '',
+        description: '',
       })
     }
     if (input.role === 'agent' && !targetAgencyId) {
@@ -924,7 +969,15 @@ export const useSiteStore = defineStore('site', () => {
     currentProUser.value ? proListings.value.filter((l) => l.agencyId === currentProUser.value?.agencyId) : [],
   )
 
-  function updateCurrentAgencyInfo(input: { name: string; logo: string; contactEmail: string; contactPhone: string; city: string; address: string }) {
+  function updateCurrentAgencyInfo(input: {
+    name: string
+    logo: string
+    contactEmail: string
+    contactPhone: string
+    city: string
+    address: string
+    description: string
+  }) {
     if (currentProUser.value?.role !== 'manager') {
       return
     }
@@ -940,6 +993,7 @@ export const useSiteStore = defineStore('site', () => {
       contactPhone: input.contactPhone.trim(),
       city: input.city.trim(),
       address: input.address.trim(),
+      description: input.description.trim(),
     }
     if (currentProUser.value) {
       currentProUser.value = {
@@ -1073,6 +1127,11 @@ export const useSiteStore = defineStore('site', () => {
       rooms: Math.max(1, Math.round(input.rooms)),
       status: input.status,
       updatedAt: new Date().toISOString().slice(0, 10),
+      createdAt: new Date().toISOString(),
+      viewCount: 0,
+      favoriteCount: 0,
+      leadCount: 0,
+      phoneRevealCount: 0,
     })
     persistProData()
     return true
@@ -1241,7 +1300,7 @@ export const useSiteStore = defineStore('site', () => {
     persistSavedSearches()
   }
 
-  function addSentMessage(input: { agency: string; listingTitle: string; listingId: number | null; messageBody: string }) {
+  function addSentMessage(input: { agency: string; listingTitle: string; listingId: string | null; messageBody: string }) {
     if (!currentUser.value) {
       return
     }
@@ -1256,6 +1315,9 @@ export const useSiteStore = defineStore('site', () => {
     }
     sentMessages.value = [next, ...sentMessages.value].slice(0, 30)
     persistSentMessages()
+    if (input.listingId) {
+      recordListingLead(input.listingId)
+    }
   }
 
   function removeSentMessage(id: string) {
@@ -1301,5 +1363,11 @@ export const useSiteStore = defineStore('site', () => {
     sentMessages,
     addSentMessage,
     removeSentMessage,
+    ensureProListingsLoadedForPublic,
+    publicActiveSearchListings,
+    recordListingView,
+    applyListingFavoriteDelta,
+    recordListingLead,
+    recordListingPhoneReveal,
   }
 })

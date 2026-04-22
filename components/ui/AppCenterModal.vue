@@ -42,7 +42,7 @@ const props = withDefaults(
     modelValue: boolean
     title?: string
     /** largeur max utile pour partage / formulaire */
-    size?: 'default' | 'wide' | 'form'
+    size?: 'default' | 'wide' | 'form' | 'preview'
   }>(),
   { size: 'default' },
 )
@@ -53,6 +53,9 @@ const sizeClass = computed(() => {
   }
   if (props.size === 'form') {
     return 'app-center-modal--form'
+  }
+  if (props.size === 'preview') {
+    return 'app-center-modal--preview'
   }
   return ''
 })

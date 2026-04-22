@@ -66,8 +66,6 @@
 <script setup lang="ts">
 import AccountNavMenu from '~/components/account/AccountNavMenu.vue'
 import logoSrc from '~/assets/images/logo.svg'
-import { MOCK_LISTINGS } from '~/data/mock-listings'
-
 const route = useRoute()
 const siteStore = useSiteStore()
 const favoritesStore = useFavoritesStore()
@@ -91,14 +89,11 @@ function annonceDetailProjet(): 'acheter' | 'louer' | undefined {
   }
   const raw = route.params.id
   const idStr = Array.isArray(raw) ? raw[0] : raw
-  if (typeof idStr !== 'string') {
+  if (typeof idStr !== 'string' || !idStr) {
     return undefined
   }
-  const id = Number(idStr)
-  if (!Number.isFinite(id)) {
-    return undefined
-  }
-  return MOCK_LISTINGS.find((l) => l.id === id)?.projet
+  siteStore.ensureProListingsLoadedForPublic()
+  return siteStore.publicActiveSearchListings.find((l) => l.id === idStr)?.projet
 }
 
 const navAcheterActive = computed(() => {

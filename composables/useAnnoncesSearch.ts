@@ -2,7 +2,6 @@ import type { LocationQuery } from 'vue-router'
 import type { ListingFeatureId, PropertyTypeSlug } from '~/data/property-types'
 import { labelForPropertyType } from '~/data/property-types'
 import type { SearchListing } from '~/data/mock-listings'
-import { MOCK_LISTINGS } from '~/data/mock-listings'
 
 export const ANNONCES_PAGE_SIZE = 32
 
@@ -232,8 +231,8 @@ export function buildParsedQueryFromFilterDraft(
 }
 
 /** Nombre d’annonces correspondant aux critères (sans tenir compte du tri ni de la pagination). */
-export function countListingsForParsed(q: AnnoncesParsedQuery): number {
-  return filterListings(q, MOCK_LISTINGS).length
+export function countListingsForParsed(q: AnnoncesParsedQuery, catalog: SearchListing[]): number {
+  return filterListings(q, catalog).length
 }
 
 function sortListings(parsed: AnnoncesParsedQuery, list: SearchListing[]): SearchListing[] {
@@ -324,10 +323,14 @@ export function buildResultsRecap(parsed: AnnoncesParsedQuery, total: number): s
 export function useAnnoncesSearch() {
   const route = useRoute()
   const router = useRouter()
+  const siteStore = useSiteStore()
+  siteStore.ensureProListingsLoadedForPublic()
 
   const parsed = computed(() => parseAnnoncesQuery(route.query))
 
-  const filtered = computed(() => filterListings(parsed.value, MOCK_LISTINGS))
+  const catalog = computed(() => siteStore.publicActiveSearchListings)
+
+  const filtered = computed(() => filterListings(parsed.value, catalog.value))
   const sorted = computed(() => sortListings(parsed.value, filtered.value))
 
   const total = computed(() => sorted.value.length)

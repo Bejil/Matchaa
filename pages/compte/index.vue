@@ -405,7 +405,6 @@ import ListingCardMedia from '~/components/listing/ListingCardMedia.vue'
 import ListingContactAnnouncerForm from '~/components/listing/ListingContactAnnouncerForm.vue'
 import { formatListingPrice } from '~/composables/useAnnoncesSearch'
 import { getAgencyById } from '~/data/agencies'
-import { MOCK_LISTINGS } from '~/data/mock-listings'
 import type { SearchListing } from '~/data/mock-listings'
 import { labelForPropertyType } from '~/data/property-types'
 
@@ -436,9 +435,10 @@ const contactListing = ref<SearchListing | null>(null)
 const settingsName = ref('')
 const settingsEmail = ref('')
 const settingsPassword = ref('')
-const favoriteListings = computed(() =>
-  MOCK_LISTINGS.filter((l) => favoritesStore.ids.includes(l.id)),
-)
+const favoriteListings = computed(() => {
+  siteStore.ensureProListingsLoadedForPublic()
+  return siteStore.publicActiveSearchListings.filter((l) => favoritesStore.ids.includes(l.id))
+})
 const totalSearchPages = computed(() =>
   Math.max(1, Math.ceil(alertSearches.value.length / ITEMS_PER_PAGE)),
 )
@@ -464,11 +464,12 @@ const paginatedSentMessages = computed(() => {
   return sentMessages.value.slice(start, start + ITEMS_PER_PAGE)
 })
 
-function messageListing(message: { listingId: number | null }) {
-  if (typeof message.listingId !== 'number') {
+function messageListing(message: { listingId: string | null }) {
+  if (!message.listingId) {
     return null
   }
-  return MOCK_LISTINGS.find((l) => l.id === message.listingId) ?? null
+  siteStore.ensureProListingsLoadedForPublic()
+  return siteStore.publicActiveSearchListings.find((l) => l.id === message.listingId) ?? null
 }
 
 function messageDate(text: string): string {

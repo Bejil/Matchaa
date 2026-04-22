@@ -48,10 +48,11 @@
 
 <script setup lang="ts">
 const props = defineProps<{
-  listingId: number
+  listingId: string
 }>()
 
 const favorites = useFavoritesStore()
+const siteStore = useSiteStore()
 
 const isFavorite = computed(() => favorites.has(props.listingId))
 
@@ -124,7 +125,9 @@ onMounted(() => {
 })
 
 function onClick() {
+  const wasFavorite = favorites.has(props.listingId)
   favorites.toggle(props.listingId)
+  siteStore.applyListingFavoriteDelta(props.listingId, wasFavorite ? -1 : 1)
   const nowFavorite = favorites.has(props.listingId)
   animClass.value = null
   nextTick(() => {

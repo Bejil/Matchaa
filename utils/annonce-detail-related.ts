@@ -11,10 +11,23 @@ const BUY_RELATED_CATS = new Set([
 ])
 const RENT_RELATED_CATS = new Set(['Location', 'Investissement'])
 
-function seededArticleOrder(listingId: number, articles: EditoArticle[]): EditoArticle[] {
+function listingIdNumericSeed(id: string | number): number {
+  if (typeof id === 'number') {
+    return id
+  }
+  let h = 0
+  for (let i = 0; i < id.length; i += 1) {
+    h = ((h << 5) - h) + id.charCodeAt(i)
+    h |= 0
+  }
+  return Math.abs(h)
+}
+
+function seededArticleOrder(listingId: string | number, articles: EditoArticle[]): EditoArticle[] {
+  const seed = listingIdNumericSeed(listingId)
   return [...articles].sort(
     (a, b) =>
-      ((listingId * 17 + b.id * 31) % 1000) - ((listingId * 17 + a.id * 31) % 1000),
+      ((seed * 17 + b.id * 31) % 1000) - ((seed * 17 + a.id * 31) % 1000),
   )
 }
 
@@ -57,7 +70,7 @@ export function pickRelatedEditoArticles(
   const preferred = (a: EditoArticle) =>
     isRent ? RENT_RELATED_CATS.has(a.category) : BUY_RELATED_CATS.has(a.category)
   const primary = seededArticleOrder(listing.id, articles.filter(preferred))
-  const secondary = seededArticleOrder(listing.id + 401, articles.filter((a) => !preferred(a)))
+  const secondary = seededArticleOrder(listingIdNumericSeed(listing.id) + 401, articles.filter((a) => !preferred(a)))
   const merged = [...primary, ...secondary]
   return merged.slice(0, limit)
 }
