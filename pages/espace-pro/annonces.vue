@@ -487,11 +487,11 @@
           </select>
         </label>
         <label class="compte-settings__field">
-          <span class="compte-settings__label">Description</span>
-          <textarea v-model="editForm.description" class="compte-settings__input" rows="4"></textarea>
+          <span class="compte-settings__label">Description <span class="compte-settings__mandatory">(obligatoire)</span></span>
+          <textarea v-model="editForm.description" class="compte-settings__input" rows="4" required></textarea>
         </label>
         <div class="compte-settings__field pro-listing-photos">
-          <span class="compte-settings__label">Photos</span>
+          <span class="compte-settings__label">Photos <span class="compte-settings__mandatory">(au moins 1)</span></span>
           <div class="pro-listing-photos__toolbar">
             <input
               ref="listingPhotoInputRef"
@@ -1349,6 +1349,19 @@ function collectListingFormMetricIssues(): string[] {
   return missing
 }
 
+function collectListingFormContentIssues(): string[] {
+  const missing: string[] = []
+  const hasDescription = editForm.value.description.trim().length > 0
+  const hasPhoto = editForm.value.images.some((src) => typeof src === 'string' && src.trim().length > 0)
+  if (!hasDescription) {
+    missing.push('la description')
+  }
+  if (!hasPhoto) {
+    missing.push('au moins une photo')
+  }
+  return missing
+}
+
 function onSubmitListing() {
   if (!isManager.value) {
     return
@@ -1374,11 +1387,21 @@ function onSubmitListing() {
   }
   editForm.value.features = uniq
 
+  const contentIssues = collectListingFormContentIssues()
+  if (contentIssues.length) {
+    showToast(
+      'Formulaire incomplet',
+      `Ajoutez ${formatMissingFieldsList(contentIssues)} avant d’enregistrer l’annonce.`,
+      'error',
+    )
+    return
+  }
+
   const metricIssues = collectListingFormMetricIssues()
   if (metricIssues.length) {
     showToast(
       'Formulaire incomplet',
-      `En plus du titre, de la ville et des photos, indiquez ${formatMissingFieldsList(metricIssues)}.`,
+      `En plus du titre, de la ville, de la description et d’au moins une photo, indiquez ${formatMissingFieldsList(metricIssues)}.`,
       'error',
     )
     return
