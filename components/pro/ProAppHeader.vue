@@ -9,13 +9,6 @@
 
       <nav class="pro-header__nav pro-header__nav--primary" aria-label="Navigation métier">
         <NuxtLink
-          to="/espace-pro/dashboard"
-          class="pro-header__link"
-          active-class="is-active"
-        >
-          Tableau de bord
-        </NuxtLink>
-        <NuxtLink
           to="/espace-pro/agence"
           class="pro-header__link"
           active-class="is-active"
@@ -24,17 +17,49 @@
         </NuxtLink>
         <NuxtLink
           to="/espace-pro/annonces"
+          class="pro-header__link pro-header__link--annonces"
+          active-class="is-active"
+        >
+          <span class="pro-header__link-text">Annonces</span>
+          <span
+            class="pro-header__annonces-badge"
+            :title="annoncesBadgeTitle"
+            role="status"
+            :aria-label="annoncesBadgeTitle"
+          >
+            <span class="pro-header__annonces-badge__n" aria-hidden="true">{{ annoncesBadgeLabel }}</span>
+          </span>
+        </NuxtLink>
+        <NuxtLink
+          to="/espace-pro/messages"
           class="pro-header__link"
           active-class="is-active"
         >
-          Annonces
+          Messages
         </NuxtLink>
         <NuxtLink
           to="/espace-pro/prospects"
-          class="pro-header__link"
+          class="pro-header__link pro-header__link--prospects"
           active-class="is-active"
         >
-          Prospects
+          <span class="pro-header__link-text">Prospects</span>
+          <span
+            class="pro-header__prospect-total-badge"
+            :title="totalProspectsTitle"
+            role="status"
+            :aria-label="totalProspectsTitle"
+          >
+            <span class="pro-header__prospect-total-badge__n" aria-hidden="true">{{ totalProspectsLabel }}</span>
+          </span>
+          <span
+            v-if="newProspectsBadgeCount > 0"
+            class="pro-header__prospect-badge"
+            :title="badgeTitle"
+            role="status"
+            :aria-label="badgeTitle"
+          >
+            <span class="pro-header__prospect-badge__n" aria-hidden="true">{{ badgeLabel }}</span>
+          </span>
         </NuxtLink>
       </nav>
 
@@ -62,8 +87,50 @@
 
 <script setup lang="ts">
 import logoSrc from '~/assets/images/logo.svg'
+import { buildProspectRows, criteriaFromLocationQuery } from '~/utils/build-prospect-rows'
 
 const siteStore = useSiteStore()
+const { newProspectsBadgeCount } = useProNewProspectsBadgeCount()
+
+const badgeTitle = computed(() =>
+  newProspectsBadgeCount.value === 1
+    ? '1 nouveau prospect (non vu, forte proximité)'
+    : `${newProspectsBadgeCount.value} nouveaux prospects (non vus, forte proximité)`,
+)
+
+const badgeLabel = computed(() =>
+  newProspectsBadgeCount.value > 9 ? '9+' : String(newProspectsBadgeCount.value),
+)
+
+const totalProspectsCount = computed(() => {
+  siteStore.ensureProListingsLoadedForPublic()
+  const rows = buildProspectRows(criteriaFromLocationQuery({}), siteStore)
+  return rows.length
+})
+
+const totalProspectsTitle = computed(() =>
+  totalProspectsCount.value === 1
+    ? '1 prospect au total'
+    : `${totalProspectsCount.value} prospects au total`,
+)
+
+const totalProspectsLabel = computed(() =>
+  totalProspectsCount.value > 99 ? '99+' : String(totalProspectsCount.value),
+)
+
+const activeListingsCount = computed(() =>
+  siteStore.currentProAgencyListings.filter((l) => l.status === 'active').length,
+)
+
+const annoncesBadgeTitle = computed(() =>
+  activeListingsCount.value === 1
+    ? '1 annonce en ligne'
+    : `${activeListingsCount.value} annonces en ligne`,
+)
+
+const annoncesBadgeLabel = computed(() =>
+  activeListingsCount.value > 99 ? '99+' : String(activeListingsCount.value),
+)
 
 const currentProUser = computed(() => siteStore.currentProUser)
 

@@ -1,6 +1,8 @@
 import type { EnergyLetter, SearchListing } from '~/data/mock-listings'
+import { buildDemoProCatalogListings } from '~/data/demo-pro-catalog-listings'
+import { getAgencyById, type Agency } from '~/data/agencies'
 import { ALL_PROPERTY_TYPE_SLUGS, PROPERTY_TYPE_GROUPS, type PropertyTypeSlug } from '~/data/property-types'
-import { proListingToSearchListing } from '~/utils/pro-listing-to-search'
+import { proAgencyIdToPublicNumeric, proListingToSearchListing } from '~/utils/pro-listing-to-search'
 
 function normalizeProListingPropertyType(raw: string | undefined | null): PropertyTypeSlug {
   const input = (raw ?? '').trim()
@@ -83,12 +85,51 @@ export const useSiteStore = defineStore('site', () => {
     messageBody: string
     listingId: string | null
     listingTitle: string
+    /** true = refuse suggestions Matchaa similaires */
+    optOutSimilar?: boolean
+    /** true = accepte offres partenaires */
+    optInPartners?: boolean
+    /** true = permissions navigateur accordees pour push desktop */
+    desktopPushGranted?: boolean
+    /** true = accepte d'etre contacte par telephone */
+    contactOptInPhone?: boolean
+    /** true = accepte d'etre contacte par e-mail */
+    contactOptInEmail?: boolean
+    /** telephone saisi dans le formulaire de contact */
+    contactPhone?: string
+  }
+  type ProspectActivitySnapshot = {
+    email: string
+    name: string
+    contactPhone: string
+    contactOptInPhone: boolean
+    contactOptInEmail: boolean
+    searches: SavedSearch[]
+    latestSearch: SavedSearch | null
+    sentMessages: SentMessage[]
+    activityCounts: {
+      views: number
+      favorites: number
+      leads: number
+      phoneReveals: number
+    }
+    recentActivityListingIds: string[]
+    recentActivityListingIdsByKind: {
+      views: string[]
+      favorites: string[]
+      leads: string[]
+      phoneReveals: string[]
+    }
+    lastActivityAt: string | null
   }
 
   type DemoUser = {
     name: string
     email: string
     password: string
+    contactPhone?: string
+    contactOptInPhone?: boolean
+    contactOptInEmail?: boolean
   }
 
   type ProRole = 'agent' | 'manager'
@@ -238,9 +279,12 @@ export const useSiteStore = defineStore('site', () => {
   const SEARCHES_KEY_PREFIX = 'matchaa-saved-searches'
   const LATEST_SEARCH_KEY_PREFIX = 'matchaa-latest-search'
   const MESSAGES_KEY_PREFIX = 'matchaa-sent-messages'
+  const PROSPECT_ACTIVITY_KEY_PREFIX = 'matchaa-prospect-activity'
+  const PUBLIC_PROFILE_KEY_PREFIX = 'matchaa-public-profile'
+  const ANON_PROSPECT_ID_KEY = 'matchaa-anon-prospect-id'
 
   const siteName = ref('Matchaa')
-  const currentUser = ref<Pick<DemoUser, 'name' | 'email'> | null>(null)
+  const currentUser = ref<Pick<DemoUser, 'name' | 'email' | 'contactPhone' | 'contactOptInPhone' | 'contactOptInEmail'> | null>(null)
   const currentProUser = ref<CurrentProUser | null>(null)
   const proMembers = ref<ProMember[]>([])
   const proAgencies = ref<ProAgency[]>([])
@@ -259,6 +303,396 @@ export const useSiteStore = defineStore('site', () => {
 
   function latestSearchStorageKey(email: string): string {
     return `${LATEST_SEARCH_KEY_PREFIX}:${email.toLowerCase()}`
+  }
+
+  function prospectActivityStorageKey(email: string): string {
+    return `${PROSPECT_ACTIVITY_KEY_PREFIX}:${email.toLowerCase()}`
+  }
+
+  function publicProfileStorageKey(email: string): string {
+    return `${PUBLIC_PROFILE_KEY_PREFIX}:${email.toLowerCase()}`
+  }
+
+  function loadPublicProfileByEmail(emailInput: string): {
+    contactPhone: string
+    contactOptInPhone: boolean
+    contactOptInEmail: boolean
+  } {
+    const email = emailInput.trim().toLowerCase()
+    if (!import.meta.client || !email) {
+      return { contactPhone: '', contactOptInPhone: false, contactOptInEmail: false }
+    }
+    try {
+      const raw = localStorage.getItem(publicProfileStorageKey(email))
+      if (!raw) {
+        return { contactPhone: '', contactOptInPhone: false, contactOptInEmail: false }
+      }
+      const parsed = JSON.parse(raw) as Partial<DemoUser>
+      return {
+        contactPhone: typeof parsed.contactPhone === 'string' ? parsed.contactPhone : '',
+        contactOptInPhone: parsed.contactOptInPhone === true,
+        contactOptInEmail: parsed.contactOptInEmail === true,
+      }
+    } catch {
+      return { contactPhone: '', contactOptInPhone: false, contactOptInEmail: false }
+    }
+  }
+
+  function isAnonymousProspectEmail(email: string): boolean {
+    return email.endsWith('@anonymous.matchaa')
+  }
+
+  function ensureAnonymousProspectEmail(): string {
+    if (!import.meta.client) {
+      return 'anon-server@anonymous.matchaa'
+    }
+    try {
+      const existing = localStorage.getItem(ANON_PROSPECT_ID_KEY)
+      if (existing && existing.trim()) {
+        return `anon-${existing.trim()}@anonymous.matchaa`
+      }
+      const created = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+      localStorage.setItem(ANON_PROSPECT_ID_KEY, created)
+      return `anon-${created}@anonymous.matchaa`
+    } catch {
+      return `anon-${Date.now().toString(36)}@anonymous.matchaa`
+    }
+  }
+
+  function prospectActorEmail(): string {
+    if (currentUser.value?.email) {
+      return currentUser.value.email.trim().toLowerCase()
+    }
+    return ensureAnonymousProspectEmail()
+  }
+
+  function parseTimestampFromEntityId(id: string | undefined): number | null {
+    if (!id) {
+      return null
+    }
+    const head = id.split('-', 1)[0] ?? ''
+    const n = Number(head)
+    return Number.isFinite(n) && n > 0 ? n : null
+  }
+
+  function bumpProspectActivityByEmail(
+    kind: 'view' | 'favorite' | 'lead' | 'phone',
+    email: string,
+    listingId: string | null,
+  ) {
+    if (!import.meta.client || !email.trim()) {
+      return
+    }
+    try {
+      const key = prospectActivityStorageKey(email)
+      const raw = localStorage.getItem(key)
+      const parsed = raw ? JSON.parse(raw) as {
+        views?: number
+        favorites?: number
+        leads?: number
+        phoneReveals?: number
+        recentActivityListingIds?: string[]
+        recentActivityListingIdsByKind?: {
+          views?: string[]
+          favorites?: string[]
+          leads?: string[]
+          phoneReveals?: string[]
+        }
+        updatedAt?: string
+      } : {}
+      const parsedByKind = parsed.recentActivityListingIdsByKind ?? {}
+      const next = {
+        views: Math.max(0, Number(parsed.views ?? 0)),
+        favorites: Math.max(0, Number(parsed.favorites ?? 0)),
+        leads: Math.max(0, Number(parsed.leads ?? 0)),
+        phoneReveals: Math.max(0, Number(parsed.phoneReveals ?? 0)),
+        recentActivityListingIds: Array.isArray(parsed.recentActivityListingIds)
+          ? parsed.recentActivityListingIds.filter((id): id is string => typeof id === 'string' && id.trim() !== '').slice(0, 80)
+          : [],
+        recentActivityListingIdsByKind: {
+          views: Array.isArray(parsedByKind.views)
+            ? parsedByKind.views.filter((id): id is string => typeof id === 'string' && id.trim() !== '').slice(0, 80)
+            : [],
+          favorites: Array.isArray(parsedByKind.favorites)
+            ? parsedByKind.favorites.filter((id): id is string => typeof id === 'string' && id.trim() !== '').slice(0, 80)
+            : [],
+          leads: Array.isArray(parsedByKind.leads)
+            ? parsedByKind.leads.filter((id): id is string => typeof id === 'string' && id.trim() !== '').slice(0, 80)
+            : [],
+          phoneReveals: Array.isArray(parsedByKind.phoneReveals)
+            ? parsedByKind.phoneReveals.filter((id): id is string => typeof id === 'string' && id.trim() !== '').slice(0, 80)
+            : [],
+        },
+        updatedAt: new Date().toISOString(),
+      }
+      if (kind === 'view') {
+        next.views += 1
+      } else if (kind === 'favorite') {
+        next.favorites += 1
+      } else if (kind === 'lead') {
+        next.leads += 1
+      } else if (kind === 'phone') {
+        next.phoneReveals += 1
+      }
+      if (listingId) {
+        next.recentActivityListingIds = [listingId, ...next.recentActivityListingIds.filter((id) => id !== listingId)].slice(0, 80)
+        if (kind === 'view') {
+          next.recentActivityListingIdsByKind.views = [listingId, ...next.recentActivityListingIdsByKind.views.filter((id) => id !== listingId)].slice(0, 80)
+        } else if (kind === 'favorite') {
+          next.recentActivityListingIdsByKind.favorites = [listingId, ...next.recentActivityListingIdsByKind.favorites.filter((id) => id !== listingId)].slice(0, 80)
+        } else if (kind === 'lead') {
+          next.recentActivityListingIdsByKind.leads = [listingId, ...next.recentActivityListingIdsByKind.leads.filter((id) => id !== listingId)].slice(0, 80)
+        } else if (kind === 'phone') {
+          next.recentActivityListingIdsByKind.phoneReveals = [listingId, ...next.recentActivityListingIdsByKind.phoneReveals.filter((id) => id !== listingId)].slice(0, 80)
+        }
+      }
+      localStorage.setItem(key, JSON.stringify(next))
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function bumpCurrentUserProspectActivity(
+    kind: 'view' | 'favorite' | 'lead' | 'phone',
+    listingId: string | null,
+  ) {
+    if (!import.meta.client) {
+      return
+    }
+    bumpProspectActivityByEmail(kind, prospectActorEmail(), listingId)
+  }
+
+  function listProspectActivitySnapshots(): ProspectActivitySnapshot[] {
+    if (!import.meta.client) {
+      return []
+    }
+    const byEmail = new Map<string, ProspectActivitySnapshot>()
+    const ensureSnapshot = (emailInput: string): ProspectActivitySnapshot | null => {
+      const email = emailInput.trim().toLowerCase()
+      if (!email) {
+        return null
+      }
+      const existing = byEmail.get(email)
+      if (existing) {
+        return existing
+      }
+      const demo = DEMO_USERS.find((u) => u.email.toLowerCase() === email)
+      const profile = loadPublicProfileByEmail(email)
+      const fallbackName = isAnonymousProspectEmail(email)
+        ? 'Visiteur anonyme'
+        : (email.split('@')[0]?.replace(/[._-]+/g, ' ') || email)
+      const snapshot: ProspectActivitySnapshot = {
+        email,
+        name: demo?.name ?? fallbackName,
+        contactPhone: profile.contactPhone,
+        contactOptInPhone: profile.contactOptInPhone,
+        contactOptInEmail: profile.contactOptInEmail,
+        searches: [],
+        latestSearch: null,
+        sentMessages: [],
+        activityCounts: {
+          views: 0,
+          favorites: 0,
+          leads: 0,
+          phoneReveals: 0,
+        },
+        recentActivityListingIds: [],
+        recentActivityListingIdsByKind: {
+          views: [],
+          favorites: [],
+          leads: [],
+          phoneReveals: [],
+        },
+        lastActivityAt: null,
+      }
+      byEmail.set(email, snapshot)
+      return snapshot
+    }
+
+    const bumpLastActivity = (snapshot: ProspectActivitySnapshot, ts: number | null) => {
+      if (!ts) {
+        return
+      }
+      const cur = snapshot.lastActivityAt ? new Date(snapshot.lastActivityAt).getTime() : 0
+      if (ts > cur) {
+        snapshot.lastActivityAt = new Date(ts).toISOString()
+      }
+    }
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (!key) {
+        continue
+      }
+      if (key.startsWith(`${SEARCHES_KEY_PREFIX}:`)) {
+        const email = key.slice(`${SEARCHES_KEY_PREFIX}:`.length)
+        const snapshot = ensureSnapshot(email)
+        if (!snapshot) {
+          continue
+        }
+        try {
+          const raw = localStorage.getItem(key)
+          const parsed = raw ? JSON.parse(raw) as unknown : []
+          if (!Array.isArray(parsed)) {
+            continue
+          }
+          snapshot.searches = parsed
+            .filter((s): s is SavedSearch =>
+              Boolean(
+                s
+                && typeof (s as SavedSearch).id === 'string'
+                && typeof (s as SavedSearch).title === 'string'
+                && typeof (s as SavedSearch).description === 'string'
+                && (s as SavedSearch).to?.path === '/annonces'
+                && typeof (s as SavedSearch).to?.query === 'object',
+              ),
+            )
+            .slice(0, 50)
+          for (const s of snapshot.searches) {
+            bumpLastActivity(snapshot, parseTimestampFromEntityId(s.id))
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      if (key.startsWith(`${LATEST_SEARCH_KEY_PREFIX}:`)) {
+        const email = key.slice(`${LATEST_SEARCH_KEY_PREFIX}:`.length)
+        const snapshot = ensureSnapshot(email)
+        if (!snapshot) {
+          continue
+        }
+        try {
+          const raw = localStorage.getItem(key)
+          const parsed = raw ? JSON.parse(raw) as SavedSearch : null
+          if (
+            parsed
+            && typeof parsed.id === 'string'
+            && parsed.to?.path === '/annonces'
+            && typeof parsed.to?.query === 'object'
+          ) {
+            snapshot.latestSearch = parsed
+            bumpLastActivity(snapshot, parseTimestampFromEntityId(parsed.id))
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      if (key.startsWith(`${MESSAGES_KEY_PREFIX}:`)) {
+        const email = key.slice(`${MESSAGES_KEY_PREFIX}:`.length)
+        const snapshot = ensureSnapshot(email)
+        if (!snapshot) {
+          continue
+        }
+        try {
+          const raw = localStorage.getItem(key)
+          const parsed = raw ? JSON.parse(raw) as unknown : []
+          if (!Array.isArray(parsed)) {
+            continue
+          }
+          snapshot.sentMessages = parsed
+            .filter((m): m is SentMessage =>
+              Boolean(
+                m
+                && typeof (m as SentMessage).id === 'string'
+                && typeof (m as SentMessage).agency === 'string'
+                && typeof (m as SentMessage).text === 'string',
+              ),
+            )
+            .map((m) => ({
+              id: m.id,
+              agency: m.agency,
+              text: m.text,
+              messageBody: m.messageBody ?? '',
+              listingId: typeof m.listingId === 'string' ? m.listingId : null,
+              listingTitle: m.listingTitle ?? '',
+              optOutSimilar: m.optOutSimilar === true,
+              optInPartners: m.optInPartners === true,
+              desktopPushGranted: m.desktopPushGranted === true,
+              contactOptInPhone: m.contactOptInPhone === true,
+              contactOptInEmail: m.contactOptInEmail === true,
+              contactPhone: typeof m.contactPhone === 'string' ? m.contactPhone : '',
+            }))
+            .slice(0, 100)
+          for (const m of snapshot.sentMessages) {
+            bumpLastActivity(snapshot, parseTimestampFromEntityId(m.id))
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      if (key.startsWith(`${PROSPECT_ACTIVITY_KEY_PREFIX}:`)) {
+        const email = key.slice(`${PROSPECT_ACTIVITY_KEY_PREFIX}:`.length)
+        const snapshot = ensureSnapshot(email)
+        if (!snapshot) {
+          continue
+        }
+        try {
+          const raw = localStorage.getItem(key)
+          const parsed = raw ? JSON.parse(raw) as {
+            views?: number
+            favorites?: number
+            leads?: number
+            phoneReveals?: number
+            recentActivityListingIds?: string[]
+            recentActivityListingIdsByKind?: {
+              views?: string[]
+              favorites?: string[]
+              leads?: string[]
+              phoneReveals?: string[]
+            }
+            updatedAt?: string
+          } : {}
+          const parsedByKind = parsed.recentActivityListingIdsByKind ?? {}
+          snapshot.activityCounts = {
+            views: Math.max(0, Number(parsed.views ?? 0)),
+            favorites: Math.max(0, Number(parsed.favorites ?? 0)),
+            leads: Math.max(0, Number(parsed.leads ?? 0)),
+            phoneReveals: Math.max(0, Number(parsed.phoneReveals ?? 0)),
+          }
+          snapshot.recentActivityListingIds = Array.isArray(parsed.recentActivityListingIds)
+            ? parsed.recentActivityListingIds.filter((id): id is string => typeof id === 'string' && id.trim() !== '').slice(0, 60)
+            : []
+          snapshot.recentActivityListingIdsByKind = {
+            views: Array.isArray(parsedByKind.views)
+              ? parsedByKind.views.filter((id): id is string => typeof id === 'string' && id.trim() !== '').slice(0, 60)
+              : [],
+            favorites: Array.isArray(parsedByKind.favorites)
+              ? parsedByKind.favorites.filter((id): id is string => typeof id === 'string' && id.trim() !== '').slice(0, 60)
+              : [],
+            leads: Array.isArray(parsedByKind.leads)
+              ? parsedByKind.leads.filter((id): id is string => typeof id === 'string' && id.trim() !== '').slice(0, 60)
+              : [],
+            phoneReveals: Array.isArray(parsedByKind.phoneReveals)
+              ? parsedByKind.phoneReveals.filter((id): id is string => typeof id === 'string' && id.trim() !== '').slice(0, 60)
+              : [],
+          }
+          if (!snapshot.recentActivityListingIdsByKind.views.length && snapshot.recentActivityListingIds.length) {
+            // Compat ascendante: anciens enregistrements sans détail par interaction.
+            snapshot.recentActivityListingIdsByKind.views = [...snapshot.recentActivityListingIds]
+            snapshot.recentActivityListingIdsByKind.favorites = [...snapshot.recentActivityListingIds]
+            snapshot.recentActivityListingIdsByKind.phoneReveals = [...snapshot.recentActivityListingIds]
+          }
+          if (parsed.updatedAt) {
+            const ts = new Date(parsed.updatedAt).getTime()
+            bumpLastActivity(snapshot, Number.isFinite(ts) ? ts : null)
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    return [...byEmail.values()]
+      .filter((p) =>
+        p.searches.length > 0
+        || p.latestSearch
+        || p.sentMessages.length > 0
+        || (p.activityCounts.views + p.activityCounts.favorites + p.activityCounts.leads + p.activityCounts.phoneReveals) > 0,
+      )
+      .sort((a, b) => {
+        const at = a.lastActivityAt ? new Date(a.lastActivityAt).getTime() : 0
+        const bt = b.lastActivityAt ? new Date(b.lastActivityAt).getTime() : 0
+        return bt - at
+      })
   }
 
   function loadSavedSearches() {
@@ -366,6 +800,12 @@ export const useSiteStore = defineStore('site', () => {
                   ? String(m.listingId)
                   : null,
             listingTitle: m.listingTitle ?? '',
+            optOutSimilar: m.optOutSimilar === true,
+            optInPartners: m.optInPartners === true,
+            desktopPushGranted: m.desktopPushGranted === true,
+            contactOptInPhone: m.contactOptInPhone === true,
+            contactOptInEmail: m.contactOptInEmail === true,
+            contactPhone: typeof m.contactPhone === 'string' ? m.contactPhone : '',
           }))
       } else {
         sentMessages.value = []
@@ -403,7 +843,13 @@ export const useSiteStore = defineStore('site', () => {
     if (!found) {
       return false
     }
-    currentUser.value = { name: found.name, email: found.email }
+    currentUser.value = {
+      name: found.name,
+      email: found.email,
+      contactPhone: found.contactPhone ?? '',
+      contactOptInPhone: found.contactOptInPhone ?? false,
+      contactOptInEmail: found.contactOptInEmail ?? false,
+    }
     if (import.meta.client) {
       localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser.value))
     }
@@ -416,7 +862,13 @@ export const useSiteStore = defineStore('site', () => {
   function createDemoAccount(name: string, email: string) {
     const nextName = name.trim() || 'Utilisateur Matchaa'
     const nextEmail = email.trim().toLowerCase()
-    currentUser.value = { name: nextName, email: nextEmail }
+    currentUser.value = {
+      name: nextName,
+      email: nextEmail,
+      contactPhone: '',
+      contactOptInPhone: false,
+      contactOptInEmail: false,
+    }
     if (import.meta.client) {
       localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser.value))
     }
@@ -646,15 +1098,67 @@ export const useSiteStore = defineStore('site', () => {
         mergedMembers.push(member)
       }
     }
-    // Pas d'annonces fictives au premier chargement : uniquement ce qui est en localStorage
-    // (créé / modifié depuis l'espace pro), aligné avec le catalogue public.
+    // Seed catalogue démo seulement pour l'agence du compte pro connecté.
+    let targetSeedAgencyId: string | null = currentProUser.value?.agencyId ?? null
+    if (!targetSeedAgencyId && import.meta.client) {
+      try {
+        const rawSession = localStorage.getItem(PRO_SESSION_KEY)
+        if (rawSession) {
+          const parsedSession = JSON.parse(rawSession) as Partial<CurrentProUser>
+          if (typeof parsedSession.agencyId === 'string' && parsedSession.agencyId.trim()) {
+            targetSeedAgencyId = parsedSession.agencyId.trim()
+          } else if (typeof parsedSession.id === 'string' && parsedSession.id.trim()) {
+            const foundById = mergedMembers.find((m) => m.id === parsedSession.id)
+            targetSeedAgencyId = foundById?.agencyId ?? null
+          } else if (typeof parsedSession.email === 'string' && parsedSession.email.trim()) {
+            const foundByEmail = mergedMembers.find((m) => m.email.toLowerCase() === parsedSession.email?.toLowerCase())
+            targetSeedAgencyId = foundByEmail?.agencyId ?? null
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    if (!targetSeedAgencyId) {
+      targetSeedAgencyId = 'agency-demo-test'
+    }
+
     const fromStorage = storedListings === null ? [] : [...storedListings]
-    const mergedListings = fromStorage.filter((l) => !LEGACY_SEEDED_PRO_LISTING_IDS.has(l.id))
+    let mergedListings = fromStorage.filter(
+      (l) => !LEGACY_SEEDED_PRO_LISTING_IDS.has(l.id),
+    )
+    if (targetSeedAgencyId) {
+      mergedListings = mergedListings.filter(
+        (l) => !l.id.startsWith('demo-catalog-') || l.agencyId === targetSeedAgencyId,
+      )
+    }
     const removedLegacySeed = fromStorage.length !== mergedListings.length
+    const byIdIndex = new Map(mergedListings.map((l, i) => [l.id, i]))
+    let addedDemoCatalog = 0
+    let refreshedDemoCatalog = 0
+    for (const row of buildDemoProCatalogListings(targetSeedAgencyId)) {
+      const existingIdx = byIdIndex.get(row.id)
+      if (existingIdx === undefined) {
+        mergedListings.push(row as ProListing)
+        byIdIndex.set(row.id, mergedListings.length - 1)
+        addedDemoCatalog++
+      } else {
+        const existing = mergedListings[existingIdx]
+        mergedListings[existingIdx] = {
+          ...(row as ProListing),
+          viewCount: existing.viewCount ?? 0,
+          favoriteCount: existing.favoriteCount ?? 0,
+          leadCount: existing.leadCount ?? 0,
+          phoneRevealCount: existing.phoneRevealCount ?? 0,
+        }
+        refreshedDemoCatalog++
+      }
+    }
+
     proAgencies.value = mergedAgencies
     proMembers.value = mergedMembers
     proListings.value = mergedListings
-    if (import.meta.client && removedLegacySeed) {
+    if (import.meta.client && (removedLegacySeed || addedDemoCatalog > 0 || refreshedDemoCatalog > 0)) {
       persistProData()
     }
   }
@@ -693,6 +1197,7 @@ export const useSiteStore = defineStore('site', () => {
       viewCount: Math.max(0, (cur.viewCount ?? 0) + 1),
     }
     persistProData()
+    bumpCurrentUserProspectActivity('view', listingId)
   }
 
   function applyListingFavoriteDelta(listingId: string, delta: number) {
@@ -710,6 +1215,9 @@ export const useSiteStore = defineStore('site', () => {
       favoriteCount: Math.max(0, (cur.favoriteCount ?? 0) + delta),
     }
     persistProData()
+    if (delta > 0) {
+      bumpCurrentUserProspectActivity('favorite', listingId)
+    }
   }
 
   function recordListingLead(listingId: string) {
@@ -727,6 +1235,7 @@ export const useSiteStore = defineStore('site', () => {
       leadCount: Math.max(0, (cur.leadCount ?? 0) + 1),
     }
     persistProData()
+    bumpCurrentUserProspectActivity('lead', listingId)
   }
 
   function recordListingPhoneReveal(listingId: string) {
@@ -744,6 +1253,7 @@ export const useSiteStore = defineStore('site', () => {
       phoneRevealCount: Math.max(0, (cur.phoneRevealCount ?? 0) + 1),
     }
     persistProData()
+    bumpCurrentUserProspectActivity('phone', listingId)
   }
 
   const publicActiveSearchListings = computed<SearchListing[]>(() =>
@@ -751,6 +1261,33 @@ export const useSiteStore = defineStore('site', () => {
       .filter((l) => l.status === 'active')
       .map((p) => proListingToSearchListing(p)),
   )
+
+  const publicAgencyByNumericId = computed<Map<number, Agency>>(() => {
+    const map = new Map<number, Agency>()
+    for (const a of proAgencies.value) {
+      const id = proAgencyIdToPublicNumeric(a.id)
+      const shortName = a.name.trim().split(/\s+/).slice(0, 2).join(' ') || a.name
+      const phoneDisplay = a.contactPhone?.trim() || 'Non renseigné'
+      const phoneTel = phoneDisplay.replace(/[^\d+]/g, '') || ''
+      map.set(id, {
+        id,
+        name: a.name,
+        shortName,
+        logo: a.logo || '',
+        city: a.city || '',
+        phoneDisplay,
+        phoneTel,
+        email: a.contactEmail || '',
+        siret: '—',
+        blurb: a.description || 'Agence professionnelle Matchaa.',
+      })
+    }
+    return map
+  })
+
+  function getPublicAgencyByListingAgencyId(agencyId: number): Agency | undefined {
+    return publicAgencyByNumericId.value.get(agencyId) ?? getAgencyById(agencyId)
+  }
 
   function loginPro(email: string, password: string): boolean {
     loadProData()
@@ -847,15 +1384,31 @@ export const useSiteStore = defineStore('site', () => {
     }
   }
 
-  function updateProfile(name: string, email: string) {
+  function updateProfile(
+    name: string,
+    email: string,
+    contactOpts?: { phone?: boolean; email?: boolean },
+    contactPhone?: string,
+  ) {
     if (!currentUser.value) {
       return
     }
     const nextName = name.trim() || currentUser.value.name
     const nextEmail = email.trim().toLowerCase() || currentUser.value.email
-    currentUser.value = { name: nextName, email: nextEmail }
+    currentUser.value = {
+      name: nextName,
+      email: nextEmail,
+      contactPhone: contactPhone?.trim() ?? currentUser.value.contactPhone ?? '',
+      contactOptInPhone: contactOpts?.phone ?? currentUser.value.contactOptInPhone ?? false,
+      contactOptInEmail: contactOpts?.email ?? currentUser.value.contactOptInEmail ?? false,
+    }
     if (import.meta.client) {
       localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser.value))
+      localStorage.setItem(publicProfileStorageKey(nextEmail), JSON.stringify({
+        contactPhone: currentUser.value.contactPhone ?? '',
+        contactOptInPhone: currentUser.value.contactOptInPhone === true,
+        contactOptInEmail: currentUser.value.contactOptInEmail === true,
+      }))
     }
   }
 
@@ -905,9 +1458,15 @@ export const useSiteStore = defineStore('site', () => {
       if (!raw) {
         return
       }
-      const parsed = JSON.parse(raw) as Pick<DemoUser, 'name' | 'email'>
+      const parsed = JSON.parse(raw) as Pick<DemoUser, 'name' | 'email' | 'contactPhone' | 'contactOptInPhone' | 'contactOptInEmail'>
       if (parsed?.name && parsed?.email) {
-        currentUser.value = parsed
+        currentUser.value = {
+          name: parsed.name,
+          email: parsed.email,
+          contactPhone: typeof parsed.contactPhone === 'string' ? parsed.contactPhone : '',
+          contactOptInPhone: parsed.contactOptInPhone === true,
+          contactOptInEmail: parsed.contactOptInEmail === true,
+        }
         loadSavedSearches()
         loadLatestSearch()
         loadSentMessages()
@@ -1098,7 +1657,14 @@ export const useSiteStore = defineStore('site', () => {
       dpe: input.dpe,
       ges: input.ges,
       features: input.features,
-      images: input.images.length ? input.images : ['https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80'],
+      images: input.images.length
+        ? input.images
+        : [
+            'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
+            'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80',
+            'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=1200&q=80',
+            'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80',
+          ],
       description: input.description.trim(),
       publishedAt: input.publishedAt || new Date().toISOString(),
       relevanceScore: Math.max(0, Math.round(input.relevanceScore)),
@@ -1268,15 +1834,33 @@ export const useSiteStore = defineStore('site', () => {
   }
 
   function saveLatestSearch(input: Omit<SavedSearch, 'id'>) {
-    if (!currentUser.value) {
-      return
-    }
+    const actorEmail = prospectActorEmail()
     const next: SavedSearch = {
       ...input,
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     }
-    latestSearch.value = next
-    persistLatestSearch()
+    if (currentUser.value) {
+      latestSearch.value = next
+      persistLatestSearch()
+      return
+    }
+    if (!import.meta.client) {
+      return
+    }
+    try {
+      localStorage.setItem(latestSearchStorageKey(actorEmail), JSON.stringify(next))
+      const searchesKey = searchesStorageKey(actorEmail)
+      const raw = localStorage.getItem(searchesKey)
+      const parsed = raw ? JSON.parse(raw) as SavedSearch[] : []
+      const signature = JSON.stringify(next.to)
+      const deduped = Array.isArray(parsed)
+        ? parsed.filter((s) => JSON.stringify(s.to) !== signature)
+        : []
+      const merged = [next, ...deduped].slice(0, 20)
+      localStorage.setItem(searchesKey, JSON.stringify(merged))
+    } catch {
+      /* ignore */
+    }
   }
 
   function createAlertFromLatestSearch() {
@@ -1300,10 +1884,19 @@ export const useSiteStore = defineStore('site', () => {
     persistSavedSearches()
   }
 
-  function addSentMessage(input: { agency: string; listingTitle: string; listingId: string | null; messageBody: string }) {
-    if (!currentUser.value) {
-      return
-    }
+  function addSentMessage(input: {
+    agency: string
+    listingTitle: string
+    listingId: string | null
+    messageBody: string
+    optOutSimilar?: boolean
+    optInPartners?: boolean
+    desktopPushGranted?: boolean
+    contactOptInPhone?: boolean
+    contactOptInEmail?: boolean
+    contactPhone?: string
+  }) {
+    const actorEmail = prospectActorEmail()
     const sentAt = new Date().toLocaleDateString('fr-FR')
     const next: SentMessage = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -1312,9 +1905,27 @@ export const useSiteStore = defineStore('site', () => {
       messageBody: input.messageBody.trim(),
       listingId: input.listingId,
       listingTitle: input.listingTitle,
+      optOutSimilar: input.optOutSimilar === true,
+      optInPartners: input.optInPartners === true,
+      desktopPushGranted: input.desktopPushGranted === true,
+      contactOptInPhone: input.contactOptInPhone === true,
+      contactOptInEmail: input.contactOptInEmail === true,
+      contactPhone: input.contactPhone?.trim() ?? '',
     }
-    sentMessages.value = [next, ...sentMessages.value].slice(0, 30)
-    persistSentMessages()
+    if (currentUser.value) {
+      sentMessages.value = [next, ...sentMessages.value].slice(0, 30)
+      persistSentMessages()
+    } else if (import.meta.client) {
+      try {
+        const key = messagesStorageKey(actorEmail)
+        const raw = localStorage.getItem(key)
+        const parsed = raw ? JSON.parse(raw) as SentMessage[] : []
+        const merged = [next, ...(Array.isArray(parsed) ? parsed : [])].slice(0, 30)
+        localStorage.setItem(key, JSON.stringify(merged))
+      } catch {
+        /* ignore */
+      }
+    }
     if (input.listingId) {
       recordListingLead(input.listingId)
     }
@@ -1369,5 +1980,7 @@ export const useSiteStore = defineStore('site', () => {
     applyListingFavoriteDelta,
     recordListingLead,
     recordListingPhoneReveal,
+    getPublicAgencyByListingAgencyId,
+    listProspectActivitySnapshots,
   }
 })

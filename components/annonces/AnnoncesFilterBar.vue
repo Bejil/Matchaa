@@ -98,6 +98,9 @@
             </svg>
           </button>
         </div>
+        <div v-if="$slots.actions" class="annonces-filters__actions">
+          <slot name="actions" />
+        </div>
       </div>
     </div>
   </div>
@@ -156,7 +159,7 @@
             </ul>
           </div>
         </label>
-        <AnnoncesPopoverFooter :count="draftPreviewCount" @cancel="cancel" @submit="applyProjet" />
+        <AnnoncesPopoverFooter :count="draftPreviewCount" :show-count="showResultCount" @cancel="cancel" @submit="applyProjet" />
       </div>
 
       <div
@@ -190,7 +193,7 @@
             </div>
           </fieldset>
         </div>
-        <AnnoncesPopoverFooter :count="draftPreviewCount" @cancel="cancel" @submit="applyTypes" />
+        <AnnoncesPopoverFooter :count="draftPreviewCount" :show-count="showResultCount" @cancel="cancel" @submit="applyTypes" />
       </div>
 
       <div
@@ -211,7 +214,7 @@
             <input v-model="draft.pmax" type="number" min="0" class="annonces-popover__input" placeholder="Max">
           </label>
         </div>
-        <AnnoncesPopoverFooter :count="draftPreviewCount" @cancel="cancel" @submit="applyBudget" />
+        <AnnoncesPopoverFooter :count="draftPreviewCount" :show-count="showResultCount" @cancel="cancel" @submit="applyBudget" />
       </div>
 
       <div
@@ -232,7 +235,7 @@
             <input v-model="draft.smax" type="number" min="0" class="annonces-popover__input" placeholder="Max">
           </label>
         </div>
-        <AnnoncesPopoverFooter :count="draftPreviewCount" @cancel="cancel" @submit="applySurface" />
+        <AnnoncesPopoverFooter :count="draftPreviewCount" :show-count="showResultCount" @cancel="cancel" @submit="applySurface" />
       </div>
 
       <div
@@ -263,7 +266,7 @@
             <input v-model="draft.chmax" type="number" min="0" class="annonces-popover__input" placeholder="Max">
           </label>
         </div>
-        <AnnoncesPopoverFooter :count="draftPreviewCount" @cancel="cancel" @submit="applyPieces" />
+        <AnnoncesPopoverFooter :count="draftPreviewCount" :show-count="showResultCount" @cancel="cancel" @submit="applyPieces" />
       </div>
 
       <div
@@ -300,7 +303,7 @@
             </label>
           </div>
         </div>
-        <AnnoncesPopoverFooter :count="draftPreviewCount" @cancel="cancel" @submit="applyMore" />
+        <AnnoncesPopoverFooter :count="draftPreviewCount" :show-count="showResultCount" @cancel="cancel" @submit="applyMore" />
       </div>
     </Teleport>
   </ClientOnly>
@@ -317,10 +320,13 @@ import {
   type ProjetFilter,
 } from '~/composables/useAnnoncesSearch'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   parsed: AnnoncesParsedQuery
   mergeQuery: (updates: Record<string, string | undefined>) => void
-}>()
+  showResultCount?: boolean
+}>(), {
+  showResultCount: true,
+})
 
 const siteStore = useSiteStore()
 siteStore.ensureProListingsLoadedForPublic()

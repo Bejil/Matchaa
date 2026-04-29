@@ -9,7 +9,15 @@ const PRO_AGENCY_STRING_TO_NUMERIC: Record<string, number> = {
 }
 
 export function proAgencyIdToPublicNumeric(agencyId: string): number {
-  return PRO_AGENCY_STRING_TO_NUMERIC[agencyId] ?? 1
+  if (PRO_AGENCY_STRING_TO_NUMERIC[agencyId]) {
+    return PRO_AGENCY_STRING_TO_NUMERIC[agencyId]
+  }
+  // Mapping stable pour toutes les agences pro, sans collision avec MOCK_AGENCIES (1..12).
+  let h = 0
+  for (const ch of agencyId) {
+    h = ((h * 31) + ch.charCodeAt(0)) >>> 0
+  }
+  return 1000 + (h % 900000)
 }
 
 export type ProListingPublicInput = {
@@ -108,6 +116,9 @@ export function proListingToSearchListing(input: ProListingPublicInput): SearchL
       ? input.images
       : [
           'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
+          'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80',
+          'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=1200&q=80',
+          'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80',
         ],
     description: input.description,
     publishedAt: input.publishedAt,

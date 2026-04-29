@@ -34,9 +34,15 @@
   position: absolute;
   inset: 0;
   z-index: 1;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
   border-radius: inherit;
   text-decoration: none;
   color: inherit;
+  cursor: pointer;
 }
 
 .listing-card__media-col,

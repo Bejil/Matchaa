@@ -17,7 +17,7 @@
 .annonces-filters__inner {
   max-width: var(--max-width);
   margin: 0 auto;
-  padding: 0.65rem 1.25rem 0.75rem;
+  padding: 0.75rem 1.25rem;
 }
 
 .annonces-filters__pills {
@@ -32,6 +32,13 @@
 .annonces-filters__pill-wrap {
   position: relative;
   flex: 0 0 auto;
+}
+
+.annonces-filters__actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .annonces-filters__pill {

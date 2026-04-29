@@ -34,6 +34,8 @@
   height: 1.75rem;
   width: auto;
   flex-shrink: 0;
+  color: var(--color-accent);
+  fill: currentColor;
 }
 
 .header__logo {

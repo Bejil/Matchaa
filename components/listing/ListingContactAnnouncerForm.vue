@@ -271,6 +271,13 @@ const optOutSimilar = ref(false)
 const optInPartners = ref(false)
 const selectedSuggestionIds = ref<string[]>([])
 
+function hasDesktopPushConsent(): boolean {
+  if (!import.meta.client || typeof window === 'undefined' || !('Notification' in window)) {
+    return false
+  }
+  return Notification.permission === 'granted'
+}
+
 const currentListing = computed(() => {
   siteStore.ensureProListingsLoadedForPublic()
   return siteStore.publicActiveSearchListings.find((l) => l.id === props.listingId)
@@ -294,11 +301,29 @@ function onRevealPhone() {
 
 function onSubmit() {
   siteStore.hydrateSession()
+  const contactPhone = `${phoneCc.value} ${phone.value}`.trim()
+  if (siteStore.currentUser) {
+    siteStore.updateProfile(
+      name.value,
+      email.value,
+      {
+        phone: !optOutSimilar.value,
+        email: !optOutSimilar.value,
+      },
+      contactPhone,
+    )
+  }
   siteStore.addSentMessage({
     agency: props.agencyName,
     listingTitle: currentListing.value?.title ?? 'Annonce immobiliere',
     listingId: currentListing.value?.id ?? null,
     messageBody: message.value || `Bonjour, je souhaite obtenir plus d'informations sur l'annonce.`,
+    contactOptInPhone: !optOutSimilar.value,
+    contactOptInEmail: !optOutSimilar.value,
+    contactPhone,
+    optOutSimilar: optOutSimilar.value,
+    optInPartners: optInPartners.value,
+    desktopPushGranted: hasDesktopPushConsent(),
   })
   if (props.hideTitle) {
     emit('request-close-container')
@@ -320,6 +345,21 @@ function onSubmit() {
   }, 3200)
 }
 
+function applyPhoneFromProfile(raw: string | undefined) {
+  const v = (raw ?? '').trim()
+  if (!v) {
+    return
+  }
+  const compact = v.replace(/\s+/g, '')
+  const cc = phoneCountries.find((c) => compact.startsWith(c.dial.replace(/\s+/g, '')))
+  if (cc) {
+    phoneCc.value = cc.dial
+    phone.value = v.slice(cc.dial.length).trim()
+    return
+  }
+  phone.value = v
+}
+
 function formatSuggestionPrice(l: SearchListing): string {
   if (l.projet === 'louer') {
     return `${l.price.toLocaleString('fr-FR')} € / mois`
@@ -331,6 +371,18 @@ function contactSelectedSuggestion() {
   if (!selectedSuggestionIds.value.length) {
     return
   }
+  const contactPhone = `${phoneCc.value} ${phone.value}`.trim()
+  if (siteStore.currentUser) {
+    siteStore.updateProfile(
+      name.value,
+      email.value,
+      {
+        phone: !optOutSimilar.value,
+        email: !optOutSimilar.value,
+      },
+      contactPhone,
+    )
+  }
   const selectedListings = similarSuggestions.value.filter((item) =>
     selectedSuggestionIds.value.includes(item.id),
   )
@@ -340,6 +392,12 @@ function contactSelectedSuggestion() {
       listingTitle: listing.title,
       listingId: listing.id,
       messageBody: `Bonjour, je souhaite obtenir plus d'informations sur l'annonce.`,
+      contactOptInPhone: !optOutSimilar.value,
+      contactOptInEmail: !optOutSimilar.value,
+      contactPhone,
+      optOutSimilar: optOutSimilar.value,
+      optInPartners: optInPartners.value,
+      desktopPushGranted: hasDesktopPushConsent(),
     })
   }
   showSentModal.value = false
@@ -352,4 +410,26 @@ function contactSelectedSuggestion() {
     sendToastTimer = null
   }, 3200)
 }
+
+watch(
+  () => siteStore.currentUser,
+  (user) => {
+    if (!user) {
+      name.value = ''
+      email.value = ''
+      phone.value = ''
+      optOutSimilar.value = false
+      return
+    }
+    name.value = user.name ?? ''
+    email.value = user.email ?? ''
+    phoneCc.value = '+33'
+    phone.value = ''
+    applyPhoneFromProfile(user.contactPhone)
+    const acceptsAgencyContact = user.contactOptInPhone === true || user.contactOptInEmail === true
+    // Liaison inverse avec "Je ne souhaite pas recevoir..."
+    optOutSimilar.value = !acceptsAgencyContact
+  },
+  { immediate: true },
+)
 </script>

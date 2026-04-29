@@ -308,8 +308,18 @@
               <label class="compte-settings__label" for="settings-email">Email</label>
               <input id="settings-email" v-model.trim="settingsEmail" class="compte-settings__input" type="email" required>
 
+              <label class="compte-settings__label" for="settings-phone">Téléphone</label>
+              <input id="settings-phone" v-model.trim="settingsPhone" class="compte-settings__input" type="tel" placeholder="Ex : 06 12 34 56 78">
+
               <label class="compte-settings__label" for="settings-password">Nouveau mot de passe</label>
               <input id="settings-password" v-model="settingsPassword" class="compte-settings__input" type="password" placeholder="Laisser vide pour ne pas changer">
+
+              <div class="listing-contact-form__checks">
+                <label class="listing-contact-form__check listing-contact-form__check--settings-optin">
+                  <input v-model="settingsContactOptIn" type="checkbox" name="settingsContactOptIn">
+                  <span>J’accepte d’être contacté (par email ou téléphone) par les agences.</span>
+                </label>
+              </div>
 
               <button type="submit" class="profil-account__btn profil-account__btn--primary">Enregistrer</button>
             </form>
@@ -434,7 +444,9 @@ const contactListing = ref<SearchListing | null>(null)
 
 const settingsName = ref('')
 const settingsEmail = ref('')
+const settingsPhone = ref('')
 const settingsPassword = ref('')
+const settingsContactOptIn = ref(false)
 const favoriteListings = computed(() => {
   siteStore.ensureProListingsLoadedForPublic()
   return siteStore.publicActiveSearchListings.filter((l) => favoritesStore.ids.includes(l.id))
@@ -498,6 +510,8 @@ onMounted(() => {
   }
   settingsName.value = siteStore.currentUser.name
   settingsEmail.value = siteStore.currentUser.email
+  settingsPhone.value = siteStore.currentUser.contactPhone ?? ''
+  settingsContactOptIn.value = siteStore.currentUser.contactOptInPhone === true || siteStore.currentUser.contactOptInEmail === true
 })
 
 watch(
@@ -531,7 +545,10 @@ function onLogout() {
 }
 
 function onSaveSettings() {
-  siteStore.updateProfile(settingsName.value, settingsEmail.value)
+  siteStore.updateProfile(settingsName.value, settingsEmail.value, {
+    phone: settingsContactOptIn.value,
+    email: settingsContactOptIn.value,
+  }, settingsPhone.value)
   settingsPassword.value = ''
   settingsToastVisible.value = true
   if (settingsToastTimer) {

@@ -115,9 +115,9 @@
                   <p class="listing-card__price">{{ formatListingPrice(item) }}</p>
                   <h3 class="listing-card__title">{{ item.title }}</h3>
                   <p class="listing-card__loc">{{ item.city }} · {{ labelForPropertyType(item.propertyType) }}</p>
-                  <p v-if="getAgencyById(item.agencyId)" class="listing-card__agency">
+                  <p v-if="getListingAgency(item)" class="listing-card__agency">
                     <img
-                      :src="getAgencyById(item.agencyId)!.logo"
+                      :src="getListingAgency(item)!.logo"
                       alt=""
                       class="listing-card__agency-logo"
                       width="28"
@@ -125,7 +125,7 @@
                       loading="lazy"
                       decoding="async"
                     >
-                    <span class="listing-card__agency-name">{{ getAgencyById(item.agencyId)!.name }}</span>
+                    <span class="listing-card__agency-name">{{ getListingAgency(item)!.name }}</span>
                   </p>
                 </div>
                 <div class="listing-card__footer">
@@ -256,9 +256,9 @@
         hide-title
         @request-close-container="contactModalOpen = false"
         :listing-id="contactListing.id"
-        :agency-name="getAgencyById(contactListing.agencyId)?.name ?? 'Agence'"
-        :agency-phone-display="getAgencyById(contactListing.agencyId)?.phoneDisplay"
-        :agency-phone-tel="getAgencyById(contactListing.agencyId)?.phoneTel"
+        :agency-name="siteStore.getPublicAgencyByListingAgencyId(contactListing.agencyId)?.name ?? 'Agence'"
+        :agency-phone-display="siteStore.getPublicAgencyByListingAgencyId(contactListing.agencyId)?.phoneDisplay"
+        :agency-phone-tel="siteStore.getPublicAgencyByListingAgencyId(contactListing.agencyId)?.phoneTel"
       />
     </AppCenterModal>
   </div>
@@ -268,7 +268,6 @@
 import AppCenterModal from '~/components/ui/AppCenterModal.vue'
 import { formatListingPrice } from '~/composables/useAnnoncesSearch'
 import { editoArticles } from '~/data/articles'
-import { getAgencyById } from '~/data/agencies'
 import type { SearchListing } from '~/data/mock-listings'
 import { labelForPropertyType } from '~/data/property-types'
 
@@ -329,6 +328,10 @@ const contactListing = ref<SearchListing | null>(null)
 function openContactModal(item: SearchListing) {
   contactListing.value = item
   contactModalOpen.value = true
+}
+
+function getListingAgency(item: SearchListing) {
+  return siteStore.getPublicAgencyByListingAgencyId(item.agencyId)
 }
 
 const featuredListings = computed(() => {

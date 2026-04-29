@@ -3,7 +3,7 @@
     <button type="button" class="annonces-popover__cancel" @click="$emit('cancel')">
       Annuler
     </button>
-    <span class="annonces-popover__count">{{ formatted }} annonces</span>
+    <span v-if="showCount" class="annonces-popover__count">{{ formatted }} annonces</span>
     <button type="button" class="annonces-popover__submit" @click="$emit('submit')">
       Valider
     </button>
@@ -11,9 +11,12 @@
 </template>
 
 <script setup lang="ts">
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   count: number
-}>()
+  showCount?: boolean
+}>(), {
+  showCount: true,
+})
 
 defineEmits<{
   cancel: []

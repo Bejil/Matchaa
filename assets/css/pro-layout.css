@@ -117,6 +117,80 @@
   border-bottom-color: #7ecfae;
 }
 
+.pro-header__link--prospects {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.pro-header__link--annonces {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.pro-header__link-text {
+  display: inline-block;
+}
+
+.pro-header__prospect-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.28rem;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 0 0 2px rgba(15, 42, 30, 0.95);
+}
+
+.pro-header__prospect-badge__n {
+  font-variant-numeric: tabular-nums;
+}
+
+.pro-header__prospect-total-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.28rem;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.95);
+  color: #334155;
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.pro-header__prospect-total-badge__n {
+  font-variant-numeric: tabular-nums;
+}
+
+.pro-header__annonces-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.28rem;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.95);
+  color: #334155;
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.pro-header__annonces-badge__n {
+  font-variant-numeric: tabular-nums;
+}
+
 .pro-header__link--muted {
   color: rgba(244, 250, 247, 0.88);
   font-weight: 500;

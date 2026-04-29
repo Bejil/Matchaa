@@ -31,57 +31,88 @@
           </button>
         </aside>
 
-        <article class="espace-pro-dashboard__card">
-          <h2 class="compte-panel__title">Mes annonces</h2>
-          <p class="compte-panel__lead">
-            <template v-if="isManager">Cliquez sur une carte pour modifier une annonce, ou sur « Menu » pour les statuts et les autres actions.</template>
-            <template v-else>Vous pouvez consulter les annonces de votre agence.</template>
-          </p>
-
-          <nav v-if="agencyListings.length" class="pro-listing-tabs-wrap" aria-label="Filtrer par statut">
-            <div class="pro-listing-tabs" role="tablist" aria-label="Filtrer par statut">
-            <button
-              v-for="tab in statusTabs"
-              :key="tab.key"
-              type="button"
-              class="pro-listing-tabs__item"
-              :class="{ 'is-active': activeStatusTab === tab.key }"
-              @click="activeStatusTab = tab.key"
-            >
-              {{ tab.label }}
-              <span class="pro-listing-tabs__count">{{ tab.count }}</span>
-            </button>
+        <div v-if="agencyListings.length" class="espace-pro-dashboard__grid listing-kpi-grid" aria-label="Performance des annonces en ligne">
+          <button
+            type="button"
+            class="espace-pro-dashboard__card prospect-kpi-card listing-kpi-card--over"
+            :class="{ 'prospect-kpi-card--active': listingPerformanceSegment === 'over' }"
+            :aria-pressed="listingPerformanceSegment === 'over'"
+            @click="onPerformanceSegmentClick('over')"
+          >
+            <div class="prospect-kpi-card__value-row">
+              <p class="prospect-kpi-card__value">{{ overperformingListingsCount }}</p>
+              <span class="prospect-kpi-card__ic prospect-kpi-card__ic--hot" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 3v18" />
+                  <path d="m6 9 6-6 6 6" />
+                </svg>
+              </span>
             </div>
-          </nav>
+            <h3 class="prospect-kpi-card__title">Annonces en ligne en surperformance</h3>
+            <p class="prospect-kpi-card__desc">
+              Ces annonces captent mieux l’attention et convertissent plus souvent en actions à forte intention commerciale.
+            </p>
+          </button>
+          <button
+            type="button"
+            class="espace-pro-dashboard__card prospect-kpi-card listing-kpi-card--under"
+            :class="{ 'prospect-kpi-card--active': listingPerformanceSegment === 'under' }"
+            :aria-pressed="listingPerformanceSegment === 'under'"
+            @click="onPerformanceSegmentClick('under')"
+          >
+            <div class="prospect-kpi-card__value-row">
+              <p class="prospect-kpi-card__value">{{ underperformingListingsCount }}</p>
+              <span class="prospect-kpi-card__ic prospect-kpi-card__ic--new" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 21V3" />
+                  <path d="m18 15-6 6-6-6" />
+                </svg>
+              </span>
+            </div>
+            <h3 class="prospect-kpi-card__title">Annonces en ligne en sousperformance</h3>
+            <p class="prospect-kpi-card__desc">
+              Ces annonces suscitent moins d’engagement qualifié et transforment moins les visites en actions concrètes.
+            </p>
+          </button>
+        </div>
+
+        <nav v-if="agencyListings.length" class="pro-listing-tabs-wrap pro-listing-tabs-wrap--outside-card" aria-label="Filtrer par statut">
+          <div class="pro-listing-tabs" role="tablist" aria-label="Filtrer par statut">
+          <button
+            v-for="tab in statusTabs"
+            :key="tab.key"
+            type="button"
+            class="pro-listing-tabs__item"
+            :class="{ 'is-active': activeStatusTab === tab.key }"
+            @click="onStatusTabClick(tab.key)"
+          >
+            {{ tab.label }}
+            <span class="pro-listing-tabs__count">{{ tab.count }}</span>
+          </button>
+          </div>
+        </nav>
+
+        <article class="espace-pro-dashboard__card espace-pro-dashboard__card--annonces-list">
 
           <div v-if="agencyListings.length" class="pro-listing-toolbar">
-            <label class="pro-listing-toolbar__field pro-listing-toolbar__field--search">
-              <span class="pro-listing-filters__label">Recherche</span>
-              <div class="pro-location-input">
-                <input
-                  v-model.trim="filterQuery"
-                  class="compte-settings__input"
-                  type="search"
-                  placeholder="Localisation, titre, type, description…"
-                  autocomplete="off"
-                  @input="onMainSearchInput"
-                  @focus="onMainSearchFocus"
-                  @blur="onMainSearchBlur"
-                >
-                <ul v-if="mainSearchLocationOpen && mainSearchSuggestions.length" class="pro-location-input__suggestions" role="listbox">
-                  <li v-for="c in mainSearchSuggestions" :key="c.code" role="presentation">
-                    <button type="button" class="pro-location-input__suggestion" @mousedown.prevent="pickMainSearchCity(c)">
-                      {{ communeLabel(c) }}
-                    </button>
-                  </li>
-                </ul>
-              </div>
-            </label>
-            <label class="annonces-sort pro-listing-toolbar__sort">
-              <span class="annonces-sort__label">Trier par</span>
-              <select v-model="sortBy" class="annonces-sort__select">
+            <AnnoncesFilterBar
+              :parsed="listingFiltersParsed"
+              :merge-query="mergeListingFilters"
+              :show-result-count="false"
+            />
+          </div>
+
+          <div v-if="agencyListings.length" class="prospects-list-toolbar pro-listing-list-toolbar">
+            <p class="prospects-list-toolbar__lead">
+              <span class="prospects-list-toolbar__count">{{ filteredListings.length }}</span> annonce(s) affichée(s).
+            </p>
+            <label class="prospects-list-toolbar__sort">
+              <span class="prospects-list-toolbar__sort-label">Trier par</span>
+              <select v-model="sortBy" class="annonces-sort__select" aria-label="Trier la liste des annonces">
+                <option value="pertinence">Pertinence</option>
+                <option value="performance_asc">Performance - croissante</option>
+                <option value="performance_desc">Performance - décroissante</option>
                 <optgroup label="Classique">
-                  <option value="pertinence">Pertinence</option>
                   <option value="prix_asc">Prix — croissant</option>
                   <option value="prix_desc">Prix — décroissant</option>
                   <option value="date">Date de publication</option>
@@ -101,7 +132,21 @@
           </div>
 
           <ul v-if="paginatedListings.length" class="pro-members-list">
-            <li v-for="item in paginatedListings" :key="item.id" class="pro-members-list__item pro-listing__row">
+            <li
+              v-for="item in paginatedListings"
+              :key="item.id"
+              class="pro-members-list__item pro-listing__row"
+              :class="{ 'is-selected': isListingSelected(item.id) }"
+            >
+              <label class="pro-listing__select" @click.stop>
+                <input
+                  class="pro-listing__select-input"
+                  type="checkbox"
+                  :checked="isListingSelected(item.id)"
+                  :aria-label="`Sélectionner l’annonce ${item.title}`"
+                  @click="onListingCheckboxClick(item.id, $event)"
+                >
+              </label>
               <div
                 class="pro-listing__card-hit"
                 role="button"
@@ -116,7 +161,147 @@
                   class="pro-listing__thumb"
                 >
                 <div class="pro-listing__content">
-                  <p class="pro-members-list__name">{{ item.title }}</p>
+                  <div class="pro-listing__title-row">
+                    <p class="pro-members-list__name">{{ item.title }}</p>
+                    <details name="pro-listing-actions" class="pro-listing__menu pro-listing__menu--inline" @click.stop>
+                      <summary class="pro-listing__menu-trigger" aria-label="Menu pour cette annonce">
+                        <span>Menu</span>
+                        <svg class="pro-listing__menu-trigger-ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <path d="m6 9 6 6 6-6" />
+                        </svg>
+                      </summary>
+                      <div class="pro-listing__menu-list">
+                        <template v-if="isManager">
+                          <p class="pro-listing__menu-heading">Statut</p>
+                          <button
+                            v-if="item.status !== 'active'"
+                            type="button"
+                            class="pro-listing__menu-item pro-listing__menu-item--publish"
+                            @click="onMenuListingStatus($event, item.id, 'active')"
+                          >
+                            <span class="pro-listing__menu-item-ic" aria-hidden="true">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 19V5" />
+                                <path d="m5 12 7-7 7 7" />
+                              </svg>
+                            </span>
+                            Publier
+                          </button>
+                          <button
+                            v-if="item.status !== 'draft'"
+                            type="button"
+                            class="pro-listing__menu-item"
+                            @click="onMenuListingStatus($event, item.id, 'draft')"
+                          >
+                            <span class="pro-listing__menu-item-ic" aria-hidden="true">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 5v14" />
+                                <path d="m19 12-7 7-7-7" />
+                              </svg>
+                            </span>
+                            Brouillon
+                          </button>
+                          <button
+                            v-if="item.status !== 'archived'"
+                            type="button"
+                            class="pro-listing__menu-item pro-listing__menu-item--archive"
+                            @click="onMenuListingStatus($event, item.id, 'archived')"
+                          >
+                            <span class="pro-listing__menu-item-ic" aria-hidden="true">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="4" width="18" height="4" rx="1" />
+                                <path d="M5 8v11a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8" />
+                              </svg>
+                            </span>
+                            Archiver
+                          </button>
+                          <div class="pro-listing__menu-sep" aria-hidden="true">
+                            <span class="pro-listing__menu-sep-line" />
+                          </div>
+                        </template>
+                        <p class="pro-listing__menu-heading">Actions</p>
+                        <button
+                          type="button"
+                          class="pro-listing__menu-item"
+                          @click="onMenuViewMatchingProspects($event, item.id)"
+                        >
+                          <span class="pro-listing__menu-item-ic" aria-hidden="true">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                              <circle cx="9" cy="7" r="4" />
+                              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                            </svg>
+                          </span>
+                          Prospects
+                          <span class="pro-listing__menu-item-badges">
+                            <span class="pro-listing__menu-item-badge pro-listing__menu-item-badge--hot">
+                              <svg class="pro-listing__menu-item-badge-ic" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M12 19V5" />
+                                <path d="m5 12 7-7 7 7" />
+                              </svg>
+                              {{ prospectsHeatCountsForListing(item).hot }}
+                            </span>
+                            <span class="pro-listing__menu-item-badge pro-listing__menu-item-badge--warm">
+                              <svg class="pro-listing__menu-item-badge-ic" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M5 12h14" />
+                              </svg>
+                              {{ prospectsHeatCountsForListing(item).warm }}
+                            </span>
+                            <span class="pro-listing__menu-item-badge pro-listing__menu-item-badge--cold">
+                              <svg class="pro-listing__menu-item-badge-ic" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M12 5v14" />
+                                <path d="m19 12-7 7-7-7" />
+                              </svg>
+                              {{ prospectsHeatCountsForListing(item).cold }}
+                            </span>
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          class="pro-listing__menu-item"
+                          @click="onMenuPreviewListing($event, item.id)"
+                        >
+                          <span class="pro-listing__menu-item-ic" aria-hidden="true">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                          </span>
+                          Aperçu
+                        </button>
+                        <button
+                          v-if="isManager"
+                          type="button"
+                          class="pro-listing__menu-item"
+                          @click="onMenuEditListing($event, item.id)"
+                        >
+                          <span class="pro-listing__menu-item-ic" aria-hidden="true">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M12 20h9" />
+                              <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4Z" />
+                            </svg>
+                          </span>
+                          Modifier
+                        </button>
+                        <button
+                          v-if="isManager"
+                          type="button"
+                          class="pro-listing__menu-item pro-listing__menu-item--danger"
+                          @click="onMenuDeleteListing($event, item.id)"
+                        >
+                          <span class="pro-listing__menu-item-ic" aria-hidden="true">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M3 6h18" />
+                              <path d="M8 6V4h8v2" />
+                              <path d="M19 6l-1 14H6L5 6" />
+                            </svg>
+                          </span>
+                          Supprimer
+                        </button>
+                      </div>
+                    </details>
+                  </div>
                   <p class="pro-members-list__meta">
                     {{ item.projectType === 'louer' ? 'Location' : 'Achat' }} · {{ item.city }} · {{ listingPropertyTypeLabel(item.propertyType) }} · {{ item.surface }} m² · {{ item.rooms }} pièces
                   </p>
@@ -127,6 +312,28 @@
                       :class="statusClass(item.status)"
                     >
                       {{ statusLabel(item.status) }}
+                    </span>
+                    <span class="pro-listing__stats-heat" aria-label="Prospects par température">
+                      <span class="pro-listing__menu-item-badge pro-listing__menu-item-badge--hot" title="Prospects chauds">
+                        <svg class="pro-listing__menu-item-badge-ic" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <path d="M12 19V5" />
+                          <path d="m5 12 7-7 7 7" />
+                        </svg>
+                        {{ prospectsHeatCountsForListing(item).hot }}
+                      </span>
+                      <span class="pro-listing__menu-item-badge pro-listing__menu-item-badge--warm" title="Prospects tièdes">
+                        <svg class="pro-listing__menu-item-badge-ic" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <path d="M5 12h14" />
+                        </svg>
+                        {{ prospectsHeatCountsForListing(item).warm }}
+                      </span>
+                      <span class="pro-listing__menu-item-badge pro-listing__menu-item-badge--cold" title="Prospects froids">
+                        <svg class="pro-listing__menu-item-badge-ic" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <path d="M12 5v14" />
+                          <path d="m19 12-7 7-7-7" />
+                        </svg>
+                        {{ prospectsHeatCountsForListing(item).cold }}
+                      </span>
                     </span>
                   </p>
                   <div class="pro-listing__sep" aria-hidden="true" />
@@ -165,72 +372,38 @@
                       <span class="pro-listing__stat-val">{{ formatListingStatNumber(item.phoneRevealCount) }}</span>
                     </span>
                   </div>
+                  <div
+                    v-if="item.status === 'active'"
+                    class="pro-listing__perf-row"
+                  >
+                    <span
+                      class="pro-listing__perf-pill"
+                      :class="`is-${listingPerformanceBadge(item)}`"
+                    >
+                      <span class="pro-listing__perf-pill-ic" aria-hidden="true">
+                        <svg v-if="listingPerformanceBadge(item) === 'over'" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M12 19V5" />
+                          <path d="m5 12 7-7 7 7" />
+                        </svg>
+                        <svg v-else-if="listingPerformanceBadge(item) === 'under'" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M12 5v14" />
+                          <path d="m19 12-7 7-7-7" />
+                        </svg>
+                        <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M5 12h14" />
+                        </svg>
+                      </span>
+                      {{ listingPerformanceBadgeLabel(item) }}
+                    </span>
+                    <p
+                      class="pro-listing__perf-explain"
+                      :class="`is-${listingPerformanceBadge(item)}`"
+                    >
+                      {{ listingPerformanceWhy(item) }}
+                    </p>
+                  </div>
                 </div>
               </div>
-              <details name="pro-listing-actions" class="pro-listing__menu" @click.stop>
-                <summary class="pro-listing__menu-trigger" aria-label="Menu pour cette annonce">
-                  <span>Menu</span>
-                  <svg class="pro-listing__menu-trigger-ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="m6 9 6 6 6-6" />
-                  </svg>
-                </summary>
-                <div class="pro-listing__menu-list">
-                  <template v-if="isManager">
-                    <p class="pro-listing__menu-heading">Statut</p>
-                    <button
-                      v-if="item.status !== 'active'"
-                      type="button"
-                      class="pro-listing__menu-item pro-listing__menu-item--publish"
-                      @click="onMenuListingStatus($event, item.id, 'active')"
-                    >
-                      Publier
-                    </button>
-                    <button
-                      v-if="item.status !== 'draft'"
-                      type="button"
-                      class="pro-listing__menu-item"
-                      @click="onMenuListingStatus($event, item.id, 'draft')"
-                    >
-                      Brouillon
-                    </button>
-                    <button
-                      v-if="item.status !== 'archived'"
-                      type="button"
-                      class="pro-listing__menu-item pro-listing__menu-item--archive"
-                      @click="onMenuListingStatus($event, item.id, 'archived')"
-                    >
-                      Archiver
-                    </button>
-                    <div class="pro-listing__menu-sep" aria-hidden="true">
-                      <span class="pro-listing__menu-sep-line" />
-                    </div>
-                  </template>
-                  <p class="pro-listing__menu-heading">Actions</p>
-                  <button
-                    type="button"
-                    class="pro-listing__menu-item"
-                    @click="onMenuPreviewListing($event, item.id)"
-                  >
-                    Aperçu
-                  </button>
-                  <button
-                    v-if="isManager"
-                    type="button"
-                    class="pro-listing__menu-item"
-                    @click="onMenuEditListing($event, item.id)"
-                  >
-                    Modifier
-                  </button>
-                  <button
-                    v-if="isManager"
-                    type="button"
-                    class="pro-listing__menu-item pro-listing__menu-item--danger"
-                    @click="onMenuDeleteListing($event, item.id)"
-                  >
-                    Supprimer
-                  </button>
-                </div>
-              </details>
             </li>
           </ul>
           <nav v-if="filteredListings.length > PAGE_SIZE" class="compte-panel__pagination" aria-label="Pagination des annonces pro">
@@ -273,6 +446,86 @@
             @cta="openCreateModal"
           />
         </article>
+
+        <div v-if="selectedListingsCount > 0" class="pro-listing-bulkbar" role="region" aria-label="Actions groupées sur les annonces sélectionnées">
+          <div class="pro-listing-bulkbar__left">
+            <p class="pro-listing-bulkbar__count">
+              {{ selectedListingsCount }} annonce(s) sélectionnée(s)
+            </p>
+            <div class="pro-listing-bulkbar__actions pro-listing-bulkbar__actions--selection">
+              <button type="button" class="pro-listing-bulkbar__btn pro-listing-bulkbar__btn--selection" @click="selectAllFilteredListings">
+                <svg class="pro-listing-bulkbar__btn-ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="m9 11 3 3L22 4" />
+                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                </svg>
+                Toutes
+              </button>
+              <button type="button" class="pro-listing-bulkbar__btn pro-listing-bulkbar__btn--selection" @click="clearSelectedListings">
+                <svg class="pro-listing-bulkbar__btn-ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+                Aucune
+              </button>
+            </div>
+          </div>
+
+          <div class="pro-listing-bulkbar__actions pro-listing-bulkbar__actions--status">
+            <button
+              v-if="showBulkPublishBtn"
+              type="button"
+              class="pro-listing-bulkbar__btn pro-listing-bulkbar__btn--publish"
+              :disabled="!isManager"
+              @click="bulkSetSelectedListingsStatus('active')"
+            >
+              <svg class="pro-listing-bulkbar__btn-ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 19V5" />
+                <path d="m5 12 7-7 7 7" />
+              </svg>
+              Publier
+            </button>
+            <button
+              v-if="showBulkUnpublishBtn"
+              type="button"
+              class="pro-listing-bulkbar__btn pro-listing-bulkbar__btn--unpublish"
+              :disabled="!isManager"
+              @click="bulkSetSelectedListingsStatus('draft')"
+            >
+              <svg class="pro-listing-bulkbar__btn-ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 5v14" />
+                <path d="m19 12-7 7-7-7" />
+              </svg>
+              Dépublier
+            </button>
+            <button
+              type="button"
+              class="pro-listing-bulkbar__btn pro-listing-bulkbar__btn--archive"
+              :disabled="!isManager"
+              @click="bulkSetSelectedListingsStatus('archived')"
+            >
+              <svg class="pro-listing-bulkbar__btn-ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="4" rx="1" />
+                <path d="M5 8v11a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8" />
+                <path d="M10 12h4" />
+              </svg>
+              Archiver
+            </button>
+            <button
+              type="button"
+              class="pro-listing-bulkbar__btn pro-listing-bulkbar__btn--danger"
+              :disabled="!isManager"
+              @click="openBulkDeleteModal"
+            >
+              <svg class="pro-listing-bulkbar__btn-ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 6h18" />
+                <path d="M8 6V4h8v2" />
+                <path d="M19 6l-1 14H6L5 6" />
+                <path d="M10 11v6M14 11v6" />
+              </svg>
+              Supprimer
+            </button>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -599,6 +852,40 @@
       </div>
     </AppCenterModal>
 
+    <AppCenterModal
+      v-model="bulkDeleteModalOpen"
+      title="Supprimer les annonces sélectionnées"
+    >
+      <p class="compte-settings__confirm-text">
+        Confirmez-vous la suppression des {{ selectedListingsCount }} annonce(s) sélectionnée(s) ? Cette action est définitive.
+      </p>
+      <div class="compte-settings__confirm-actions">
+        <button type="button" class="profil-account__btn profil-account__btn--ghost" @click="bulkDeleteModalOpen = false">
+          Annuler
+        </button>
+        <button type="button" class="profil-account__btn profil-account__btn--danger" @click="confirmDeleteSelectedListings">
+          Supprimer
+        </button>
+      </div>
+    </AppCenterModal>
+
+    <AppCenterModal
+      v-model="bulkPublishWarningModalOpen"
+      title="Publication impossible"
+    >
+      <p class="compte-settings__confirm-text">
+        Aucune annonce sélectionnée n’est éligible à la publication.
+      </p>
+      <p class="compte-settings__hint">
+        Vérifiez au minimum : titre, ville, description, photo, prix, surface, pièces et chambres.
+      </p>
+      <div class="compte-settings__confirm-actions">
+        <button type="button" class="profil-account__btn profil-account__btn--ghost" @click="bulkPublishWarningModalOpen = false">
+          Compris
+        </button>
+      </div>
+    </AppCenterModal>
+
     <AppToast
       :visible="toastVisible"
       :title="toastTitle"
@@ -610,6 +897,11 @@
 
 <script setup lang="ts">
 import type { CommuneResult } from '~/composables/useCommuneSearch'
+import {
+  buildParsedQueryFromFilterDraft,
+  type AnnoncesFilterDraft,
+  type AnnoncesParsedQuery,
+} from '~/composables/useAnnoncesSearch'
 import AccountEmptyState from '~/components/account/AccountEmptyState.vue'
 import AppCenterModal from '~/components/ui/AppCenterModal.vue'
 import AppToast from '~/components/ui/AppToast.vue'
@@ -625,8 +917,10 @@ import {
   labelForPropertyType,
   LISTING_FEATURE_OPTIONS,
   PROPERTY_TYPE_GROUPS,
+  type ListingFeatureId,
   type PropertyTypeSlug,
 } from '~/data/property-types'
+import { buildProspectRows, criteriaFromLocationQuery } from '~/utils/build-prospect-rows'
 
 definePageMeta({ layout: 'pro' })
 
@@ -670,17 +964,22 @@ type ListingForm = {
 }
 
 type ListingStatusTab = 'all' | 'active' | 'draft' | 'archived'
+type ListingPerformanceSegment = 'all' | 'over' | 'under'
 const PAGE_SIZE = 32
 const ENERGY_LETTERS: EnergyLetter[] = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
 const maxBuildingYearInput = new Date().getFullYear() + 1
 const siteStore = useSiteStore()
 const { suggestions, debouncedFetch, clearSuggestions } = useCommuneSearch()
 const isManager = computed(() => siteStore.currentProUser?.role === 'manager')
+const router = useRouter()
 const agencyListings = computed(() => siteStore.currentProAgencyListings)
 const activeStatusTab = ref<ListingStatusTab>('all')
+const listingPerformanceSegment = ref<ListingPerformanceSegment>('all')
 const currentPage = ref(1)
 const sortBy = ref<
   | 'pertinence'
+  | 'performance_asc'
+  | 'performance_desc'
   | 'prix_asc'
   | 'prix_desc'
   | 'date'
@@ -693,9 +992,21 @@ const sortBy = ref<
   | 'stats_messages_desc'
   | 'stats_phone_desc'
 >('date')
-const filterPriceMin = ref<number | null>(null)
-const filterPriceMax = ref<number | null>(null)
-const filterQuery = ref('')
+const listingFilterDraft = ref<AnnoncesFilterDraft>({
+  projet: 'tous',
+  ville: '',
+  typeSlugs: [],
+  pmin: '',
+  pmax: '',
+  smin: '',
+  smax: '',
+  pimin: '',
+  pimax: '',
+  chmin: '',
+  chmax: '',
+  dpe: '',
+  featureIds: [],
+})
 
 function listingPropertyTypeLabel(slug: string): string {
   if ((ALL_PROPERTY_TYPE_SLUGS as readonly string[]).includes(slug)) {
@@ -711,12 +1022,17 @@ function normalizeListingGeneralCondition(value: string): string {
 const listingModalOpen = ref(false)
 const previewModalOpen = ref(false)
 const deleteModalOpen = ref(false)
+const bulkDeleteModalOpen = ref(false)
+const bulkPublishWarningModalOpen = ref(false)
 const selectedListingId = ref<string | null>(null)
 const previewListingId = ref<string | null>(null)
 const editLocationOpen = ref(false)
-const mainSearchLocationOpen = ref(false)
 const listingPhotoInputRef = ref<HTMLInputElement | null>(null)
 const editFeatureInput = ref('')
+const selectedListingIds = ref<string[]>([])
+const lastSelectedListingId = ref<string | null>(null)
+type ProspectHeatCounts = { hot: number; warm: number; cold: number }
+const prospectsHeatCountsByListingId = ref<Record<string, ProspectHeatCounts>>({})
 
 const MAX_LISTING_PHOTO_BYTES = 3 * 1024 * 1024
 const ALLOWED_LISTING_PHOTO_TYPES = new Set(['image/jpeg', 'image/png'])
@@ -795,39 +1111,205 @@ function toggleListingGes(letter: EnergyLetter) {
 const editCitySuggestions = computed(() =>
   editLocationOpen.value ? suggestions.value : [],
 )
-const mainSearchSuggestions = computed(() =>
-  mainSearchLocationOpen.value ? suggestions.value : [],
+
+const listingFiltersParsed = computed<AnnoncesParsedQuery>(() =>
+  buildParsedQueryFromFilterDraft(listingFilterDraft.value, 'pertinence'),
 )
 
-const filteredListings = computed(() => {
-  const q = filterQuery.value.trim().toLowerCase()
-  const minPrice = filterPriceMin.value
-  const maxPrice = filterPriceMax.value
+function mergeListingFilters(updates: Record<string, string | undefined>) {
+  const next = { ...listingFilterDraft.value }
+  const parseList = (value?: string): string[] =>
+    value ? value.split(',').map((v) => v.trim()).filter(Boolean) : []
+  const keepNum = (value?: string): string => {
+    if (value === undefined) {
+      return ''
+    }
+    const n = Number(value)
+    return Number.isFinite(n) ? String(n) : ''
+  }
+  if (Object.hasOwn(updates, 'projet')) {
+    const projet = updates.projet
+    next.projet = projet === 'acheter' || projet === 'louer' ? projet : 'tous'
+  }
+  if (Object.hasOwn(updates, 'ville')) {
+    next.ville = updates.ville?.trim() ?? ''
+  }
+  if (Object.hasOwn(updates, 'types')) {
+    next.typeSlugs = parseList(updates.types) as PropertyTypeSlug[]
+  }
+  if (Object.hasOwn(updates, 'pmin')) {
+    next.pmin = keepNum(updates.pmin)
+  }
+  if (Object.hasOwn(updates, 'pmax')) {
+    next.pmax = keepNum(updates.pmax)
+  }
+  if (Object.hasOwn(updates, 'smin')) {
+    next.smin = keepNum(updates.smin)
+  }
+  if (Object.hasOwn(updates, 'smax')) {
+    next.smax = keepNum(updates.smax)
+  }
+  if (Object.hasOwn(updates, 'pimin')) {
+    next.pimin = keepNum(updates.pimin)
+  }
+  if (Object.hasOwn(updates, 'pimax')) {
+    next.pimax = keepNum(updates.pimax)
+  }
+  if (Object.hasOwn(updates, 'chmin')) {
+    next.chmin = keepNum(updates.chmin)
+  }
+  if (Object.hasOwn(updates, 'chmax')) {
+    next.chmax = keepNum(updates.chmax)
+  }
+  if (Object.hasOwn(updates, 'dpe')) {
+    const dpe = (updates.dpe ?? '').trim().toUpperCase()
+    next.dpe = (ENERGY_LETTERS as string[]).includes(dpe) ? dpe : ''
+  }
+  if (Object.hasOwn(updates, 'eq')) {
+    next.featureIds = parseList(updates.eq) as ListingFeatureId[]
+  }
+  listingFilterDraft.value = next
+}
 
-  const byStatus = agencyListings.value.filter((item) =>
+type AgencyListingItem = (typeof agencyListings.value)[number]
+
+const listingPerformanceScore = (item: AgencyListingItem): number =>
+  (item.viewCount ?? 0) * 1
+  + (item.favoriteCount ?? 0) * 3
+  + (item.leadCount ?? 0) * 5
+  + (item.phoneRevealCount ?? 0) * 6
+
+const activeListingsForPerformance = computed(() =>
+  agencyListings.value.filter((item) => item.status === 'active'),
+)
+
+const filteredListingsByCriteria = computed(() => {
+  const parsed = listingFiltersParsed.value
+  const cityNeedle = parsed.ville.trim().toLowerCase()
+  const maxDpeIndex = parsed.dpeMin ? ENERGY_LETTERS.indexOf(parsed.dpeMin) : -1
+
+  return agencyListings.value.filter((item) => {
+    if (parsed.projet !== 'tous' && item.projectType !== parsed.projet) {
+      return false
+    }
+    if (cityNeedle && !item.city.toLowerCase().includes(cityNeedle)) {
+      return false
+    }
+    if (parsed.types.length && !parsed.types.includes(item.propertyType)) {
+      return false
+    }
+    if (parsed.budgetMin !== undefined && item.price < parsed.budgetMin) {
+      return false
+    }
+    if (parsed.budgetMax !== undefined && item.price > parsed.budgetMax) {
+      return false
+    }
+    if (parsed.surfaceMin !== undefined && item.surface < parsed.surfaceMin) {
+      return false
+    }
+    if (parsed.surfaceMax !== undefined && item.surface > parsed.surfaceMax) {
+      return false
+    }
+    if (parsed.piecesMin !== undefined && item.rooms < parsed.piecesMin) {
+      return false
+    }
+    if (parsed.piecesMax !== undefined && item.rooms > parsed.piecesMax) {
+      return false
+    }
+    if (parsed.chambresMin !== undefined && item.bedrooms < parsed.chambresMin) {
+      return false
+    }
+    if (parsed.chambresMax !== undefined && item.bedrooms > parsed.chambresMax) {
+      return false
+    }
+    if (maxDpeIndex >= 0) {
+      const listingDpe = item.dpe
+      if (!listingDpe) {
+        return false
+      }
+      const listingDpeIndex = ENERGY_LETTERS.indexOf(listingDpe)
+      if (listingDpeIndex < 0 || listingDpeIndex > maxDpeIndex) {
+        return false
+      }
+    }
+    if (parsed.features.length > 0) {
+      const listingFeatures = new Set((item.features ?? []) as string[])
+      for (const feature of parsed.features) {
+        if (!listingFeatures.has(feature)) {
+          return false
+        }
+      }
+    }
+    return true
+  })
+})
+
+const listingPerformanceAverage = computed(() => {
+  if (!activeListingsForPerformance.value.length) {
+    return 0
+  }
+  const total = activeListingsForPerformance.value.reduce((acc, item) => acc + listingPerformanceScore(item), 0)
+  return total / activeListingsForPerformance.value.length
+})
+
+const overperformingListingsCount = computed(() => {
+  const list = activeListingsForPerformance.value
+  if (!list.length) {
+    return 0
+  }
+  const avg = listingPerformanceAverage.value
+  const threshold = avg <= 0 ? 1 : avg * 1.35
+  return list.filter((item) => listingPerformanceScore(item) >= threshold).length
+})
+
+const underperformingListingsCount = computed(() => {
+  const list = activeListingsForPerformance.value
+  if (!list.length) {
+    return 0
+  }
+  const avg = listingPerformanceAverage.value
+  if (avg <= 0) {
+    return list.length
+  }
+  const threshold = avg * 0.65
+  return list.filter((item) => listingPerformanceScore(item) <= threshold).length
+})
+
+const overperformingListingIdSet = computed(() => {
+  const avg = listingPerformanceAverage.value
+  const threshold = avg <= 0 ? 1 : avg * 1.35
+  return new Set(
+    activeListingsForPerformance.value
+      .filter((item) => listingPerformanceScore(item) >= threshold)
+      .map((item) => item.id),
+  )
+})
+
+const underperformingListingIdSet = computed(() => {
+  const list = activeListingsForPerformance.value
+  const avg = listingPerformanceAverage.value
+  const threshold = avg <= 0 ? Number.POSITIVE_INFINITY : avg * 0.65
+  return new Set(
+    list
+      .filter((item) => (avg <= 0 ? true : listingPerformanceScore(item) <= threshold))
+      .map((item) => item.id),
+  )
+})
+
+const filteredListingsBase = computed(() => {
+  let list = filteredListingsByCriteria.value.filter((item) =>
     activeStatusTab.value === 'all' ? true : item.status === activeStatusTab.value,
   )
+  if (listingPerformanceSegment.value === 'over') {
+    list = list.filter((item) => item.status === 'active' && overperformingListingIdSet.value.has(item.id))
+  } else if (listingPerformanceSegment.value === 'under') {
+    list = list.filter((item) => item.status === 'active' && underperformingListingIdSet.value.has(item.id))
+  }
+  return list
+})
 
-  const byFilters = byStatus.filter((item) => {
-    if (typeof minPrice === 'number' && item.price < minPrice) {
-      return false
-    }
-    if (typeof maxPrice === 'number' && item.price > maxPrice) {
-      return false
-    }
-    if (minPrice !== null && maxPrice !== null && minPrice > maxPrice) {
-      return false
-    }
-    if (!q) {
-      return true
-    }
-    const description = (item as { description?: string }).description ?? ''
-    const typeLabel = listingPropertyTypeLabel(item.propertyType)
-    const hay = `${item.title} ${item.city} ${item.propertyType} ${typeLabel} ${description} ${item.rooms} ${item.surface} ${item.price} ${statusLabel(item.status)}`.toLowerCase()
-    return hay.includes(q)
-  })
-
-  return [...byFilters].sort((a, b) => {
+const filteredListings = computed(() => {
+  return [...filteredListingsBase.value].sort((a, b) => {
     if (sortBy.value === 'prix_asc') {
       return a.price - b.price
     }
@@ -858,6 +1340,20 @@ const filteredListings = computed(() => {
     if (sortBy.value === 'stats_phone_desc') {
       return (b.phoneRevealCount ?? 0) - (a.phoneRevealCount ?? 0)
     }
+    if (sortBy.value === 'performance_asc') {
+      const d = listingPerformanceScore(a) - listingPerformanceScore(b)
+      if (d !== 0) {
+        return d
+      }
+      return b.relevanceScore - a.relevanceScore
+    }
+    if (sortBy.value === 'performance_desc') {
+      const d = listingPerformanceScore(b) - listingPerformanceScore(a)
+      if (d !== 0) {
+        return d
+      }
+      return b.relevanceScore - a.relevanceScore
+    }
     if (sortBy.value === 'pertinence') {
       return 0
     }
@@ -875,6 +1371,22 @@ const paginatedListings = computed(() => {
   const start = (currentPage.value - 1) * PAGE_SIZE
   return filteredListings.value.slice(start, start + PAGE_SIZE)
 })
+const selectedListingsCount = computed(() => selectedListingIds.value.length)
+const selectedListingItems = computed(() => {
+  const byId = new Map(agencyListings.value.map((item) => [item.id, item]))
+  return selectedListingIds.value
+    .map((id) => byId.get(id))
+    .filter((item): item is AgencyListingItem => Boolean(item))
+})
+const areAllSelectedListingsActive = computed(() =>
+  selectedListingItems.value.length > 0
+  && selectedListingItems.value.every((item) => item.status === 'active'),
+)
+const hasSelectedActiveListings = computed(() =>
+  selectedListingItems.value.some((item) => item.status === 'active'),
+)
+const showBulkPublishBtn = computed(() => !areAllSelectedListingsActive.value)
+const showBulkUnpublishBtn = computed(() => hasSelectedActiveListings.value)
 
 const statusTabs = computed(() => [
   { key: 'all' as const, label: 'Toutes', count: agencyListings.value.length },
@@ -886,11 +1398,21 @@ const statusTabs = computed(() => [
 type ListingListEmptyState = { title: string; text: string; hideCta: boolean }
 
 const hasActiveListingFilters = computed(() => {
-  const q = filterQuery.value.trim()
+  const parsed = listingFiltersParsed.value
   return (
-    q.length > 0
-    || filterPriceMin.value !== null
-    || filterPriceMax.value !== null
+    parsed.projet !== 'tous'
+    || parsed.ville.trim().length > 0
+    || parsed.types.length > 0
+    || parsed.budgetMin !== undefined
+    || parsed.budgetMax !== undefined
+    || parsed.surfaceMin !== undefined
+    || parsed.surfaceMax !== undefined
+    || parsed.piecesMin !== undefined
+    || parsed.piecesMax !== undefined
+    || parsed.chambresMin !== undefined
+    || parsed.chambresMax !== undefined
+    || parsed.dpeMin !== undefined
+    || parsed.features.length > 0
   )
 })
 
@@ -1107,6 +1629,95 @@ function statusClass(status: ListingForm['status']): string {
   return 'is-archived'
 }
 
+type ListingPerformanceBadge = 'over' | 'under' | 'avg'
+
+function listingPerformanceBadge(item: AgencyListingItem): ListingPerformanceBadge {
+  if (overperformingListingIdSet.value.has(item.id)) {
+    return 'over'
+  }
+  if (underperformingListingIdSet.value.has(item.id)) {
+    return 'under'
+  }
+  return 'avg'
+}
+
+function listingPerformanceBadgeLabel(item: AgencyListingItem): string {
+  const badge = listingPerformanceBadge(item)
+  if (badge === 'over') {
+    return 'Surperformance'
+  }
+  if (badge === 'under') {
+    return 'Sousperformance'
+  }
+  return 'Performance moyenne'
+}
+
+function listingPerformanceWhy(item: AgencyListingItem): string {
+  const views = item.viewCount ?? 0
+  const favs = item.favoriteCount ?? 0
+  const leads = item.leadCount ?? 0
+  const calls = item.phoneRevealCount ?? 0
+  const activeCount = Math.max(1, activeListingsForPerformance.value.length)
+  const avgViews = activeListingsForPerformance.value.reduce((acc, l) => acc + (l.viewCount ?? 0), 0) / activeCount
+  const avgFavs = activeListingsForPerformance.value.reduce((acc, l) => acc + (l.favoriteCount ?? 0), 0) / activeCount
+  const avgLeads = activeListingsForPerformance.value.reduce((acc, l) => acc + (l.leadCount ?? 0), 0) / activeCount
+  const avgCalls = activeListingsForPerformance.value.reduce((acc, l) => acc + (l.phoneRevealCount ?? 0), 0) / activeCount
+
+  const ratio = (value: number, avg: number): number => {
+    if (avg <= 0) {
+      return value > 0 ? 2 : 1
+    }
+    return value / avg
+  }
+  const isHigh = (value: number, avg: number) => ratio(value, avg) >= 1.2
+  const isLow = (value: number, avg: number) => ratio(value, avg) <= 0.8
+
+  const viewsHigh = isHigh(views, avgViews)
+  const viewsLow = isLow(views, avgViews)
+  const favsHigh = isHigh(favs, avgFavs)
+  const favsLow = isLow(favs, avgFavs)
+  const leadsHigh = isHigh(leads, avgLeads)
+  const leadsLow = isLow(leads, avgLeads)
+  const callsHigh = isHigh(calls, avgCalls)
+  const callsLow = isLow(calls, avgCalls)
+
+  const badge = listingPerformanceBadge(item)
+  if (badge === 'over') {
+    if ((leadsHigh || callsHigh) && (favsHigh || viewsHigh)) {
+      return 'L’annonce combine visibilité et conversion, avec plus de vues/favoris et plus de contacts que la moyenne.'
+    }
+    if (leadsHigh || callsHigh) {
+      return 'La conversion est très bonne, les visiteurs passent plus souvent à l’action (message ou téléphone).'
+    }
+    if (favsHigh && viewsHigh) {
+      return 'Très bonne attractivité, l’annonce capte plus de vues et davantage de favoris que les autres.'
+    }
+    if (favsHigh) {
+      return 'Engagement qualitatif, les utilisateurs enregistrent plus souvent cette annonce en favoris.'
+    }
+    return 'Dynamique globale positive, les signaux clés restent au-dessus du niveau moyen.'
+  }
+  if (badge === 'under') {
+    if (viewsHigh && (leadsLow || callsLow)) {
+      return 'L’annonce est visible, mais elle convertit peu ; les vues se transforment rarement en prises de contact.'
+    }
+    if (viewsLow && favsLow) {
+      return 'Engagement modéré, l’annonce est moins mise en favoris et n’a pas beaucoup de vues.'
+    }
+    if (favsLow && (leadsLow || callsLow)) {
+      return 'Intérêt faible, avec moins de favoris et moins d’actions de contact que les annonces comparables.'
+    }
+    return 'Les signaux de performance sont en retrait par rapport à la moyenne du portefeuille.'
+  }
+  if ((viewsHigh || favsHigh) && (leadsLow || callsLow)) {
+    return 'Bonne exposition, mais la conversion en messages/téléphone peut encore progresser.'
+  }
+  if (viewsLow && favsLow) {
+    return 'Equilibre global, avec un potentiel d’amélioration surtout sur la visibilité et l’attractivité.'
+  }
+  return 'Niveau stable, proche de la moyenne sur les principaux signaux d’engagement.'
+}
+
 function energyLetterClass(letter: string, kind: 'dpe' | 'ges'): string {
   return `is-${kind}-${letter.toLowerCase()}`
 }
@@ -1139,28 +1750,34 @@ function pickEditCity(c: CommuneResult) {
   clearSuggestions()
 }
 
-function onMainSearchInput() {
-  debouncedFetch(filterQuery.value)
-  mainSearchLocationOpen.value = filterQuery.value.trim().length >= 2
-  editLocationOpen.value = false
-}
-
-function onMainSearchFocus() {
-  if (filterQuery.value.trim().length >= 2 && suggestions.value.length) {
-    mainSearchLocationOpen.value = true
+function clearMainListingSearch() {
+  listingFilterDraft.value = {
+    projet: 'tous',
+    ville: '',
+    typeSlugs: [],
+    pmin: '',
+    pmax: '',
+    smin: '',
+    smax: '',
+    pimin: '',
+    pimax: '',
+    chmin: '',
+    chmax: '',
+    dpe: '',
+    featureIds: [],
   }
 }
 
-function onMainSearchBlur() {
-  window.setTimeout(() => {
-    mainSearchLocationOpen.value = false
-  }, 180)
+function onStatusTabClick(tab: ListingStatusTab) {
+  clearMainListingSearch()
+  clearSelectedListings()
+  listingPerformanceSegment.value = 'all'
+  activeStatusTab.value = tab
 }
 
-function pickMainSearchCity(c: CommuneResult) {
-  filterQuery.value = c.nom
-  mainSearchLocationOpen.value = false
-  clearSuggestions()
+function onPerformanceSegmentClick(segment: Exclude<ListingPerformanceSegment, 'all'>) {
+  clearMainListingSearch()
+  listingPerformanceSegment.value = listingPerformanceSegment.value === segment ? 'all' : segment
 }
 
 function onEditProjectTypeChange() {
@@ -1218,6 +1835,165 @@ function onListingCardKeydown(e: KeyboardEvent, listingId: string) {
   onListingCardHit(listingId)
 }
 
+function isListingSelected(listingId: string): boolean {
+  return selectedListingIds.value.includes(listingId)
+}
+
+function onToggleListingSelection(listingId: string, checked: boolean) {
+  const next = new Set(selectedListingIds.value)
+  if (checked) {
+    next.add(listingId)
+  } else {
+    next.delete(listingId)
+  }
+  selectedListingIds.value = [...next]
+}
+
+function onListingCheckboxClick(listingId: string, event: MouseEvent) {
+  const target = event.target as HTMLInputElement | null
+  if (!target) {
+    return
+  }
+  const checked = target.checked
+  if (!event.shiftKey || !lastSelectedListingId.value) {
+    onToggleListingSelection(listingId, checked)
+    lastSelectedListingId.value = listingId
+    return
+  }
+  const orderedIds = paginatedListings.value.map((item) => item.id)
+  const start = orderedIds.indexOf(lastSelectedListingId.value)
+  const end = orderedIds.indexOf(listingId)
+  if (start < 0 || end < 0) {
+    onToggleListingSelection(listingId, checked)
+    lastSelectedListingId.value = listingId
+    return
+  }
+  const [from, to] = start < end ? [start, end] : [end, start]
+  const next = new Set(selectedListingIds.value)
+  for (let i = from; i <= to; i += 1) {
+    const id = orderedIds[i]
+    if (checked) {
+      next.add(id)
+    } else {
+      next.delete(id)
+    }
+  }
+  selectedListingIds.value = [...next]
+  lastSelectedListingId.value = listingId
+}
+
+function selectAllFilteredListings() {
+  selectedListingIds.value = filteredListings.value.map((item) => item.id)
+}
+
+function clearSelectedListings() {
+  selectedListingIds.value = []
+  lastSelectedListingId.value = null
+}
+
+function collectListingPublishIssuesFromListing(item: AgencyListingItem): string[] {
+  const missing: string[] = []
+  const hasTitle = item.title.trim().length > 0
+  const hasCity = item.city.trim().length > 0
+  const hasDescription = item.description.trim().length > 0
+  const hasPhoto = item.images.some((src) => typeof src === 'string' && src.trim().length > 0)
+  if (!hasTitle) {
+    missing.push('titre')
+  }
+  if (!hasCity) {
+    missing.push('ville')
+  }
+  if (!hasDescription) {
+    missing.push('description')
+  }
+  if (!hasPhoto) {
+    missing.push('photo')
+  }
+  if (!item.price || item.price <= 0) {
+    missing.push('prix')
+  }
+  if (!item.surface || item.surface <= 0) {
+    missing.push('surface')
+  }
+  if (!item.rooms || item.rooms < 1) {
+    missing.push('pièces')
+  }
+  if (item.bedrooms === null || item.bedrooms === undefined || item.bedrooms < 0) {
+    missing.push('chambres')
+  }
+  return missing
+}
+
+function bulkSetSelectedListingsStatus(status: 'active' | 'draft' | 'archived') {
+  if (!isManager.value || !selectedListingIds.value.length) {
+    return
+  }
+  const byId = new Map(agencyListings.value.map((item) => [item.id, item]))
+  let updatedCount = 0
+  let skippedNotEligible = 0
+  for (const listingId of selectedListingIds.value) {
+    const item = byId.get(listingId)
+    if (!item) {
+      continue
+    }
+    if (status === 'active') {
+      const issues = collectListingPublishIssuesFromListing(item)
+      if (issues.length > 0) {
+        skippedNotEligible += 1
+        continue
+      }
+    }
+    if (siteStore.setCurrentAgencyListingStatus(listingId, status)) {
+      updatedCount += 1
+    }
+  }
+  if (updatedCount === 0) {
+    if (status === 'active' && skippedNotEligible > 0) {
+      bulkPublishWarningModalOpen.value = true
+      return
+    }
+    showToast('Action impossible', 'Aucune annonce sélectionnée n’a pu être mise à jour.', 'error')
+    return
+  }
+  const actionLabel = status === 'active' ? 'publiée(s)' : status === 'draft' ? 'passée(s) en brouillon' : 'archivée(s)'
+  if (status === 'active' && skippedNotEligible > 0) {
+    showToast(
+      'Mise à jour partielle',
+      `${updatedCount} annonce(s) ${actionLabel}. ${skippedNotEligible} non éligible(s) à la publication.`,
+      'info',
+    )
+    return
+  }
+  showToast('Mise à jour effectuée', `${updatedCount} annonce(s) ${actionLabel}.`)
+}
+
+function openBulkDeleteModal() {
+  if (!isManager.value || !selectedListingIds.value.length) {
+    return
+  }
+  bulkDeleteModalOpen.value = true
+}
+
+function confirmDeleteSelectedListings() {
+  if (!isManager.value || !selectedListingIds.value.length) {
+    return
+  }
+  let removedCount = 0
+  for (const listingId of selectedListingIds.value) {
+    if (siteStore.removeCurrentAgencyListing(listingId)) {
+      removedCount += 1
+    }
+  }
+  if (removedCount === 0) {
+    showToast('Action impossible', 'Aucune annonce sélectionnée n’a pu être supprimée.', 'error')
+    return
+  }
+  bulkDeleteModalOpen.value = false
+  clearSelectedListings()
+  currentPage.value = 1
+  showToast('Suppression effectuée', `${removedCount} annonce(s) supprimée(s).`)
+}
+
 function onMenuListingStatus(ev: Event, listingId: string, status: 'active' | 'draft' | 'archived') {
   closeListingActionsMenu(ev)
   onListingStatusChange(listingId, status)
@@ -1231,6 +2007,75 @@ function onMenuEditListing(ev: Event, listingId: string) {
 function onMenuDeleteListing(ev: Event, listingId: string) {
   closeListingActionsMenu(ev)
   openDeleteModal(listingId)
+}
+
+function prospectsHeatCountsForListing(item: AgencyListingItem): ProspectHeatCounts {
+  const cached = prospectsHeatCountsByListingId.value[item.id]
+  if (cached) {
+    return cached
+  }
+  const rows = buildProspectRows(
+    criteriaFromLocationQuery({
+      projet: item.projectType,
+      ville: item.city || undefined,
+      types: item.propertyType || undefined,
+      pmin: undefined,
+      pmax: String(Math.max(0, item.price ?? 0)),
+      smin: String(Math.max(0, item.surface ?? 0)),
+      smax: undefined,
+      pimin: String(Math.max(1, item.rooms ?? 1)),
+      pimax: undefined,
+      chmin: (item.bedrooms ?? 0) > 0 ? String(item.bedrooms) : undefined,
+      chmax: undefined,
+      dpe: item.dpe ?? undefined,
+      eq: item.features.length ? item.features.join(',') : undefined,
+      page: undefined,
+    }),
+    siteStore,
+  )
+  const counts: ProspectHeatCounts = { hot: 0, warm: 0, cold: 0 }
+  for (const row of rows) {
+    if (row.heatLevel === 'hot') {
+      counts.hot += 1
+    } else if (row.heatLevel === 'warm') {
+      counts.warm += 1
+    } else {
+      counts.cold += 1
+    }
+  }
+  prospectsHeatCountsByListingId.value = {
+    ...prospectsHeatCountsByListingId.value,
+    [item.id]: counts,
+  }
+  return counts
+}
+
+function onMenuViewMatchingProspects(ev: Event, listingId: string) {
+  closeListingActionsMenu(ev)
+  const item = agencyListings.value.find((entry) => entry.id === listingId)
+  if (!item) {
+    return
+  }
+  router.push({
+    path: '/espace-pro/prospects',
+    query: {
+      projet: item.projectType,
+      ville: item.city || undefined,
+      types: item.propertyType || undefined,
+      pmin: undefined,
+      pmax: String(Math.max(0, item.price ?? 0)),
+      smin: String(Math.max(0, item.surface ?? 0)),
+      smax: undefined,
+      pimin: String(Math.max(1, item.rooms ?? 1)),
+      pimax: undefined,
+      chmin: (item.bedrooms ?? 0) > 0 ? String(item.bedrooms) : undefined,
+      chmax: undefined,
+      dpe: item.dpe ?? undefined,
+      eq: item.features.length ? item.features.join(',') : undefined,
+      lid: item.id,
+      page: undefined,
+    },
+  })
 }
 
 function onMenuPreviewListing(ev: Event, listingId: string) {
@@ -1488,16 +2333,34 @@ function onDeleteListing() {
 }
 
 watch(
-  [activeStatusTab, sortBy, filterPriceMin, filterPriceMax, filterQuery],
+  [activeStatusTab, listingPerformanceSegment, sortBy, listingFiltersParsed],
   () => {
     currentPage.value = 1
   },
 )
 
+watch(listingPerformanceSegment, (segment) => {
+  if (segment !== 'all' && activeStatusTab.value !== 'active') {
+    activeStatusTab.value = 'active'
+  }
+})
+
 watch(totalPages, (value) => {
   if (currentPage.value > value) {
     currentPage.value = value
   }
+})
+
+watch(filteredListings, (list) => {
+  const visibleIds = new Set(list.map((item) => item.id))
+  selectedListingIds.value = selectedListingIds.value.filter((id) => visibleIds.has(id))
+  if (lastSelectedListingId.value && !visibleIds.has(lastSelectedListingId.value)) {
+    lastSelectedListingId.value = null
+  }
+})
+
+watch(agencyListings, () => {
+  prospectsHeatCountsByListingId.value = {}
 })
 
 onMounted(() => {

@@ -254,9 +254,9 @@
                       <p class="listing-card__price">{{ formatListingPrice(item) }}</p>
                       <h3 class="listing-card__title">{{ item.title }}</h3>
                       <p class="listing-card__loc">{{ item.city }} · {{ labelForPropertyType(item.propertyType) }}</p>
-                      <p v-if="getAgencyById(item.agencyId)" class="listing-card__agency">
+                      <p v-if="getListingAgency(item)" class="listing-card__agency">
                         <img
-                          :src="getAgencyById(item.agencyId)!.logo"
+                          :src="getListingAgency(item)!.logo"
                           alt=""
                           class="listing-card__agency-logo"
                           width="28"
@@ -264,7 +264,7 @@
                           loading="lazy"
                           decoding="async"
                         >
-                        <span class="listing-card__agency-name">{{ getAgencyById(item.agencyId)!.name }}</span>
+                        <span class="listing-card__agency-name">{{ getListingAgency(item)!.name }}</span>
                       </p>
                     </div>
                     <div class="listing-card__footer">
@@ -387,9 +387,9 @@
         hide-title
         @request-close-container="contactSimilarModalOpen = false"
         :listing-id="contactSimilarListing.id"
-        :agency-name="getAgencyById(contactSimilarListing.agencyId)?.name ?? 'Agence'"
-        :agency-phone-display="getAgencyById(contactSimilarListing.agencyId)?.phoneDisplay"
-        :agency-phone-tel="getAgencyById(contactSimilarListing.agencyId)?.phoneTel"
+        :agency-name="siteStore.getPublicAgencyByListingAgencyId(contactSimilarListing.agencyId)?.name ?? 'Agence'"
+        :agency-phone-display="siteStore.getPublicAgencyByListingAgencyId(contactSimilarListing.agencyId)?.phoneDisplay"
+        :agency-phone-tel="siteStore.getPublicAgencyByListingAgencyId(contactSimilarListing.agencyId)?.phoneTel"
       />
     </AppCenterModal>
   </div>
@@ -398,7 +398,6 @@
 <script setup lang="ts">
 import AppCenterModal from '~/components/ui/AppCenterModal.vue'
 import { formatListingPrice } from '~/composables/useAnnoncesSearch'
-import { getAgencyById } from '~/data/agencies'
 import { editoArticles } from '~/data/articles'
 import type { SearchListing } from '~/data/mock-listings'
 import { labelForPropertyType, LISTING_FEATURE_OPTIONS } from '~/data/property-types'
@@ -417,7 +416,13 @@ const listing = computed(() => {
   return siteStore.publicActiveSearchListings.find((l) => l.id === id)
 })
 
-const agency = computed(() => (listing.value ? getAgencyById(listing.value.agencyId) : undefined))
+const agency = computed(() =>
+  listing.value ? siteStore.getPublicAgencyByListingAgencyId(listing.value.agencyId) : undefined,
+)
+
+function getListingAgency(item: SearchListing) {
+  return siteStore.getPublicAgencyByListingAgencyId(item.agencyId)
+}
 
 const similarListings = computed(() =>
   listing.value ? pickSimilarListings(listing.value, siteStore.publicActiveSearchListings, 4) : [],
