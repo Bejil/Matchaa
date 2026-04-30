@@ -32,10 +32,19 @@
         </NuxtLink>
         <NuxtLink
           to="/espace-pro/messages"
-          class="pro-header__link"
+          class="pro-header__link pro-header__link--messages"
           active-class="is-active"
         >
-          Messages
+          <span class="pro-header__link-text">Messages</span>
+          <span
+            v-if="proUnreadMessagesCount > 0"
+            class="pro-header__prospect-badge"
+            :title="proUnreadMessagesCount === 1 ? '1 nouveau message' : `${proUnreadMessagesCount} nouveaux messages`"
+            role="status"
+            :aria-label="proUnreadMessagesCount === 1 ? '1 nouveau message' : `${proUnreadMessagesCount} nouveaux messages`"
+          >
+            <span class="pro-header__prospect-badge__n" aria-hidden="true">{{ proUnreadMessagesCount > 9 ? '9+' : proUnreadMessagesCount }}</span>
+          </span>
         </NuxtLink>
         <NuxtLink
           to="/espace-pro/prospects"
@@ -91,6 +100,7 @@ import { buildProspectRows, criteriaFromLocationQuery } from '~/utils/build-pros
 
 const siteStore = useSiteStore()
 const { newProspectsBadgeCount } = useProNewProspectsBadgeCount()
+const proUnreadMessagesCount = computed(() => siteStore.proUnreadMessagesCount)
 
 const badgeTitle = computed(() =>
   newProspectsBadgeCount.value === 1

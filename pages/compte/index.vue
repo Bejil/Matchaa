@@ -19,7 +19,7 @@
             :active-tab="activeTab"
             :recherches-count="alertSearches.length"
             :favoris-count="favoriteListings.length"
-            :messages-count="sentMessages.length"
+            :messages-count="publicUnreadMessagesCount"
             @select="activeTab = $event"
           />
         </aside>
@@ -216,85 +216,101 @@
 
           <article v-else-if="activeTab === 'messages'" class="profil-account__card">
             <h2 class="compte-panel__title">Mes messages</h2>
-            <p class="compte-panel__lead">Suivi de vos dernières demandes envoyées aux agences.</p>
-            <ul v-if="sentMessages.length" class="compte-panel__message-list">
-              <li v-for="m in paginatedSentMessages" :key="m.id" class="compte-panel__message-item">
-                <NuxtLink
-                  v-if="messageListing(m)"
-                  :to="`/annonces/${messageListing(m)!.id}`"
-                  class="compte-panel__message-thumb-link"
-                  :aria-label="`Voir l’annonce : ${messageListing(m)!.title}`"
+            <p class="compte-panel__lead">Retrouvez toutes vos conversations avec les agences.</p>
+            <div v-if="publicMessageThreads.length" class="conversation-layout">
+              <aside class="conversation-list" aria-label="Conversations">
+                <article
+                  v-for="thread in publicMessageThreads"
+                  :key="thread.id"
+                  class="conversation-list__item"
+                  :class="{ 'is-active': activePublicThread?.id === thread.id }"
+                  @click="selectedPublicThreadId = thread.id"
                 >
-                  <img
-                    :src="messageListing(m)!.images[0]"
-                    :alt="messageListing(m)!.title"
-                    class="compte-panel__message-thumb"
-                    loading="lazy"
-                    decoding="async"
-                  >
-                </NuxtLink>
-                <div v-else class="compte-panel__message-thumb-link compte-panel__message-thumb-link--missing" aria-hidden="true">
-                  <span>Annonce indisponible</span>
-                </div>
-
-                <div class="compte-panel__message-body">
-                  <strong>{{ m.agency }}</strong>
-                  <p class="compte-panel__message-meta">
-                    <span>Message envoyé le {{ messageDate(m.text) }} · </span>
-                    <NuxtLink
-                      v-if="messageListing(m)"
-                      :to="`/annonces/${messageListing(m)!.id}`"
-                      class="compte-panel__message-listing-link"
-                    >
-                      {{ messageListing(m)!.title }}
-                    </NuxtLink>
-                    <span v-else>{{ m.listingTitle || 'Annonce indisponible' }}</span>
-                  </p>
-                  <p class="compte-panel__message-copy">
-                    {{ m.messageBody || 'Aucun texte personnalise.' }}
-                  </p>
-                </div>
-                <div class="compte-panel__message-actions">
+                  <span class="conversation-list__title-wrap">
+                    <span v-if="thread.unreadPublic > 0" class="conversation-list__dot" aria-hidden="true" />
+                    <span class="conversation-list__title">{{ thread.proAgencyName }}</span>
+                  </span>
                   <button
                     type="button"
-                    class="compte-panel__search-remove compte-panel__search-remove--icon"
-                    aria-label="Supprimer le message"
-                    @click="requestDeleteSentMessage(m.id)"
+                    class="conversation-list__menu-btn"
+                    aria-label="Actions du thread"
+                    @click.stop="toggleThreadMenu(thread.id)"
                   >
-                    <svg class="compte-panel__search-remove-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                      <path d="M3 6h18" />
-                      <path d="M8 6V4h8v2" />
-                      <rect x="6" y="6" width="12" height="14" rx="1" />
-                      <path d="M10 10v7" />
-                      <path d="M14 10v7" />
-                    </svg>
+                    ⋮
                   </button>
+                  <div v-if="openThreadMenuId === thread.id" class="conversation-list__menu" @click.stop>
+                    <button type="button" @click="toggleThreadReadState(thread)">
+                      {{ thread.unreadPublic > 0 ? 'Marquer comme lu' : 'Marquer comme non lu' }}
+                    </button>
+                    <button type="button" class="is-danger" @click="openDeleteThread(thread.id)">
+                      Supprimer
+                    </button>
+                  </div>
+                  <span class="conversation-list__meta">{{ formatThreadTime(thread.updatedAt) }}</span>
+                  <span class="conversation-list__snippet">{{ thread.messages.at(-1)?.text || 'Aucun message' }}</span>
+                </article>
+              </aside>
+              <section v-if="activePublicThread" class="conversation-panel" aria-label="Fil de discussion">
+                <div class="conversation-panel__thread" role="log" aria-live="polite">
+                  <article
+                    v-for="msg in activePublicThread.messages"
+                    :key="msg.id"
+                    class="conversation-bubble"
+                    :class="msg.author === 'public' ? 'is-self' : 'is-other'"
+                  >
+                    <p class="conversation-bubble__text">{{ msg.text }}</p>
+                    <button
+                      v-if="listingForThreadMessage(msg)"
+                      type="button"
+                      class="prospects-listing-picker__result-btn conversation-bubble__listing-btn"
+                      :aria-label="`Annonce : ${listingForThreadMessage(msg)!.title}`"
+                      @click="openListingPreview(listingForThreadMessage(msg)!.id)"
+                    >
+                      <img
+                        v-if="listingForThreadMessage(msg)!.images[0]"
+                        :src="listingForThreadMessage(msg)!.images[0] || ''"
+                        alt=""
+                        class="prospects-listing-picker__result-thumb"
+                      >
+                      <span class="prospects-listing-picker__result-content">
+                        <span class="prospects-listing-picker__result-title">{{ listingForThreadMessage(msg)!.title }}</span>
+                        <span class="prospects-listing-picker__result-meta">
+                          {{ listingForThreadMessage(msg)!.city }} ·
+                          {{ labelForPropertyType(listingForThreadMessage(msg)!.propertyType) }} ·
+                          {{ formatListingPrice(listingForThreadMessage(msg)!) }}
+                        </span>
+                      </span>
+                    </button>
+                    <div
+                      v-else-if="msg.listingId || msg.listingTitle"
+                      class="conversation-bubble__listing-fallback"
+                    >
+                      Annonce : {{ msg.listingTitle || `#${msg.listingId}` }}
+                    </div>
+                    <time>{{ formatThreadTime(msg.at) }}</time>
+                  </article>
                 </div>
-              </li>
-            </ul>
-            <nav v-if="totalMessagePages > 1" class="compte-panel__pagination" aria-label="Pagination des messages">
-              <button
-                type="button"
-                class="compte-panel__pagination-btn"
-                :disabled="messagesPage <= 1"
-                @click="messagesPage -= 1"
-              >
-                Précédent
-              </button>
-              <span class="compte-panel__pagination-info">Page {{ messagesPage }} / {{ totalMessagePages }}</span>
-              <button
-                type="button"
-                class="compte-panel__pagination-btn"
-                :disabled="messagesPage >= totalMessagePages"
-                @click="messagesPage += 1"
-              >
-                Suivant
-              </button>
-            </nav>
+                <form class="conversation-panel__composer" @submit.prevent="sendPublicThreadMessage">
+                  <textarea
+                    ref="publicComposerInput"
+                    v-model="publicThreadDraft"
+                    class="conversation-panel__input"
+                    rows="1"
+                    placeholder="Écrire un message à l’agence…"
+                    @input="autoResizeComposer"
+                    @keydown="onComposerKeydown"
+                  />
+                  <p class="conversation-panel__hint">Entrée pour envoyer · Shift + Entrée pour un saut de ligne</p>
+                  <button type="submit" class="profil-account__btn profil-account__btn--primary" :disabled="!publicThreadDraft.trim()">
+                    Envoyer
+                  </button>
+                </form>
+              </section>
+            </div>
             <AccountEmptyState
-              v-if="!sentMessages.length"
-              title="Aucun message envoye"
-              text="Quand tu contacteras une agence, tes echanges apparaitront ici pour un suivi simple."
+              v-if="!publicMessageThreads.length"
+              title="Aucune conversation"
+              text="Quand vous contacterez une agence, vos échanges apparaîtront ici."
             />
           </article>
 
@@ -363,16 +379,28 @@
         </div>
       </AppCenterModal>
 
-      <AppCenterModal v-model="showDeleteMessagesConfirm" title="Supprimer le message">
+      <AppCenterModal
+        v-model="deleteThreadConfirmOpen"
+        title="Supprimer la conversation"
+        size="sm"
+      >
         <p class="compte-settings__confirm-text">
-          Voulez-vous supprimer ce message envoyé ?
+          Voulez-vous vraiment supprimer cette conversation ?
         </p>
         <div class="compte-settings__confirm-actions">
-          <button type="button" class="profil-account__btn profil-account__btn--ghost" @click="showDeleteMessagesConfirm = false">
+          <button
+            type="button"
+            class="profil-account__btn profil-account__btn--ghost"
+            @click="deleteThreadConfirmOpen = false"
+          >
             Annuler
           </button>
-          <button type="button" class="profil-account__btn profil-account__btn--danger" @click="onDeleteSentMessage">
-            Confirmer
+          <button
+            type="button"
+            class="profil-account__btn profil-account__btn--danger"
+            @click="confirmDeleteThread"
+          >
+            Confirmer la suppression
           </button>
         </div>
       </AppCenterModal>
@@ -393,6 +421,17 @@
           :agency-phone-display="getAgencyById(contactListing.agencyId)?.phoneDisplay"
           :agency-phone-tel="getAgencyById(contactListing.agencyId)?.phoneTel"
         />
+      </AppCenterModal>
+      <AppCenterModal v-model="previewModalOpen" title="Aperçu de l'annonce" size="preview">
+        <div class="pro-listing-preview">
+          <iframe
+            v-if="previewModalSrc"
+            :src="previewModalSrc"
+            class="pro-listing-preview__frame"
+            loading="lazy"
+            referrerpolicy="strict-origin-when-cross-origin"
+          />
+        </div>
       </AppCenterModal>
 
       <AppToast
@@ -426,17 +465,23 @@ const route = useRoute()
 const currentUser = computed(() => siteStore.currentUser)
 const latestSearch = computed(() => siteStore.latestSearch)
 const alertSearches = computed(() => siteStore.savedSearches)
-const sentMessages = computed(() => siteStore.sentMessages)
+const publicUnreadMessagesCount = computed(() => siteStore.publicUnreadMessagesCount)
+const publicMessageThreads = computed(() => siteStore.currentPublicMessageThreads)
+const selectedPublicThreadId = ref<string | null>(null)
+const publicThreadDraft = ref('')
+const publicComposerInput = ref<HTMLTextAreaElement | null>(null)
+const openThreadMenuId = ref<string | null>(null)
+const deleteThreadConfirmOpen = ref(false)
+const threadToDeleteId = ref<string | null>(null)
+const previewModalOpen = ref(false)
+const previewListingId = ref<string | null>(null)
 const activeTab = ref<'recherches' | 'favoris' | 'messages' | 'parametres'>('recherches')
 const ITEMS_PER_PAGE = 32
 const searchesPage = ref(1)
 const favoritesPage = ref(1)
-const messagesPage = ref(1)
 const showDeleteConfirm = ref(false)
 const showDeleteSearchesConfirm = ref(false)
-const showDeleteMessagesConfirm = ref(false)
 const searchToDeleteId = ref<string | null>(null)
-const messageToDeleteId = ref<string | null>(null)
 const settingsToastVisible = ref(false)
 let settingsToastTimer: ReturnType<typeof setTimeout> | null = null
 const contactModalOpen = ref(false)
@@ -457,10 +502,6 @@ const totalSearchPages = computed(() =>
 const totalFavoritePages = computed(() =>
   Math.max(1, Math.ceil(favoriteListings.value.length / ITEMS_PER_PAGE)),
 )
-const totalMessagePages = computed(() =>
-  Math.max(1, Math.ceil(sentMessages.value.length / ITEMS_PER_PAGE)),
-)
-
 const paginatedAlertSearches = computed(() => {
   const start = (searchesPage.value - 1) * ITEMS_PER_PAGE
   return alertSearches.value.slice(start, start + ITEMS_PER_PAGE)
@@ -471,23 +512,130 @@ const paginatedFavoriteListings = computed(() => {
   return favoriteListings.value.slice(start, start + ITEMS_PER_PAGE)
 })
 
-const paginatedSentMessages = computed(() => {
-  const start = (messagesPage.value - 1) * ITEMS_PER_PAGE
-  return sentMessages.value.slice(start, start + ITEMS_PER_PAGE)
+const activePublicThread = computed(() =>
+  publicMessageThreads.value.find((t) => t.id === selectedPublicThreadId.value)
+  ?? publicMessageThreads.value[0]
+  ?? null,
+)
+
+const listingById = computed(() => {
+  siteStore.ensureProListingsLoadedForPublic()
+  return new Map(siteStore.publicActiveSearchListings.map((l) => [l.id, l]))
 })
 
-function messageListing(message: { listingId: string | null }) {
-  if (!message.listingId) {
+function listingForThreadMessage(msg: { listingId?: string | null }): SearchListing | null {
+  const id = msg.listingId ?? null
+  if (!id) {
     return null
   }
-  siteStore.ensureProListingsLoadedForPublic()
-  return siteStore.publicActiveSearchListings.find((l) => l.id === message.listingId) ?? null
+  return listingById.value.get(id) ?? null
 }
 
-function messageDate(text: string): string {
-  const match = text.match(/(\d{2}\/\d{2}\/\d{4})/)
-  return match?.[1] ?? '--/--/----'
+function previewListingUrl(listingId: string): string {
+  return `/annonces/${encodeURIComponent(listingId)}?embed=1`
 }
+
+const previewModalSrc = computed(() =>
+  previewListingId.value ? previewListingUrl(previewListingId.value) : '',
+)
+
+function openListingPreview(listingId: string) {
+  previewListingId.value = listingId
+  previewModalOpen.value = true
+}
+
+function formatThreadTime(iso: string): string {
+  return new Date(iso).toLocaleString('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function sendPublicThreadMessage() {
+  const thread = activePublicThread.value
+  const text = publicThreadDraft.value.trim()
+  if (!thread || !text) {
+    return
+  }
+  siteStore.sendPublicMessageToAgency({
+    threadId: thread.id,
+    text,
+  })
+  publicThreadDraft.value = ''
+  resetComposerHeight()
+}
+
+function onComposerKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Enter' || event.shiftKey) {
+    return
+  }
+  event.preventDefault()
+  sendPublicThreadMessage()
+}
+
+function autoResizeComposer(event: Event) {
+  const el = event.target as HTMLTextAreaElement | null
+  if (!el) {
+    return
+  }
+  el.style.height = 'auto'
+  el.style.height = `${Math.max(el.scrollHeight, 42)}px`
+}
+
+function resetComposerHeight() {
+  nextTick(() => {
+    const el = publicComposerInput.value
+    if (!el) {
+      return
+    }
+    el.style.height = ''
+  })
+}
+
+function toggleThreadReadState(thread: (typeof publicMessageThreads.value)[number]) {
+  if (thread.unreadPublic > 0) {
+    siteStore.markPublicThreadRead(thread.id)
+  } else {
+    siteStore.markPublicThreadUnread(thread.id)
+  }
+  openThreadMenuId.value = null
+}
+
+function openDeleteThread(threadId: string) {
+  threadToDeleteId.value = threadId
+  deleteThreadConfirmOpen.value = true
+  openThreadMenuId.value = null
+}
+
+function confirmDeleteThread() {
+  if (!threadToDeleteId.value) {
+    deleteThreadConfirmOpen.value = false
+    return
+  }
+  siteStore.deleteMessageThread(threadToDeleteId.value)
+  threadToDeleteId.value = null
+  deleteThreadConfirmOpen.value = false
+}
+
+function toggleThreadMenu(threadId: string) {
+  openThreadMenuId.value = openThreadMenuId.value === threadId ? null : threadId
+}
+
+function closeThreadMenuOnOutsideClick() {
+  if (openThreadMenuId.value) {
+    openThreadMenuId.value = null
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('click', closeThreadMenuOnOutsideClick)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('click', closeThreadMenuOnOutsideClick)
+})
 
 function isCompteTab(value: unknown): value is 'recherches' | 'favoris' | 'messages' | 'parametres' {
   return value === 'recherches' || value === 'favoris' || value === 'messages' || value === 'parametres'
@@ -504,6 +652,7 @@ onMounted(() => {
   siteStore.hydrateSession()
   favoritesStore.loadFromStorage()
   setActiveTabFromRoute()
+  siteStore.ensureProListingsLoadedForPublic()
   if (!siteStore.currentUser) {
     router.replace('/profil')
     return
@@ -521,6 +670,42 @@ watch(
   },
 )
 
+watch(
+  () => activeTab.value,
+  (tab) => {
+    if (tab === 'messages') {
+      if (!selectedPublicThreadId.value && publicMessageThreads.value[0]) {
+        selectedPublicThreadId.value = publicMessageThreads.value[0].id
+      }
+    }
+  },
+  { immediate: true },
+)
+
+watch(
+  () => publicMessageThreads.value,
+  (threads) => {
+    if (!threads.length) {
+      selectedPublicThreadId.value = null
+      return
+    }
+    if (!selectedPublicThreadId.value || !threads.some((t) => t.id === selectedPublicThreadId.value)) {
+      selectedPublicThreadId.value = threads[0].id
+    }
+  },
+  { immediate: true },
+)
+
+watch(
+  [() => activePublicThread.value?.id, () => siteStore.currentUser?.email, () => activeTab.value],
+  ([threadId, email, tab]) => {
+    if (tab === 'messages' && threadId && email) {
+      siteStore.markPublicThreadRead(threadId)
+    }
+  },
+  { immediate: true },
+)
+
 watch(totalSearchPages, (total) => {
   if (searchesPage.value > total) {
     searchesPage.value = total
@@ -530,12 +715,6 @@ watch(totalSearchPages, (total) => {
 watch(totalFavoritePages, (total) => {
   if (favoritesPage.value > total) {
     favoritesPage.value = total
-  }
-})
-
-watch(totalMessagePages, (total) => {
-  if (messagesPage.value > total) {
-    messagesPage.value = total
   }
 })
 
@@ -579,21 +758,6 @@ function onDeleteSearch() {
   showDeleteSearchesConfirm.value = false
   siteStore.removeSavedSearch(searchToDeleteId.value)
   searchToDeleteId.value = null
-}
-
-function requestDeleteSentMessage(id: string) {
-  messageToDeleteId.value = id
-  showDeleteMessagesConfirm.value = true
-}
-
-function onDeleteSentMessage() {
-  if (!messageToDeleteId.value) {
-    showDeleteMessagesConfirm.value = false
-    return
-  }
-  siteStore.removeSentMessage(messageToDeleteId.value)
-  messageToDeleteId.value = null
-  showDeleteMessagesConfirm.value = false
 }
 
 function openContactModal(item: SearchListing) {

@@ -38,6 +38,13 @@
               <path d="M4 20c1.2-3.7 4.1-5.5 8-5.5s6.8 1.8 8 5.5" />
             </svg>
             Mon compte
+            <span
+              v-if="messagesCount > 0"
+              class="header__messages-badge"
+              :aria-label="messagesCount === 1 ? '1 nouveau message' : `${messagesCount} nouveaux messages`"
+            >
+              {{ messagesCount > 9 ? '9+' : messagesCount }}
+            </span>
           </NuxtLink>
           <div
             class="header__account-dropdown"
@@ -122,7 +129,7 @@ const siteName = computed(() => siteStore.siteName)
 const currentUser = computed(() => siteStore.currentUser)
 const accountLink = computed(() => (currentUser.value ? '/compte' : '/profil'))
 const alertSearchCount = computed(() => siteStore.savedSearches.length)
-const messagesCount = computed(() => siteStore.sentMessages.length)
+const messagesCount = computed(() => siteStore.publicUnreadMessagesCount)
 const favoriteCount = computed(() => favoritesStore.ids.length)
 const accountMenuOpen = ref(false)
 

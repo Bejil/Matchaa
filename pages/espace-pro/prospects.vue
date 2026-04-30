@@ -361,6 +361,7 @@
                             type="button"
                             class="prospect-hero-contact-btn prospect-hero-contact-btn--message"
                             :disabled="!selectedProspect.hasAccount"
+                            @click="openProspectChat"
                           >
                             <svg class="prospect-hero-contact-btn__ic" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                               <path d="M4 4h16v10H8l-4 4V4z" />
@@ -626,6 +627,73 @@
     </AppCenterModal>
 
     <AppCenterModal
+      v-model="prospectChatModalOpen"
+      title="Messagerie prospect"
+      size="form"
+    >
+      <div class="prospect-chat-modal">
+        <div class="prospect-chat-modal__head">
+          <p class="prospect-chat-modal__title">
+            Conversation avec
+            <strong>{{ activeChatProspect ? displayProspectName(activeChatProspect) : 'ce prospect' }}</strong>
+          </p>
+        </div>
+        <div class="prospect-chat-modal__thread" role="log" aria-live="polite" aria-label="Historique des messages">
+          <div
+            v-for="msg in activeProspectChatMessages"
+            :key="msg.id"
+            class="prospect-chat-msg"
+            :class="msg.author === 'pro' ? 'is-pro' : 'is-prospect'"
+          >
+            <p class="prospect-chat-msg__bubble">{{ msg.text }}</p>
+            <button
+              v-if="listingForThreadMessage(msg)"
+              type="button"
+              class="prospects-listing-picker__result-btn"
+              :aria-label="`Annonce : ${listingForThreadMessage(msg)!.title}`"
+              @click="openInteractionListingPreview(listingForThreadMessage(msg)!.id)"
+            >
+              <img
+                v-if="listingForThreadMessage(msg)!.images[0]"
+                :src="listingForThreadMessage(msg)!.images[0] || ''"
+                alt=""
+                class="prospects-listing-picker__result-thumb"
+              >
+              <span class="prospects-listing-picker__result-content">
+                <span class="prospects-listing-picker__result-title">{{ listingForThreadMessage(msg)!.title }}</span>
+                <span class="prospects-listing-picker__result-meta">
+                  {{ listingForThreadMessage(msg)!.city }} ·
+                  {{ labelForPropertyType(listingForThreadMessage(msg)!.propertyType) }} ·
+                  {{ formatListingPrice(listingForThreadMessage(msg)!) }}
+                </span>
+              </span>
+            </button>
+            <div
+              v-else-if="msg.listingId || msg.listingTitle"
+              class="prospect-chat-msg__bubble"
+            >
+              Annonce : {{ msg.listingTitle || (msg.listingId ? `#${msg.listingId}` : '—') }}
+            </div>
+            <span class="prospect-chat-msg__time">{{ formatChatTime(msg.at) }}</span>
+          </div>
+        </div>
+        <form class="prospect-chat-modal__composer" @submit.prevent="sendProspectChatMessage">
+          <label for="prospect-chat-input" class="visually-hidden">Message</label>
+          <textarea
+            id="prospect-chat-input"
+            v-model="prospectChatDraft"
+            class="prospect-chat-modal__input"
+            rows="2"
+            placeholder="Écrire un message..."
+          />
+          <button type="submit" class="profil-account__btn profil-account__btn--primary" :disabled="!prospectChatDraft.trim()">
+            Envoyer
+          </button>
+        </form>
+      </div>
+    </AppCenterModal>
+
+    <AppCenterModal
       v-model="prospectEmailModalOpen"
       title="Envoyer un e-mail"
       size="form"
@@ -715,15 +783,30 @@ const contactListing = ref<SearchListing | null>(null)
 const previewModalOpen = ref(false)
 const previewListingId = ref<string | null>(null)
 const prospectCallModalOpen = ref(false)
+const prospectChatModalOpen = ref(false)
 const prospectEmailModalOpen = ref(false)
 const prospectEmailSubject = ref('')
 const prospectEmailMessage = ref('')
+const prospectChatDraft = ref('')
+const activeChatProspectEmail = ref<string | null>(null)
 const emailSentToastVisible = ref(false)
 let emailSentToastTimer: ReturnType<typeof setTimeout> | null = null
 const listingCriteriaPickerRef = ref<HTMLElement | null>(null)
 const listingCriteriaPickerOpen = ref(false)
 const listingCriteriaSearch = ref('')
 const selectedListingCriteria = ref<SearchListing | null>(null)
+const listingById = computed(() => {
+  siteStore.ensureProListingsLoadedForPublic()
+  return new Map(siteStore.publicActiveSearchListings.map((l) => [l.id, l]))
+})
+
+function listingForThreadMessage(msg: { listingId?: string | null }): SearchListing | null {
+  const id = msg.listingId ?? null
+  if (!id) {
+    return null
+  }
+  return listingById.value.get(id) ?? null
+}
 /** Ancienne clé globale ; migrée vers {@link prospectSeenStorageKey} si besoin. */
 const PROSPECTS_SEEN_LEGACY_STORAGE_KEY = 'matchaa-pro-prospects-seen'
 const seenProspectEmails = ref<Set<string>>(new Set())
@@ -808,6 +891,48 @@ function openProspectCallModal() {
   prospectCallModalOpen.value = true
 }
 
+const activeChatProspect = computed(() =>
+  prospects.value.find((p) => p.email === activeChatProspectEmail.value) ?? null,
+)
+
+const activeProspectChatMessages = computed(() => {
+  const email = activeChatProspectEmail.value
+  if (!email) {
+    return []
+  }
+  return siteStore.listMessagesForProspectFromPro(email)
+})
+
+function formatChatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('fr-FR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function openProspectChat() {
+  if (!selectedProspect.value?.hasAccount) {
+    return
+  }
+  activeChatProspectEmail.value = selectedProspect.value.email
+  prospectChatDraft.value = ''
+  prospectChatModalOpen.value = true
+}
+
+function sendProspectChatMessage() {
+  const prospect = activeChatProspect.value
+  const text = prospectChatDraft.value.trim()
+  if (!prospect || !text) {
+    return
+  }
+  siteStore.sendProMessageToProspect({
+    prospectEmail: prospect.email,
+    prospectName: prospect.name,
+    text,
+  })
+  prospectChatDraft.value = ''
+}
+
 function openProspectEmailModal() {
   if (!selectedProspect.value?.hasEmailConsent) {
     return
@@ -819,23 +944,11 @@ function openProspectEmailModal() {
 }
 
 function sendProspectEmail() {
-  if (!selectedProspect.value) {
-    return
-  }
   const subject = prospectEmailSubject.value.trim()
   const body = prospectEmailMessage.value.trim()
   if (!subject || !body) {
     return
   }
-  siteStore.addSentMessage({
-    agency: siteStore.currentProAgency?.name ?? siteStore.currentProUser?.companyName ?? 'Agence',
-    listingTitle: selectedListingCriteria.value?.title ?? 'Prospect (contact direct)',
-    listingId: selectedListingCriteria.value?.id ?? null,
-    messageBody: `Objet: ${subject}\n\n${body}`,
-    contactOptInEmail: true,
-    contactOptInPhone: selectedProspect.value.hasCallConsent,
-    contactPhone: selectedProspect.value.contactPhone,
-  })
   prospectEmailModalOpen.value = false
   emailSentToastVisible.value = true
   if (emailSentToastTimer) {
@@ -846,6 +959,15 @@ function sendProspectEmail() {
     emailSentToastTimer = null
   }, 2800)
 }
+
+watch(
+  () => prospectChatModalOpen.value,
+  (open) => {
+    if (open) {
+      siteStore.markCurrentProMessagesRead()
+    }
+  },
+)
 
 onBeforeUnmount(() => {
   if (emailSentToastTimer) {

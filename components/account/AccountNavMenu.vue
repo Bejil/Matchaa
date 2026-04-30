@@ -11,7 +11,7 @@
       >
         <span class="account-nav__ic" aria-hidden="true">{{ item.icon }}</span>
         <span>{{ item.label }}</span>
-        <span v-if="item.showBadge" class="account-nav__badge">
+        <span v-if="item.showBadge" class="account-nav__badge" :class="{ 'is-unread': item.id === 'messages' && item.count > 0 }">
           {{ item.count }}
         </span>
       </NuxtLink>
@@ -27,7 +27,7 @@
       >
         <span class="account-nav__ic" aria-hidden="true">{{ item.icon }}</span>
         <span>{{ item.label }}</span>
-        <span v-if="item.showBadge" class="account-nav__badge">
+        <span v-if="item.showBadge" class="account-nav__badge" :class="{ 'is-unread': item.id === 'messages' && item.count > 0 }">
           {{ item.count }}
         </span>
       </button>
@@ -128,6 +128,11 @@ function onClickItem(tab: CompteTab) {
 
 .account-nav__item.is-active .account-nav__badge {
   background: var(--color-accent);
+  color: #fff;
+}
+
+.account-nav__badge.is-unread {
+  background: #dc2626;
   color: #fff;
 }
 

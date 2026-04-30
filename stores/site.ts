@@ -98,6 +98,25 @@ export const useSiteStore = defineStore('site', () => {
     /** telephone saisi dans le formulaire de contact */
     contactPhone?: string
   }
+  type MessageThreadEntry = {
+    id: string
+    author: 'public' | 'pro'
+    text: string
+    at: string
+    listingId?: string | null
+    listingTitle?: string
+  }
+  type MessageThread = {
+    id: string
+    publicEmail: string
+    proAgencyId: string
+    proAgencyName: string
+    publicName: string
+    messages: MessageThreadEntry[]
+    unreadPublic: number
+    unreadPro: number
+    updatedAt: string
+  }
   type ProspectActivitySnapshot = {
     email: string
     name: string
@@ -279,6 +298,7 @@ export const useSiteStore = defineStore('site', () => {
   const SEARCHES_KEY_PREFIX = 'matchaa-saved-searches'
   const LATEST_SEARCH_KEY_PREFIX = 'matchaa-latest-search'
   const MESSAGES_KEY_PREFIX = 'matchaa-sent-messages'
+  const MESSAGE_THREADS_KEY = 'matchaa-message-threads-v1'
   const PROSPECT_ACTIVITY_KEY_PREFIX = 'matchaa-prospect-activity'
   const PUBLIC_PROFILE_KEY_PREFIX = 'matchaa-public-profile'
   const ANON_PROSPECT_ID_KEY = 'matchaa-anon-prospect-id'
@@ -292,6 +312,9 @@ export const useSiteStore = defineStore('site', () => {
   const savedSearches = ref<SavedSearch[]>([])
   const latestSearch = ref<SavedSearch | null>(null)
   const sentMessages = ref<SentMessage[]>([])
+  const messageThreads = ref<MessageThread[]>([])
+  let messageThreadsLoaded = false
+  let messageThreadsSyncBound = false
 
   function searchesStorageKey(email: string): string {
     return `${SEARCHES_KEY_PREFIX}:${email.toLowerCase()}`
@@ -829,6 +852,412 @@ export const useSiteStore = defineStore('site', () => {
     }
   }
 
+  function normalizeThreadEntry(raw: unknown): MessageThreadEntry | null {
+    if (!raw || typeof raw !== 'object') {
+      return null
+    }
+    const r = raw as Record<string, unknown>
+    if (
+      typeof r.id !== 'string'
+      || (r.author !== 'public' && r.author !== 'pro')
+      || typeof r.text !== 'string'
+      || typeof r.at !== 'string'
+    ) {
+      return null
+    }
+
+    const listingId =
+      typeof r.listingId === 'string' || typeof r.listingId === 'number'
+        ? String(r.listingId)
+        : (r.listingId === null ? null : undefined)
+    const listingTitle = typeof r.listingTitle === 'string' ? r.listingTitle : undefined
+    return {
+      id: r.id,
+      author: r.author,
+      text: r.text,
+      at: r.at,
+      listingId,
+      listingTitle,
+    }
+  }
+
+  function normalizeMessageThread(raw: unknown): MessageThread | null {
+    if (!raw || typeof raw !== 'object') {
+      return null
+    }
+    const r = raw as Record<string, unknown>
+    if (
+      typeof r.id !== 'string'
+      || typeof r.publicEmail !== 'string'
+      || typeof r.proAgencyId !== 'string'
+      || typeof r.proAgencyName !== 'string'
+      || typeof r.publicName !== 'string'
+      || !Array.isArray(r.messages)
+    ) {
+      return null
+    }
+    const messages = r.messages
+      .map((m) => normalizeThreadEntry(m))
+      .filter((m): m is MessageThreadEntry => m !== null)
+      .slice(-120)
+    return {
+      id: r.id,
+      publicEmail: r.publicEmail.trim().toLowerCase(),
+      proAgencyId: r.proAgencyId,
+      proAgencyName: r.proAgencyName,
+      publicName: r.publicName,
+      messages,
+      unreadPublic: Math.max(0, Number(r.unreadPublic ?? 0)),
+      unreadPro: Math.max(0, Number(r.unreadPro ?? 0)),
+      updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : (messages.at(-1)?.at ?? new Date().toISOString()),
+    }
+  }
+
+  function loadMessageThreads() {
+    if (!import.meta.client) {
+      messageThreads.value = []
+      return
+    }
+    if (!messageThreadsSyncBound) {
+      window.addEventListener('storage', (event) => {
+        if (event.key && event.key !== MESSAGE_THREADS_KEY) {
+          return
+        }
+        loadMessageThreads()
+      })
+      messageThreadsSyncBound = true
+    }
+    try {
+      const raw = localStorage.getItem(MESSAGE_THREADS_KEY)
+      if (!raw) {
+        messageThreads.value = []
+        messageThreadsLoaded = true
+        return
+      }
+      const parsed = JSON.parse(raw) as unknown
+      if (!Array.isArray(parsed)) {
+        messageThreads.value = []
+        messageThreadsLoaded = true
+        return
+      }
+      messageThreads.value = parsed
+        .map((item) => normalizeMessageThread(item))
+        .filter((t): t is MessageThread => t !== null)
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      messageThreadsLoaded = true
+    } catch {
+      messageThreads.value = []
+      messageThreadsLoaded = true
+    }
+  }
+
+  function persistMessageThreads() {
+    if (!import.meta.client) {
+      return
+    }
+    try {
+      localStorage.setItem(MESSAGE_THREADS_KEY, JSON.stringify(messageThreads.value))
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function publicDisplayName(): string {
+    if (currentUser.value?.name?.trim()) {
+      return currentUser.value.name.trim()
+    }
+    return 'Prospect'
+  }
+
+  function findProAgencyForListing(listingId: string | null | undefined): ProAgency | null {
+    if (!listingId) {
+      return null
+    }
+    const listing = proListings.value.find((l) => l.id === listingId)
+    if (!listing) {
+      return null
+    }
+    return proAgencies.value.find((a) => a.id === listing.agencyId) ?? null
+  }
+
+  function upsertThreadMessage(input: {
+    publicEmail: string
+    publicName: string
+    proAgencyId: string
+    proAgencyName: string
+    author: 'public' | 'pro'
+    text: string
+    listingId?: string | null
+    listingTitle?: string
+  }): MessageThread | null {
+    if (import.meta.client && !messageThreadsLoaded) {
+      loadMessageThreads()
+    }
+    const publicEmail = input.publicEmail.trim().toLowerCase()
+    const text = input.text.trim()
+    if (!publicEmail || !input.proAgencyId || !text) {
+      return null
+    }
+    const now = new Date().toISOString()
+    const existing = messageThreads.value.find(
+      (t) => t.publicEmail === publicEmail && t.proAgencyId === input.proAgencyId,
+    )
+    const nextMsg: MessageThreadEntry = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      author: input.author,
+      text,
+      at: now,
+      listingId: input.listingId ?? null,
+      listingTitle: input.listingTitle,
+    }
+    let nextThread: MessageThread
+    if (existing) {
+      nextThread = {
+        ...existing,
+        publicName: input.publicName || existing.publicName,
+        proAgencyName: input.proAgencyName || existing.proAgencyName,
+        messages: [...existing.messages, nextMsg].slice(-120),
+        unreadPublic: existing.unreadPublic + (input.author === 'pro' ? 1 : 0),
+        unreadPro: existing.unreadPro + (input.author === 'public' ? 1 : 0),
+        updatedAt: now,
+      }
+      messageThreads.value = [
+        nextThread,
+        ...messageThreads.value.filter((t) => t.id !== existing.id),
+      ]
+    } else {
+      nextThread = {
+        id: `thread-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        publicEmail,
+        proAgencyId: input.proAgencyId,
+        proAgencyName: input.proAgencyName,
+        publicName: input.publicName || 'Prospect',
+        messages: [nextMsg],
+        unreadPublic: input.author === 'pro' ? 1 : 0,
+        unreadPro: input.author === 'public' ? 1 : 0,
+        updatedAt: now,
+      }
+      messageThreads.value = [nextThread, ...messageThreads.value]
+    }
+    persistMessageThreads()
+    return nextThread
+  }
+
+  const publicUnreadMessagesCount = computed(() => {
+    const email = currentUser.value?.email?.trim().toLowerCase()
+    if (!email) {
+      return 0
+    }
+    return messageThreads.value
+      .filter((t) => t.publicEmail === email)
+      .reduce((acc, t) => acc + Math.max(0, t.unreadPublic), 0)
+  })
+
+  const proUnreadMessagesCount = computed(() => {
+    const agencyId = currentProUser.value?.agencyId
+    if (!agencyId) {
+      return 0
+    }
+    return messageThreads.value
+      .filter((t) => t.proAgencyId === agencyId)
+      .reduce((acc, t) => acc + Math.max(0, t.unreadPro), 0)
+  })
+
+  const currentPublicMessageThreads = computed(() => {
+    const email = currentUser.value?.email?.trim().toLowerCase()
+    if (!email) {
+      return [] as MessageThread[]
+    }
+    return messageThreads.value
+      .filter((t) => t.publicEmail === email)
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+  })
+
+  const currentProMessageThreads = computed(() => {
+    const agencyId = currentProUser.value?.agencyId
+    if (!agencyId) {
+      return [] as MessageThread[]
+    }
+    return messageThreads.value
+      .filter((t) => t.proAgencyId === agencyId)
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+  })
+
+  function markCurrentPublicMessagesRead() {
+    const email = currentUser.value?.email?.trim().toLowerCase()
+    if (!email) {
+      return
+    }
+    let changed = false
+    messageThreads.value = messageThreads.value.map((t) => {
+      if (t.publicEmail !== email || t.unreadPublic === 0) {
+        return t
+      }
+      changed = true
+      return { ...t, unreadPublic: 0 }
+    })
+    if (changed) {
+      persistMessageThreads()
+    }
+  }
+
+  function markPublicThreadRead(threadId: string) {
+    const email = currentUser.value?.email?.trim().toLowerCase()
+    if (!email || !threadId) {
+      return
+    }
+    let changed = false
+    messageThreads.value = messageThreads.value.map((t) => {
+      if (t.id !== threadId || t.publicEmail !== email || t.unreadPublic === 0) {
+        return t
+      }
+      changed = true
+      return { ...t, unreadPublic: 0 }
+    })
+    if (changed) {
+      persistMessageThreads()
+    }
+  }
+
+  function markCurrentProMessagesRead() {
+    const agencyId = currentProUser.value?.agencyId
+    if (!agencyId) {
+      return
+    }
+    let changed = false
+    messageThreads.value = messageThreads.value.map((t) => {
+      if (t.proAgencyId !== agencyId || t.unreadPro === 0) {
+        return t
+      }
+      changed = true
+      return { ...t, unreadPro: 0 }
+    })
+    if (changed) {
+      persistMessageThreads()
+    }
+  }
+
+  function markProThreadRead(threadId: string) {
+    const agencyId = currentProUser.value?.agencyId
+    if (!agencyId || !threadId) {
+      return
+    }
+    let changed = false
+    messageThreads.value = messageThreads.value.map((t) => {
+      if (t.id !== threadId || t.proAgencyId !== agencyId || t.unreadPro === 0) {
+        return t
+      }
+      changed = true
+      return { ...t, unreadPro: 0 }
+    })
+    if (changed) {
+      persistMessageThreads()
+    }
+  }
+
+  function markPublicThreadUnread(threadId: string) {
+    const email = currentUser.value?.email?.trim().toLowerCase()
+    if (!email || !threadId) {
+      return
+    }
+    let changed = false
+    messageThreads.value = messageThreads.value.map((t) => {
+      if (t.id !== threadId || t.publicEmail !== email) {
+        return t
+      }
+      if (t.unreadPublic > 0) {
+        return t
+      }
+      changed = true
+      return { ...t, unreadPublic: 1 }
+    })
+    if (changed) {
+      persistMessageThreads()
+    }
+  }
+
+  function markProThreadUnread(threadId: string) {
+    const agencyId = currentProUser.value?.agencyId
+    if (!agencyId || !threadId) {
+      return
+    }
+    let changed = false
+    messageThreads.value = messageThreads.value.map((t) => {
+      if (t.id !== threadId || t.proAgencyId !== agencyId) {
+        return t
+      }
+      if (t.unreadPro > 0) {
+        return t
+      }
+      changed = true
+      return { ...t, unreadPro: 1 }
+    })
+    if (changed) {
+      persistMessageThreads()
+    }
+  }
+
+  function deleteMessageThread(threadId: string) {
+    if (!threadId) {
+      return
+    }
+    messageThreads.value = messageThreads.value.filter((t) => t.id !== threadId)
+    persistMessageThreads()
+  }
+
+  function listMessagesForProspectFromPro(prospectEmail: string): MessageThreadEntry[] {
+    const agencyId = currentProUser.value?.agencyId
+    if (!agencyId) {
+      return []
+    }
+    const email = prospectEmail.trim().toLowerCase()
+    const thread = messageThreads.value.find((t) => t.proAgencyId === agencyId && t.publicEmail === email)
+    return thread?.messages ?? []
+  }
+
+  function sendProMessageToProspect(input: {
+    prospectEmail: string
+    text: string
+    prospectName?: string
+    listingId?: string | null
+    listingTitle?: string
+  }) {
+    const agencyId = currentProUser.value?.agencyId
+    if (!agencyId) {
+      return null
+    }
+    const agency = proAgencies.value.find((a) => a.id === agencyId)
+    return upsertThreadMessage({
+      publicEmail: input.prospectEmail,
+      publicName: input.prospectName?.trim() || 'Prospect',
+      proAgencyId: agencyId,
+      proAgencyName: agency?.name ?? currentProUser.value?.companyName ?? 'Agence',
+      author: 'pro',
+      text: input.text,
+      listingId: input.listingId ?? null,
+      listingTitle: input.listingTitle,
+    })
+  }
+
+  function sendPublicMessageToAgency(input: { threadId: string; text: string }) {
+    const email = currentUser.value?.email?.trim().toLowerCase()
+    if (!email || !input.threadId) {
+      return null
+    }
+    const thread = messageThreads.value.find((t) => t.id === input.threadId && t.publicEmail === email)
+    if (!thread) {
+      return null
+    }
+    return upsertThreadMessage({
+      publicEmail: email,
+      publicName: currentUser.value?.name ?? thread.publicName,
+      proAgencyId: thread.proAgencyId,
+      proAgencyName: thread.proAgencyName,
+      author: 'public',
+      text: input.text,
+    })
+  }
+
   function login(email: string, password: string): boolean {
     loadProData()
     const e = email.trim().toLowerCase()
@@ -856,6 +1285,7 @@ export const useSiteStore = defineStore('site', () => {
     loadSavedSearches()
     loadLatestSearch()
     loadSentMessages()
+    loadMessageThreads()
     return true
   }
 
@@ -875,6 +1305,7 @@ export const useSiteStore = defineStore('site', () => {
     loadSavedSearches()
     loadLatestSearch()
     loadSentMessages()
+    loadMessageThreads()
   }
 
   function toSessionProUser(member: ProMember): CurrentProUser {
@@ -1309,6 +1740,7 @@ export const useSiteStore = defineStore('site', () => {
     if (import.meta.client) {
       localStorage.setItem(PRO_SESSION_KEY, JSON.stringify(currentProUser.value))
     }
+    loadMessageThreads()
     return true
   }
 
@@ -1361,6 +1793,7 @@ export const useSiteStore = defineStore('site', () => {
 
   function logoutPro() {
     currentProUser.value = null
+    loadMessageThreads()
     if (import.meta.client) {
       localStorage.removeItem(PRO_SESSION_KEY)
     }
@@ -1379,6 +1812,7 @@ export const useSiteStore = defineStore('site', () => {
     savedSearches.value = []
     latestSearch.value = null
     sentMessages.value = []
+    loadMessageThreads()
     if (import.meta.client) {
       localStorage.removeItem(SESSION_KEY)
     }
@@ -1470,6 +1904,7 @@ export const useSiteStore = defineStore('site', () => {
         loadSavedSearches()
         loadLatestSearch()
         loadSentMessages()
+        loadMessageThreads()
       }
     } catch {
       /* ignore */
@@ -1504,6 +1939,7 @@ export const useSiteStore = defineStore('site', () => {
         const found = proMembers.value.find((m) => m.id === parsed.id)
         if (found) {
           currentProUser.value = toSessionProUser(found)
+          loadMessageThreads()
           return
         }
       }
@@ -1511,6 +1947,7 @@ export const useSiteStore = defineStore('site', () => {
         const found = proMembers.value.find((m) => m.email.toLowerCase() === parsed.email?.toLowerCase())
         if (found) {
           currentProUser.value = toSessionProUser(found)
+          loadMessageThreads()
         }
       }
     } catch {
@@ -1929,6 +2366,19 @@ export const useSiteStore = defineStore('site', () => {
     if (input.listingId) {
       recordListingLead(input.listingId)
     }
+    const agency = findProAgencyForListing(input.listingId)
+    if (agency) {
+      upsertThreadMessage({
+        publicEmail: actorEmail,
+        publicName: currentUser.value?.name ?? 'Prospect',
+        proAgencyId: agency.id,
+        proAgencyName: agency.name,
+        author: 'public',
+        text: input.messageBody.trim() || `Demande de contact : ${input.listingTitle}`,
+        listingId: input.listingId,
+        listingTitle: input.listingTitle,
+      })
+    }
   }
 
   function removeSentMessage(id: string) {
@@ -1972,6 +2422,21 @@ export const useSiteStore = defineStore('site', () => {
     createAlertFromLatestSearch,
     removeSavedSearch,
     sentMessages,
+    messageThreads,
+    currentPublicMessageThreads,
+    currentProMessageThreads,
+    publicUnreadMessagesCount,
+    proUnreadMessagesCount,
+    markCurrentPublicMessagesRead,
+    markCurrentProMessagesRead,
+    markPublicThreadRead,
+    markProThreadRead,
+    markPublicThreadUnread,
+    markProThreadUnread,
+    deleteMessageThread,
+    listMessagesForProspectFromPro,
+    sendProMessageToProspect,
+    sendPublicMessageToAgency,
     addSentMessage,
     removeSentMessage,
     ensureProListingsLoadedForPublic,

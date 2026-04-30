@@ -129,6 +129,12 @@
   gap: 0.4rem;
 }
 
+.pro-header__link--messages {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 .pro-header__link-text {
   display: inline-block;
 }
