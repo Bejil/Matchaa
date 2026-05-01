@@ -17,6 +17,7 @@ import {
   sortThreadsByUpdatedAt,
   upsertThreadMessage as upsertMessageThread,
 } from '~/stores/modules/messages'
+import { useFavoritesStore } from '~/stores/favorites'
 
 function normalizeProListingPropertyType(raw: string | undefined | null): PropertyTypeSlug {
   const input = (raw ?? '').trim()
@@ -1553,6 +1554,7 @@ export const useSiteStore = defineStore('site', () => {
     mergeAnonymousProspectDataIntoEmail(found.email)
     if (import.meta.client) {
       localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser.value))
+      useFavoritesStore().mergeGuestFavoritesIntoAccount(found.email)
     }
     loadSavedSearches()
     loadLatestSearch()
@@ -1574,6 +1576,7 @@ export const useSiteStore = defineStore('site', () => {
     mergeAnonymousProspectDataIntoEmail(nextEmail)
     if (import.meta.client) {
       localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser.value))
+      useFavoritesStore().mergeGuestFavoritesIntoAccount(nextEmail)
     }
     loadSavedSearches()
     loadLatestSearch()
@@ -2044,12 +2047,15 @@ export const useSiteStore = defineStore('site', () => {
   let proPublicCatalogLoaded = false
 
   function ensureProListingsLoadedForPublic() {
-    if (!import.meta.client || proPublicCatalogLoaded) {
+    if (!import.meta.client) {
       return
     }
-    proPublicCatalogLoaded = true
-    loadProData()
-    enforceListingExpiry()
+    if (!proPublicCatalogLoaded) {
+      proPublicCatalogLoaded = true
+      loadProData()
+      enforceListingExpiry()
+    }
+    prunePublicFavoritesAgainstCatalog()
   }
 
   function recordListingView(listingId: string) {
@@ -2275,6 +2281,7 @@ export const useSiteStore = defineStore('site', () => {
       localStorage.removeItem(SESSION_KEY)
       localStorage.removeItem(ANON_PROSPECT_ID_KEY)
       localStorage.removeItem(PREAUTH_IDENTITIES_KEY)
+      useFavoritesStore().loadFromStorage(true)
     }
   }
 
@@ -2289,8 +2296,10 @@ export const useSiteStore = defineStore('site', () => {
     }
     const nextName = name.trim() || currentUser.value.name
     const nextEmail = email.trim().toLowerCase() || currentUser.value.email
-    if (nextEmail !== currentUser.value.email.trim().toLowerCase()) {
+    const prevEmail = currentUser.value.email.trim().toLowerCase()
+    if (nextEmail !== prevEmail) {
       mergeAnonymousProspectDataIntoEmail(nextEmail)
+      useFavoritesStore().migrateFavoritesToNewEmail(prevEmail, nextEmail)
     }
     currentUser.value = {
       name: nextName,
@@ -2365,6 +2374,7 @@ export const useSiteStore = defineStore('site', () => {
           contactOptInPhone: parsed.contactOptInPhone === true,
           contactOptInEmail: parsed.contactOptInEmail === true,
         }
+        useFavoritesStore().mergeGuestFavoritesIntoAccount(parsed.email)
         loadSavedSearches()
         loadLatestSearch()
         loadSentMessages()
@@ -2614,6 +2624,19 @@ export const useSiteStore = defineStore('site', () => {
     persistProData()
   }
 
+  /** IDs des annonces visibles catalogue public (actives & non expirées). */
+  function prunePublicFavoritesAgainstCatalog() {
+    if (!import.meta.client || !proPublicCatalogLoaded) {
+      return
+    }
+    const available = new Set(
+      proListings.value
+        .filter((l) => l.status === 'active' && !listingHasExpiredAt(l))
+        .map((l) => l.id),
+    )
+    useFavoritesStore().pruneToAvailableIds(available)
+  }
+
   function enforceListingExpiry(nowIso = new Date().toISOString()) {
     let changed = false
     for (let i = 0; i < proListings.value.length; i += 1) {
@@ -2633,6 +2656,9 @@ export const useSiteStore = defineStore('site', () => {
     }
     if (changed) {
       persistProData()
+    }
+    if (import.meta.client) {
+      prunePublicFavoritesAgainstCatalog()
     }
     return changed
   }

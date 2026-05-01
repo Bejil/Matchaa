@@ -62,14 +62,32 @@
             />
           </div>
         </div>
-        <NuxtLink
-          v-else
-          :to="accountLink"
-          class="header__link header__link--muted"
-          :class="{ 'is-active': accountNavActive }"
-        >
-          Se connecter
-        </NuxtLink>
+        <template v-else>
+          <NuxtLink
+            to="/favoris"
+            class="header__link header__link--muted"
+            :class="{ 'is-active': favorisNavActive }"
+          >
+            <svg class="header__fav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+            </svg>
+            Favoris
+            <span
+              v-if="favoriteCount > 0"
+              class="header__favorites-badge"
+              :aria-label="favoriteCount === 1 ? '1 favori' : `${favoriteCount} favoris`"
+            >
+              {{ favoriteCount > 9 ? '9+' : favoriteCount }}
+            </span>
+          </NuxtLink>
+          <NuxtLink
+            :to="accountLink"
+            class="header__link header__link--muted"
+            :class="{ 'is-active': accountNavActive }"
+          >
+            Se connecter
+          </NuxtLink>
+        </template>
         <NuxtLink :to="espaceProLink" class="header__link header__link--cta">Espace Pro</NuxtLink>
       </nav>
     </div>
@@ -125,6 +143,7 @@ const navLouerActive = computed(() => {
 const accountNavActive = computed(
   () => route.path.startsWith('/profil') || route.path.startsWith('/compte'),
 )
+const favorisNavActive = computed(() => route.path.startsWith('/favoris'))
 const siteName = computed(() => siteStore.siteName)
 const currentUser = computed(() => siteStore.currentUser)
 const accountLink = computed(() => (currentUser.value ? '/compte' : '/profil'))
@@ -152,6 +171,7 @@ const espaceProLink = computed(() =>
 onMounted(() => {
   siteStore.hydrateSession()
   siteStore.hydrateProSession()
-  favoritesStore.loadFromStorage()
+  siteStore.ensureProListingsLoadedForPublic()
+  favoritesStore.loadFromStorage(true)
 })
 </script>

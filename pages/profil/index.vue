@@ -8,6 +8,12 @@
           <p class="profil-auth__lead">
             Connectez-vous ou créez votre compte pour sauvegarder vos recherches et retrouver vos annonces favorites.
           </p>
+          <p class="profil-auth__guest-fav-line">
+            <NuxtLink class="profil-auth__guest-fav-link" to="/favoris">
+              Voir mes favoris sur cet appareil
+            </NuxtLink>
+            <span v-if="guestFavoriteCount > 0" class="profil-auth__guest-fav-count">{{ guestFavoriteCount }}</span>
+          </p>
         </header>
 
         <section class="profil-auth__usp" aria-label="Avantages Matchaa">
@@ -171,7 +177,10 @@
 
 <script setup lang="ts">
 const siteStore = useSiteStore()
+const favoritesStore = useFavoritesStore()
 const router = useRouter()
+
+const guestFavoriteCount = computed(() => favoritesStore.ids.length)
 
 const loginEmail = ref('')
 const loginPassword = ref('')
@@ -208,6 +217,8 @@ useHead({
 
 onMounted(() => {
   siteStore.hydrateSession()
+  siteStore.ensureProListingsLoadedForPublic()
+  favoritesStore.loadFromStorage(true)
   if (siteStore.currentUser) {
     router.replace('/compte')
   }
