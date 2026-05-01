@@ -313,6 +313,9 @@
                     >
                       {{ statusLabel(item.status) }}
                     </span>
+                    <span class="pro-listing__lifetime-pill">
+                      {{ listingExpiryLabel(item) }}
+                    </span>
                     <span class="pro-listing__stats-heat" aria-label="Prospects par température">
                       <span class="pro-listing__menu-item-badge pro-listing__menu-item-badge--hot" title="Prospects chauds">
                         <svg class="pro-listing__menu-item-badge-ic" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -535,13 +538,12 @@
       size="wide"
     >
       <form class="compte-settings pro-listing-form" @submit.prevent="onSubmitListing">
-        <p class="pro-listing-form__intro">
-          Renseignez les informations essentielles puis affinez les caractéristiques avancées.
-        </p>
-        <p class="pro-listing-form__legend" role="note">
-          Pour enregistrer l’annonce, renseignez tous les champs marqués <span class="compte-settings__mandatory">(obligatoire)</span>.
-          Ajouter des photos et une description détaillée améliore la fiche.
-        </p>
+        <StepperForm
+          :model-value="listingFormStep"
+          :steps="listingFormSteps"
+          @update:model-value="setListingFormStep"
+        />
+        <section v-show="listingFormStep === 1" class="pro-listing-form__step-panel">
         <h3 class="pro-listing-form__section-title pro-listing-form__section-title--first">Informations principales</h3>
         <label class="compte-settings__field">
           <span class="compte-settings__label">Type de projet <span class="compte-settings__mandatory">(obligatoire)</span></span>
@@ -609,6 +611,8 @@
             <input v-model.number="editForm.bedrooms" class="compte-settings__input" type="number" min="0" step="1">
           </label>
         </div>
+        </section>
+        <section v-show="listingFormStep === 2" class="pro-listing-form__step-panel">
         <h3 class="pro-listing-form__section-title">Performance énergétique</h3>
         <div class="compte-settings__row pro-listing-form__row--energy">
           <label class="compte-settings__field">
@@ -693,6 +697,8 @@
             <input v-model.number="editForm.coproAnnualCharges" class="compte-settings__input" type="number" min="0">
           </label>
         </div>
+        </section>
+        <section v-show="listingFormStep === 3" class="pro-listing-form__step-panel">
         <h3 class="pro-listing-form__section-title">Confort</h3>
         <div
           class="compte-settings__row pro-listing-form__row--comfort-line"
@@ -743,6 +749,8 @@
           <span class="compte-settings__label">Description <span class="compte-settings__mandatory">(obligatoire)</span></span>
           <textarea v-model="editForm.description" class="compte-settings__input" rows="4" required></textarea>
         </label>
+        </section>
+        <section v-show="listingFormStep === 4" class="pro-listing-form__step-panel">
         <div class="compte-settings__field pro-listing-photos">
           <span class="compte-settings__label">Photos <span class="compte-settings__mandatory">(au moins 1)</span></span>
           <div class="pro-listing-photos__toolbar">
@@ -808,13 +816,34 @@
             </li>
           </ul>
         </div>
+        </section>
         <div class="pro-listing-form__actions">
-          <button type="button" class="profil-account__btn profil-account__btn--ghost" @click="listingModalOpen = false">
-            Annuler
-          </button>
-          <button type="submit" class="profil-account__btn profil-account__btn--primary">
-            {{ isEditingListing ? 'Enregistrer' : 'Créer l\'annonce' }}
-          </button>
+          <div class="pro-listing-form__actions-left">
+            <button type="button" class="profil-account__btn profil-account__btn--ghost" @click="closeListingModal">
+              Annuler
+            </button>
+            <button
+              v-if="listingFormStep > 1"
+              type="button"
+              class="profil-account__btn profil-account__btn--ghost"
+              @click="onListingFormPrevStep"
+            >
+              Étape précédente
+            </button>
+          </div>
+          <div class="pro-listing-form__actions-right">
+            <button
+              v-if="listingFormStep < listingFormSteps.length"
+              type="button"
+              class="profil-account__btn profil-account__btn--primary"
+              @click="onListingFormNextStep"
+            >
+              Étape suivante
+            </button>
+            <button v-else type="submit" class="profil-account__btn profil-account__btn--primary">
+              {{ isEditingListing ? 'Enregistrer' : 'Créer l\'annonce' }}
+            </button>
+          </div>
         </div>
       </form>
     </AppCenterModal>
@@ -877,7 +906,7 @@
         Aucune annonce sélectionnée n’est éligible à la publication.
       </p>
       <p class="compte-settings__hint">
-        Vérifiez au minimum : titre, ville, description, photo, prix, surface, pièces et chambres.
+        Vérifiez au minimum : titre, ville, description, photo, prix, surface, pièces, chambres et solde de crédits.
       </p>
       <div class="compte-settings__confirm-actions">
         <button type="button" class="profil-account__btn profil-account__btn--ghost" @click="bulkPublishWarningModalOpen = false">
@@ -905,6 +934,7 @@ import {
 import AccountEmptyState from '~/components/account/AccountEmptyState.vue'
 import AppCenterModal from '~/components/ui/AppCenterModal.vue'
 import AppToast from '~/components/ui/AppToast.vue'
+import StepperForm from '~/components/forms/StepperForm.vue'
 import type { EnergyLetter } from '~/data/mock-listings'
 import {
   LISTING_EXPOSURE_OPTIONS,
@@ -961,6 +991,7 @@ type ListingForm = {
   surface: number | null
   rooms: number | null
   status: 'active' | 'draft' | 'archived'
+  lifetimeMonths: 1 | 3 | 6 | 12
 }
 
 type ListingStatusTab = 'all' | 'active' | 'draft' | 'archived'
@@ -1029,6 +1060,7 @@ const previewListingId = ref<string | null>(null)
 const editLocationOpen = ref(false)
 const listingPhotoInputRef = ref<HTMLInputElement | null>(null)
 const editFeatureInput = ref('')
+const listingFormStep = ref(1)
 const selectedListingIds = ref<string[]>([])
 const lastSelectedListingId = ref<string | null>(null)
 type ProspectHeatCounts = { hot: number; warm: number; cold: number }
@@ -1068,7 +1100,15 @@ const editForm = ref<ListingForm>({
   surface: null,
   rooms: null,
   status: 'draft',
+  lifetimeMonths: 3,
 })
+
+const listingFormSteps = [
+  { id: 'main', label: 'Informations clés' },
+  { id: 'building', label: 'Bâtiment & énergie' },
+  { id: 'comfort', label: 'Confort & description' },
+  { id: 'media', label: 'Photos & équipements' },
+] as const
 
 function listingFeatureLabel(id: string): string {
   const o = LISTING_FEATURE_OPTIONS.find((f) => f.id === id)
@@ -1478,6 +1518,7 @@ function showToast(title: string, message: string, variant: 'success' | 'error' 
 }
 
 function resetListingForm() {
+  listingFormStep.value = 1
   editForm.value = {
     projectType: 'acheter',
     bedrooms: null,
@@ -1509,6 +1550,7 @@ function resetListingForm() {
     surface: null,
     rooms: null,
     status: 'draft',
+    lifetimeMonths: 3,
   }
   if (listingPhotoInputRef.value) {
     listingPhotoInputRef.value.value = ''
@@ -1617,6 +1659,21 @@ function statusLabel(status: ListingForm['status']): string {
     return 'Brouillon'
   }
   return 'Archivée'
+}
+
+function listingExpiryLabel(item: AgencyListingItem): string {
+  if (!item.expiresAt) {
+    return item.status === 'active' ? 'Durée en attente d’activation' : 'Durée non démarrée'
+  }
+  const expiryTs = new Date(item.expiresAt).getTime()
+  if (!Number.isFinite(expiryTs)) {
+    return 'Durée inconnue'
+  }
+  const now = Date.now()
+  if (expiryTs <= now) {
+    return 'Expirée'
+  }
+  return `Expire le ${new Date(expiryTs).toLocaleDateString('fr-FR')}`
 }
 
 function statusClass(status: ListingForm['status']): string {
@@ -1921,6 +1978,10 @@ function collectListingPublishIssuesFromListing(item: AgencyListingItem): string
   if (item.bedrooms === null || item.bedrooms === undefined || item.bedrooms < 0) {
     missing.push('chambres')
   }
+  const eligibility = siteStore.getListingPublishEligibility(item.id)
+  for (const reason of eligibility.reasons) {
+    missing.push(reason)
+  }
   return missing
 }
 
@@ -2089,6 +2150,7 @@ function openCreateModal() {
   }
   selectedListingId.value = null
   resetListingForm()
+  listingFormStep.value = 1
   listingModalOpen.value = true
 }
 
@@ -2101,6 +2163,7 @@ function openEditModal(listingId: string) {
     return
   }
   selectedListingId.value = listingId
+  listingFormStep.value = 1
   editForm.value = {
     projectType: listing.projectType,
     bedrooms: listing.bedrooms,
@@ -2132,6 +2195,7 @@ function openEditModal(listingId: string) {
     surface: listing.surface,
     rooms: listing.rooms,
     status: listing.status,
+    lifetimeMonths: listing.lifetimeMonths ?? 3,
   }
   if (listingPhotoInputRef.value) {
     listingPhotoInputRef.value.value = ''
@@ -2149,7 +2213,18 @@ function openPreviewModal(listingId: string) {
 function closeListingModal() {
   listingModalOpen.value = false
   selectedListingId.value = null
+  listingFormStep.value = 1
 }
+
+watch(
+  () => listingModalOpen.value,
+  (open) => {
+    if (!open) {
+      selectedListingId.value = null
+      listingFormStep.value = 1
+    }
+  },
+)
 
 function toOptionalNumber(value: unknown): number | null {
   if (value === '' || value === null || value === undefined) {
@@ -2171,6 +2246,69 @@ function formatMissingFieldsList(labels: string[]): string {
   }
   const head = labels.slice(0, -1).join(', ')
   return `${head} et ${labels[labels.length - 1]}`
+}
+
+function setListingFormStep(step: number) {
+  const max = listingFormSteps.length
+  const targetStep = Math.min(max, Math.max(1, step))
+  if (targetStep <= listingFormStep.value) {
+    listingFormStep.value = targetStep
+    return
+  }
+  for (let current = listingFormStep.value; current < targetStep; current += 1) {
+    const issues = collectListingFormStepIssues(current)
+    if (issues.length) {
+      showToast(
+        'Étape incomplète',
+        `Avant de continuer, renseignez ${formatMissingFieldsList(issues)}.`,
+        'error',
+      )
+      return
+    }
+  }
+  listingFormStep.value = targetStep
+}
+
+function onListingFormPrevStep() {
+  setListingFormStep(listingFormStep.value - 1)
+}
+
+function collectListingFormPrimaryIssues(): string[] {
+  const missing: string[] = []
+  if (!editForm.value.title.trim()) {
+    missing.push('le titre')
+  }
+  if (!editForm.value.city.trim()) {
+    missing.push('la ville')
+  }
+  if (!editForm.value.propertyType) {
+    missing.push('le type de bien')
+  }
+  return missing
+}
+
+function onListingFormNextStep() {
+  if (listingFormStep.value === 3) {
+    commitFeatureInput()
+  }
+  setListingFormStep(listingFormStep.value + 1)
+}
+
+function collectListingFormStepIssues(step: number): string[] {
+  if (step === 1) {
+    return [
+      ...collectListingFormPrimaryIssues(),
+      ...collectListingFormMetricIssues(),
+    ]
+  }
+  if (step === 3) {
+    const issues: string[] = []
+    if (!editForm.value.description.trim()) {
+      issues.push('la description')
+    }
+    return issues
+  }
+  return []
 }
 
 function collectListingFormMetricIssues(): string[] {
@@ -2266,6 +2404,7 @@ function onSubmitListing() {
     price: editForm.value.price as number,
     surface: editForm.value.surface as number,
     rooms: editForm.value.rooms as number,
+    lifetimeMonths: editForm.value.lifetimeMonths,
   }
 
   if (selectedListingId.value) {
@@ -2292,7 +2431,9 @@ function onListingStatusChange(listingId: string, status: 'active' | 'draft' | '
   }
   const ok = siteStore.setCurrentAgencyListingStatus(listingId, status)
   if (!ok) {
-    showToast('Action impossible', 'Le statut n’a pas pu être mis à jour.', 'error')
+    const eligibility = status === 'active' ? siteStore.getListingPublishEligibility(listingId) : null
+    const details = eligibility?.reasons?.join(' ') || 'Le statut n’a pas pu être mis à jour.'
+    showToast('Action impossible', details, 'error')
     return
   }
   if (status === 'active') {
@@ -2364,6 +2505,7 @@ watch(agencyListings, () => {
 })
 
 onMounted(() => {
+  siteStore.enforceListingExpiry()
   if (import.meta.client) {
     document.addEventListener('click', onDocumentClickCloseListingMenus)
   }

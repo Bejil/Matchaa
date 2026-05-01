@@ -138,3 +138,111 @@
   font-weight: 700;
   text-align: center;
 }
+
+.desktop-push-modal {
+  display: grid;
+  justify-items: stretch;
+  text-align: center;
+  gap: 0.6rem;
+  margin-bottom: 0.25rem;
+  width: 100%;
+}
+
+.desktop-push-modal__illu {
+  width: 5.5rem;
+  height: 5.5rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--color-accent, #db3846) 8%, #fff);
+  border: 1px solid color-mix(in srgb, var(--color-accent, #db3846) 22%, var(--color-border));
+  margin: auto;
+}
+
+.desktop-push-modal__illu svg {
+  width: 4.2rem;
+  height: 4.2rem;
+}
+
+.desktop-push-modal__illu-bg {
+  fill: color-mix(in srgb, var(--color-accent, #db3846) 14%, #fff);
+}
+
+.desktop-push-modal__illu-bell {
+  stroke: var(--color-accent, #db3846);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.desktop-push-modal__illu-dot {
+  fill: var(--color-accent, #db3846);
+}
+
+.desktop-push-modal__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+  text-align: center;
+}
+
+.desktop-push-modal__text {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.desktop-push-modal__actions {
+  justify-content: center;
+  margin-top: 0.3rem;
+}
+
+.desktop-push-modal__help {
+  width: 100%;
+  margin-top: 0.1rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.55rem;
+  background: var(--color-surface-muted, #fafafa);
+  text-align: center;
+}
+
+.desktop-push-modal__help-title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.desktop-push-modal__help-list {
+  margin: 0.35rem 0 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.76rem;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+  list-style: none;
+}
+
+.desktop-push-modal-shell .app-center-modal__header {
+  justify-content: center;
+  text-align: center;
+  position: relative;
+}
+
+.desktop-push-modal-shell .app-center-modal__title {
+  margin: 0 auto;
+  padding-right: 0;
+}
+
+.desktop-push-modal-shell .app-center-modal__close {
+  position: absolute;
+  right: 0.8rem;
+  top: 0.65rem;
+  margin: 0;
+}

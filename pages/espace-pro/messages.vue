@@ -51,7 +51,7 @@
               </article>
             </aside>
             <section v-if="activeProThread" class="conversation-panel" aria-label="Fil de discussion prospect">
-              <div class="conversation-panel__thread" role="log" aria-live="polite">
+              <div ref="proThreadContainer" class="conversation-panel__thread" role="log" aria-live="polite">
                 <article
                   v-for="msg in activeProThread.messages"
                   :key="msg.id"
@@ -90,37 +90,7 @@
                   <time>{{ formatThreadTime(msg.at) }}</time>
                 </article>
               </div>
-              <form class="conversation-panel__composer" @submit.prevent="sendProThreadMessage">
-                <div class="conversation-panel__listing-pick">
-                  <button type="button" class="profil-account__btn profil-account__btn--ghost" @click="toggleListingPicker">
-                    Envoyer une annonce
-                  </button>
-                  <div v-if="listingPickerOpen" class="prospects-listing-picker__popover conversation-panel__listing-popover" @click.stop>
-                    <input
-                      v-model.trim="listingPickerSearch"
-                      class="prospects-listing-picker__search-input"
-                      type="search"
-                      placeholder="Rechercher une annonce…"
-                    >
-                    <ul v-if="filteredListingPickerOptions.length" class="prospects-listing-picker__results">
-                      <li v-for="entry in filteredListingPickerOptions" :key="entry.id">
-                        <button
-                          type="button"
-                          class="prospects-listing-picker__result-btn"
-                          @click="selectListingToSend(entry)"
-                        >
-                          <img :src="entry.images[0] || ''" alt="" class="prospects-listing-picker__result-thumb">
-                          <span class="prospects-listing-picker__result-content">
-                            <span class="prospects-listing-picker__result-title">{{ entry.title }}</span>
-                            <span class="prospects-listing-picker__result-meta">
-                              {{ entry.city }} · {{ labelForPropertyType(entry.propertyType) }} · {{ formatListingPrice(entry) }}
-                            </span>
-                          </span>
-                        </button>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
+              <form class="conversation-panel__composer conversation-panel__composer--pro-actions-under" @submit.prevent="sendProThreadMessage">
                 <div v-if="selectedListingToSend" class="prospects-listing-picker__selected conversation-panel__selected-listing">
                   <img :src="selectedListingToSend.images[0] || ''" alt="" class="prospects-listing-picker__selected-thumb">
                   <div class="prospects-listing-picker__selected-text">
@@ -140,10 +110,46 @@
                   @input="autoResizeComposer"
                   @keydown="onComposerKeydown"
                 />
-                <p class="conversation-panel__hint">Entrée pour envoyer · Shift + Entrée pour un saut de ligne</p>
-                <button type="submit" class="profil-account__btn profil-account__btn--primary" :disabled="!proThreadDraft.trim()">
-                  Envoyer
-                </button>
+                <div class="conversation-panel__composer-actions">
+                  <div class="conversation-panel__listing-pick">
+                    <button type="button" class="profil-account__btn profil-account__btn--ghost conversation-panel__attach-btn" @click="toggleListingPicker">
+                      Joindre une annonce
+                    </button>
+                    <div v-if="listingPickerOpen" class="prospects-listing-picker__popover conversation-panel__listing-popover" @click.stop>
+                      <input
+                        v-model.trim="listingPickerSearch"
+                        class="prospects-listing-picker__search-input"
+                        type="search"
+                        placeholder="Rechercher une annonce…"
+                      >
+                      <ul v-if="filteredListingPickerOptions.length" class="prospects-listing-picker__results">
+                        <li v-for="entry in filteredListingPickerOptions" :key="entry.id">
+                          <button
+                            type="button"
+                            class="prospects-listing-picker__result-btn"
+                            @click="selectListingToSend(entry)"
+                          >
+                            <img :src="entry.images[0] || ''" alt="" class="prospects-listing-picker__result-thumb">
+                            <span class="prospects-listing-picker__result-content">
+                              <span class="prospects-listing-picker__result-title">{{ entry.title }}</span>
+                              <span class="prospects-listing-picker__result-meta">
+                                {{ entry.city }} · {{ labelForPropertyType(entry.propertyType) }} · {{ formatListingPrice(entry) }}
+                              </span>
+                            </span>
+                          </button>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                  <p class="conversation-panel__hint conversation-panel__hint--inline">Entrée pour envoyer · Shift + Entrée pour un saut de ligne</p>
+                  <button type="submit" class="profil-account__btn profil-account__btn--primary conversation-panel__send-btn" :disabled="!proThreadDraft.trim()">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M22 2 11 13" />
+                      <path d="m22 2-7 20-4-9-9-4 20-7Z" />
+                    </svg>
+                    Envoyer
+                  </button>
+                </div>
               </form>
             </section>
           </div>
@@ -207,6 +213,7 @@ const proMessageThreads = computed(() => siteStore.currentProMessageThreads)
 const selectedProThreadId = ref<string | null>(null)
 const proThreadDraft = ref('')
 const proComposerInput = ref<HTMLTextAreaElement | null>(null)
+const proThreadContainer = ref<HTMLElement | null>(null)
 const openThreadMenuId = ref<string | null>(null)
 const listingPickerOpen = ref(false)
 const listingPickerSearch = ref('')
@@ -332,6 +339,16 @@ function resetComposerHeight() {
   })
 }
 
+function scrollProThreadToBottom() {
+  nextTick(() => {
+    const el = proThreadContainer.value
+    if (!el) {
+      return
+    }
+    el.scrollTop = el.scrollHeight
+  })
+}
+
 function toggleThreadReadState(thread: (typeof proMessageThreads.value)[number]) {
   if (thread.unreadPro > 0) {
     siteStore.markProThreadRead(thread.id)
@@ -407,6 +424,14 @@ watch(
     if (threadId && agencyId) {
       siteStore.markProThreadRead(threadId)
     }
+  },
+  { immediate: true },
+)
+
+watch(
+  () => activeProThread.value?.messages.length ?? 0,
+  () => {
+    scrollProThreadToBottom()
   },
   { immediate: true },
 )

@@ -52,6 +52,10 @@ export type DemoProCatalogListing = {
   favoriteCount: number
   leadCount: number
   phoneRevealCount: number
+  lifetimeMonths: 1 | 3 | 6 | 12
+  lifetimeStartedAt: string | null
+  expiresAt: string | null
+  publishedCreditsConsumed: number
 }
 
 const LETTERS: EnergyLetter[] = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
@@ -273,6 +277,10 @@ export function buildDemoProCatalogListings(agencyId: string): DemoProCatalogLis
           favoriteCount: (idx * 11) % 72,
           leadCount: (idx * 7) % 22,
           phoneRevealCount: (idx * 5) % 16,
+          lifetimeMonths: 3,
+          lifetimeStartedAt: status === 'active' ? publishedIso(idx) : null,
+          expiresAt: status === 'active' ? new Date(new Date(publishedIso(idx)).setMonth(new Date(publishedIso(idx)).getMonth() + 3)).toISOString() : null,
+          publishedCreditsConsumed: status === 'active' ? 1 : 0,
         })
         idx++
       }

@@ -243,6 +243,7 @@ import { useSiteStore } from '~/stores/site'
 
 const route = useRoute()
 const siteStore = useSiteStore()
+const desktopPush = useDesktopPush()
 
 const {
   parsed,
@@ -365,6 +366,7 @@ function onCreateSearchAlert() {
   }
   saveCurrentSearchForUser()
   siteStore.createAlertFromLatestSearch()
+  desktopPush.openPermissionPromptIfNeeded('public')
 }
 
 watch(

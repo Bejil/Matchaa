@@ -3,6 +3,20 @@ import { buildDemoProCatalogListings } from '~/data/demo-pro-catalog-listings'
 import { getAgencyById, type Agency } from '~/data/agencies'
 import { ALL_PROPERTY_TYPE_SLUGS, PROPERTY_TYPE_GROUPS, type PropertyTypeSlug } from '~/data/property-types'
 import { proAgencyIdToPublicNumeric, proListingToSearchListing } from '~/utils/pro-listing-to-search'
+import {
+  addMonthsIso as addMonthsIsoFromModule,
+  computeListingPublishEligibility,
+  listingHasExpiredAt as listingHasExpiredAtFromModule,
+} from '~/stores/modules/credits-lifecycle'
+import {
+  markAllRead as markAllMessageThreadsRead,
+  markThreadRead as markMessageThreadRead,
+  markThreadUnread as markMessageThreadUnread,
+  normalizeMessageThread as normalizeStoredMessageThread,
+  normalizeThreadEntry as normalizeStoredThreadEntry,
+  sortThreadsByUpdatedAt,
+  upsertThreadMessage as upsertMessageThread,
+} from '~/stores/modules/messages'
 
 function normalizeProListingPropertyType(raw: string | undefined | null): PropertyTypeSlug {
   const input = (raw ?? '').trim()
@@ -97,6 +111,10 @@ export const useSiteStore = defineStore('site', () => {
     contactOptInEmail?: boolean
     /** telephone saisi dans le formulaire de contact */
     contactPhone?: string
+    /** e-mail saisi dans le formulaire de contact */
+    contactEmail?: string
+    /** nom saisi dans le formulaire de contact */
+    contactName?: string
   }
   type MessageThreadEntry = {
     id: string
@@ -120,6 +138,7 @@ export const useSiteStore = defineStore('site', () => {
   type ProspectActivitySnapshot = {
     email: string
     name: string
+    hasAccount: boolean
     contactPhone: string
     contactOptInPhone: boolean
     contactOptInEmail: boolean
@@ -162,6 +181,8 @@ export const useSiteStore = defineStore('site', () => {
     address: string
     /** Présentation courte de l’agence (vitrine / contact) */
     description: string
+    creditsBalance: number
+    creditsPlan: 'none' | 'annual'
   }
   type ProMember = {
     id: string
@@ -170,6 +191,19 @@ export const useSiteStore = defineStore('site', () => {
     email: string
     password: string
     role: ProRole
+    creditsConsumedTotal: number
+    creditsConsumed30d: number
+    lastCreditConsumptionAt: string | null
+  }
+  type AgencyCreditLedgerEntry = {
+    id: string
+    agencyId: string
+    type: 'purchase_pack' | 'annual_subscription' | 'listing_publish'
+    amount: number
+    at: string
+    byMemberId: string | null
+    listingId: string | null
+    note: string
   }
   type CurrentProUser = Pick<ProMember, 'id' | 'agencyId' | 'name' | 'email' | 'role'> & {
     companyName: string
@@ -216,6 +250,15 @@ export const useSiteStore = defineStore('site', () => {
     leadCount: number
     /** Affichages du numéro de téléphone depuis la fiche annonce */
     phoneRevealCount: number
+    lifetimeMonths: 1 | 3 | 6 | 12
+    lifetimeStartedAt: string | null
+    expiresAt: string | null
+    publishedCreditsConsumed: number
+  }
+  type ListingPublishEligibility = {
+    eligible: boolean
+    needsCredit: boolean
+    reasons: string[]
   }
 
   const DEMO_USERS: DemoUser[] = [
@@ -234,6 +277,8 @@ export const useSiteStore = defineStore('site', () => {
       city: 'Paris',
       address: '12 rue de la Paix',
       description: 'Agence de démonstration Matchaa pour tester la publication et le suivi des annonces.',
+      creditsBalance: 24,
+      creditsPlan: 'none',
     },
     {
       id: 'agency-demo-toits',
@@ -244,6 +289,8 @@ export const useSiteStore = defineStore('site', () => {
       city: 'Lyon',
       address: '8 avenue des Acacias',
       description: 'Spécialiste des biens avec extérieur et maisons familiales en métropole lyonnaise.',
+      creditsBalance: 24,
+      creditsPlan: 'none',
     },
     {
       id: 'agency-demo-central',
@@ -254,6 +301,8 @@ export const useSiteStore = defineStore('site', () => {
       city: 'Bordeaux',
       address: '31 quai des Chartrons',
       description: 'Transactions et locations au cœur de Bordeaux et en Nouvelle-Aquitaine.',
+      creditsBalance: 24,
+      creditsPlan: 'none',
     },
   ]
   /** Comptes démo réservés à l’espace pro (emails distincts des comptes publics). */
@@ -265,6 +314,9 @@ export const useSiteStore = defineStore('site', () => {
       email: 'test.pro@matchaa.demo',
       password: 'matchaa-pro-test',
       role: 'manager',
+      creditsConsumedTotal: 0,
+      creditsConsumed30d: 0,
+      lastCreditConsumptionAt: null,
     },
     {
       id: 'pro-camille-manager',
@@ -273,6 +325,9 @@ export const useSiteStore = defineStore('site', () => {
       email: 'pro.toitsverts@matchaa.demo',
       password: 'pro-demo',
       role: 'manager',
+      creditsConsumedTotal: 0,
+      creditsConsumed30d: 0,
+      lastCreditConsumptionAt: null,
     },
     {
       id: 'pro-julien-agent',
@@ -281,6 +336,9 @@ export const useSiteStore = defineStore('site', () => {
       email: 'julien.paret@immo-central.demo',
       password: 'pro-demo',
       role: 'agent',
+      creditsConsumedTotal: 0,
+      creditsConsumed30d: 0,
+      lastCreditConsumptionAt: null,
     },
   ]
 
@@ -289,6 +347,7 @@ export const useSiteStore = defineStore('site', () => {
   const PRO_MEMBERS_KEY = 'matchaa-pro-members'
   const PRO_AGENCIES_KEY = 'matchaa-pro-agencies'
   const PRO_LISTINGS_KEY = 'matchaa-pro-listings'
+  const AGENCY_CREDITS_LEDGER_KEY = 'matchaa-agency-credits-ledger-v1'
   /** Anciennes annonces injectées par le seed démo (retiré du code) — encore présentes chez certains navigateurs. */
   const LEGACY_SEEDED_PRO_LISTING_IDS = new Set([
     'pro-listing-test-1',
@@ -302,6 +361,7 @@ export const useSiteStore = defineStore('site', () => {
   const PROSPECT_ACTIVITY_KEY_PREFIX = 'matchaa-prospect-activity'
   const PUBLIC_PROFILE_KEY_PREFIX = 'matchaa-public-profile'
   const ANON_PROSPECT_ID_KEY = 'matchaa-anon-prospect-id'
+  const PREAUTH_IDENTITIES_KEY = 'matchaa-preauth-identities-v1'
 
   const siteName = ref('Matchaa')
   const currentUser = ref<Pick<DemoUser, 'name' | 'email' | 'contactPhone' | 'contactOptInPhone' | 'contactOptInEmail'> | null>(null)
@@ -309,12 +369,18 @@ export const useSiteStore = defineStore('site', () => {
   const proMembers = ref<ProMember[]>([])
   const proAgencies = ref<ProAgency[]>([])
   const proListings = ref<ProListing[]>([])
+  const agencyCreditsLedger = ref<AgencyCreditLedgerEntry[]>([])
   const savedSearches = ref<SavedSearch[]>([])
   const latestSearch = ref<SavedSearch | null>(null)
   const sentMessages = ref<SentMessage[]>([])
   const messageThreads = ref<MessageThread[]>([])
+  const prospectsDataVersion = ref(0)
   let messageThreadsLoaded = false
   let messageThreadsSyncBound = false
+
+  function bumpProspectsDataVersion() {
+    prospectsDataVersion.value += 1
+  }
 
   function searchesStorageKey(email: string): string {
     return `${SEARCHES_KEY_PREFIX}:${email.toLowerCase()}`
@@ -387,6 +453,314 @@ export const useSiteStore = defineStore('site', () => {
       return currentUser.value.email.trim().toLowerCase()
     }
     return ensureAnonymousProspectEmail()
+  }
+
+  function rememberPreAuthIdentity(emailInput: string) {
+    if (!import.meta.client || currentUser.value) {
+      return
+    }
+    const email = emailInput.trim().toLowerCase()
+    if (!email) {
+      return
+    }
+    try {
+      const raw = localStorage.getItem(PREAUTH_IDENTITIES_KEY)
+      const parsed = raw ? JSON.parse(raw) as unknown : []
+      const arr = Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : []
+      const next = [...new Set([email, ...arr])].slice(0, 50)
+      localStorage.setItem(PREAUTH_IDENTITIES_KEY, JSON.stringify(next))
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function mergePublicProfileFromAnonymousSource(targetEmail: string, sourceEmail: string) {
+    const sourceKey = publicProfileStorageKey(sourceEmail)
+    const targetKey = publicProfileStorageKey(targetEmail)
+    try {
+      const sourceRaw = localStorage.getItem(sourceKey)
+      const sourceParsed = sourceRaw
+        ? JSON.parse(sourceRaw) as Partial<DemoUser>
+        : null
+      const targetRaw = localStorage.getItem(targetKey)
+      const targetParsed = targetRaw ? JSON.parse(targetRaw) as Partial<DemoUser> : {}
+      const tPhone = typeof targetParsed.contactPhone === 'string' ? targetParsed.contactPhone.trim() : ''
+      const sPhone = sourceParsed && typeof sourceParsed.contactPhone === 'string'
+        ? sourceParsed.contactPhone.trim()
+        : ''
+      const tOptP = targetParsed.contactOptInPhone === true
+      const sOptP = sourceParsed?.contactOptInPhone === true
+      const tOptE = targetParsed.contactOptInEmail === true
+      const sOptE = sourceParsed?.contactOptInEmail === true
+      localStorage.setItem(targetKey, JSON.stringify({
+        contactPhone: tPhone || sPhone,
+        contactOptInPhone: tOptP || sOptP,
+        contactOptInEmail: tOptE || sOptE,
+      }))
+      localStorage.removeItem(sourceKey)
+    } catch {
+      try {
+        localStorage.removeItem(sourceKey)
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  function applyReconciledContactPrefsFromMergedMessages(targetEmail: string) {
+    if (!import.meta.client) {
+      return
+    }
+    try {
+      const raw = localStorage.getItem(messagesStorageKey(targetEmail))
+      if (!raw) {
+        return
+      }
+      const parsed = JSON.parse(raw) as unknown
+      if (!Array.isArray(parsed)) {
+        return
+      }
+      const messages = parsed.filter((m): m is SentMessage =>
+        Boolean(
+          m
+          && typeof (m as SentMessage).id === 'string'
+          && typeof (m as SentMessage).agency === 'string'
+          && typeof (m as SentMessage).text === 'string',
+        ),
+      )
+      if (!messages.length) {
+        return
+      }
+      const sorted = [...messages].sort((a, b) => {
+        const ta = parseTimestampFromEntityId(a.id) ?? 0
+        const tb = parseTimestampFromEntityId(b.id) ?? 0
+        return tb - ta
+      })
+      const latestConsentful = sorted.find((m) => m.optOutSimilar !== true)
+      if (!latestConsentful) {
+        return
+      }
+      const prof = loadPublicProfileByEmail(targetEmail)
+      const phoneFromMsg = typeof latestConsentful.contactPhone === 'string'
+        ? latestConsentful.contactPhone.trim()
+        : ''
+      localStorage.setItem(publicProfileStorageKey(targetEmail), JSON.stringify({
+        contactPhone: prof.contactPhone.trim() ? prof.contactPhone : phoneFromMsg,
+        contactOptInPhone: latestConsentful.contactOptInPhone === true,
+        contactOptInEmail: latestConsentful.contactOptInEmail === true,
+      }))
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function syncCurrentUserContactPrefsFromPublicProfile(targetEmail: string) {
+    if (!import.meta.client || !currentUser.value) {
+      return
+    }
+    if (currentUser.value.email.trim().toLowerCase() !== targetEmail) {
+      return
+    }
+    const prof = loadPublicProfileByEmail(targetEmail)
+    currentUser.value = {
+      ...currentUser.value,
+      contactPhone: prof.contactPhone.trim() || currentUser.value.contactPhone,
+      contactOptInPhone: prof.contactOptInPhone,
+      contactOptInEmail: prof.contactOptInEmail,
+    }
+    try {
+      localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser.value))
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function mergeAnonymousProspectDataIntoEmail(targetEmailInput: string) {
+    if (!import.meta.client) {
+      return
+    }
+    const targetEmail = targetEmailInput.trim().toLowerCase()
+    if (!targetEmail || isAnonymousProspectEmail(targetEmail)) {
+      return
+    }
+    const anonymousEmails = new Set<string>()
+    const currentAnonymous = ensureAnonymousProspectEmail()
+    if (isAnonymousProspectEmail(currentAnonymous) && currentAnonymous !== targetEmail) {
+      anonymousEmails.add(currentAnonymous)
+    }
+    try {
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i)
+        if (!key) {
+          continue
+        }
+        const prefixes = [
+          `${SEARCHES_KEY_PREFIX}:`,
+          `${LATEST_SEARCH_KEY_PREFIX}:`,
+          `${MESSAGES_KEY_PREFIX}:`,
+          `${PROSPECT_ACTIVITY_KEY_PREFIX}:`,
+          `${PUBLIC_PROFILE_KEY_PREFIX}:`,
+        ]
+        const matchedPrefix = prefixes.find((prefix) => key.startsWith(prefix))
+        if (!matchedPrefix) {
+          continue
+        }
+        const maybeEmail = key.slice(matchedPrefix.length).trim().toLowerCase()
+        if (isAnonymousProspectEmail(maybeEmail) && maybeEmail !== targetEmail) {
+          anonymousEmails.add(maybeEmail)
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    try {
+      const raw = localStorage.getItem(PREAUTH_IDENTITIES_KEY)
+      const parsed = raw ? JSON.parse(raw) as unknown : []
+      const arr = Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : []
+      for (const identity of arr) {
+        const id = identity.trim().toLowerCase()
+        if (id && id !== targetEmail) {
+          anonymousEmails.add(id)
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    if (!anonymousEmails.size) {
+      return
+    }
+
+    const mergeArrayStorageByPrefix = (prefix: string, sourceEmail: string) => {
+      const sourceKey = `${prefix}:${sourceEmail}`
+      const targetKey = `${prefix}:${targetEmail}`
+      try {
+        const sourceRaw = localStorage.getItem(sourceKey)
+        if (!sourceRaw) {
+          return
+        }
+        const sourceParsed = JSON.parse(sourceRaw) as unknown
+        const targetRaw = localStorage.getItem(targetKey)
+        const targetParsed = targetRaw ? JSON.parse(targetRaw) as unknown : []
+        const sourceArray = Array.isArray(sourceParsed) ? sourceParsed : []
+        const targetArray = Array.isArray(targetParsed) ? targetParsed : []
+        const merged = [...targetArray, ...sourceArray].slice(0, 100)
+        localStorage.setItem(targetKey, JSON.stringify(merged))
+        localStorage.removeItem(sourceKey)
+      } catch {
+        /* ignore */
+      }
+    }
+
+    const mergeLatestSearch = (sourceEmail: string) => {
+      const sourceKey = latestSearchStorageKey(sourceEmail)
+      const targetKey = latestSearchStorageKey(targetEmail)
+      try {
+        const sourceRaw = localStorage.getItem(sourceKey)
+        if (!sourceRaw) {
+          return
+        }
+        if (!localStorage.getItem(targetKey)) {
+          localStorage.setItem(targetKey, sourceRaw)
+        }
+        localStorage.removeItem(sourceKey)
+      } catch {
+        /* ignore */
+      }
+    }
+
+    const mergeProspectActivity = (sourceEmail: string) => {
+      const sourceKey = prospectActivityStorageKey(sourceEmail)
+      const targetKey = prospectActivityStorageKey(targetEmail)
+      try {
+        const sourceRaw = localStorage.getItem(sourceKey)
+        if (!sourceRaw) {
+          return
+        }
+        const sourceParsed = JSON.parse(sourceRaw) as Record<string, unknown>
+        const targetRaw = localStorage.getItem(targetKey)
+        const targetParsed = targetRaw ? JSON.parse(targetRaw) as Record<string, unknown> : {}
+        const mergeIds = (a: unknown, b: unknown) => {
+          const arrA = Array.isArray(a) ? a.filter((v): v is string => typeof v === 'string') : []
+          const arrB = Array.isArray(b) ? b.filter((v): v is string => typeof v === 'string') : []
+          return [...new Set([...arrA, ...arrB])].slice(0, 80)
+        }
+        const merged = {
+          views: Math.max(0, Number(targetParsed.views ?? 0)) + Math.max(0, Number(sourceParsed.views ?? 0)),
+          favorites: Math.max(0, Number(targetParsed.favorites ?? 0)) + Math.max(0, Number(sourceParsed.favorites ?? 0)),
+          leads: Math.max(0, Number(targetParsed.leads ?? 0)) + Math.max(0, Number(sourceParsed.leads ?? 0)),
+          phoneReveals: Math.max(0, Number(targetParsed.phoneReveals ?? 0)) + Math.max(0, Number(sourceParsed.phoneReveals ?? 0)),
+          recentActivityListingIds: mergeIds(targetParsed.recentActivityListingIds, sourceParsed.recentActivityListingIds),
+          recentActivityListingIdsByKind: {
+            views: mergeIds(
+              (targetParsed.recentActivityListingIdsByKind as Record<string, unknown> | undefined)?.views,
+              (sourceParsed.recentActivityListingIdsByKind as Record<string, unknown> | undefined)?.views,
+            ),
+            favorites: mergeIds(
+              (targetParsed.recentActivityListingIdsByKind as Record<string, unknown> | undefined)?.favorites,
+              (sourceParsed.recentActivityListingIdsByKind as Record<string, unknown> | undefined)?.favorites,
+            ),
+            leads: mergeIds(
+              (targetParsed.recentActivityListingIdsByKind as Record<string, unknown> | undefined)?.leads,
+              (sourceParsed.recentActivityListingIdsByKind as Record<string, unknown> | undefined)?.leads,
+            ),
+            phoneReveals: mergeIds(
+              (targetParsed.recentActivityListingIdsByKind as Record<string, unknown> | undefined)?.phoneReveals,
+              (sourceParsed.recentActivityListingIdsByKind as Record<string, unknown> | undefined)?.phoneReveals,
+            ),
+          },
+          updatedAt: new Date().toISOString(),
+        }
+        localStorage.setItem(targetKey, JSON.stringify(merged))
+        localStorage.removeItem(sourceKey)
+      } catch {
+        /* ignore */
+      }
+    }
+
+    const mergeMessageThreads = () => {
+      try {
+        const raw = localStorage.getItem(MESSAGE_THREADS_KEY)
+        if (!raw) {
+          return
+        }
+        const parsed = JSON.parse(raw) as unknown
+        if (!Array.isArray(parsed)) {
+          return
+        }
+        const next = parsed
+          .map((item) => normalizeStoredMessageThread(item))
+          .filter((t): t is MessageThread => t !== null)
+          .map((thread) => {
+            if (!anonymousEmails.has(thread.publicEmail)) {
+              return thread
+            }
+            return { ...thread, publicEmail: targetEmail }
+          })
+        localStorage.setItem(MESSAGE_THREADS_KEY, JSON.stringify(next))
+      } catch {
+        /* ignore */
+      }
+    }
+
+    for (const sourceEmail of anonymousEmails) {
+      mergeArrayStorageByPrefix(SEARCHES_KEY_PREFIX, sourceEmail)
+      mergeArrayStorageByPrefix(MESSAGES_KEY_PREFIX, sourceEmail)
+      mergeLatestSearch(sourceEmail)
+      mergeProspectActivity(sourceEmail)
+      mergePublicProfileFromAnonymousSource(targetEmail, sourceEmail)
+    }
+    mergeMessageThreads()
+    applyReconciledContactPrefsFromMergedMessages(targetEmail)
+    syncCurrentUserContactPrefsFromPublicProfile(targetEmail)
+    try {
+      localStorage.removeItem(PREAUTH_IDENTITIES_KEY)
+    } catch {
+      /* ignore */
+    }
+    if (currentUser.value?.email?.trim().toLowerCase() === targetEmail) {
+      loadMessageThreads()
+    }
+    bumpProspectsDataVersion()
   }
 
   function parseTimestampFromEntityId(id: string | undefined): number | null {
@@ -482,7 +856,9 @@ export const useSiteStore = defineStore('site', () => {
     if (!import.meta.client) {
       return
     }
-    bumpProspectActivityByEmail(kind, prospectActorEmail(), listingId)
+    const actorEmail = prospectActorEmail()
+    rememberPreAuthIdentity(actorEmail)
+    bumpProspectActivityByEmail(kind, actorEmail, listingId)
   }
 
   function listProspectActivitySnapshots(): ProspectActivitySnapshot[] {
@@ -507,6 +883,7 @@ export const useSiteStore = defineStore('site', () => {
       const snapshot: ProspectActivitySnapshot = {
         email,
         name: demo?.name ?? fallbackName,
+        hasAccount: Boolean(demo),
         contactPhone: profile.contactPhone,
         contactOptInPhone: profile.contactOptInPhone,
         contactOptInEmail: profile.contactOptInEmail,
@@ -601,18 +978,14 @@ export const useSiteStore = defineStore('site', () => {
         }
       }
       if (key.startsWith(`${MESSAGES_KEY_PREFIX}:`)) {
-        const email = key.slice(`${MESSAGES_KEY_PREFIX}:`.length)
-        const snapshot = ensureSnapshot(email)
-        if (!snapshot) {
-          continue
-        }
+        const keyEmail = key.slice(`${MESSAGES_KEY_PREFIX}:`.length)
         try {
           const raw = localStorage.getItem(key)
           const parsed = raw ? JSON.parse(raw) as unknown : []
           if (!Array.isArray(parsed)) {
             continue
           }
-          snapshot.sentMessages = parsed
+          const normalizedMessages = parsed
             .filter((m): m is SentMessage =>
               Boolean(
                 m
@@ -634,9 +1007,20 @@ export const useSiteStore = defineStore('site', () => {
               contactOptInPhone: m.contactOptInPhone === true,
               contactOptInEmail: m.contactOptInEmail === true,
               contactPhone: typeof m.contactPhone === 'string' ? m.contactPhone : '',
+              contactEmail: typeof m.contactEmail === 'string' ? m.contactEmail : '',
+              contactName: typeof m.contactName === 'string' ? m.contactName : '',
             }))
             .slice(0, 100)
-          for (const m of snapshot.sentMessages) {
+          for (const m of normalizedMessages) {
+            const contactEmail = typeof m.contactEmail === 'string' ? m.contactEmail.trim().toLowerCase() : ''
+            const targetEmail = isAnonymousProspectEmail(keyEmail) && contactEmail.includes('@')
+              ? contactEmail
+              : keyEmail
+            const snapshot = ensureSnapshot(targetEmail)
+            if (!snapshot) {
+              continue
+            }
+            snapshot.sentMessages.push(m)
             bumpLastActivity(snapshot, parseTimestampFromEntityId(m.id))
           }
         } catch {
@@ -829,6 +1213,8 @@ export const useSiteStore = defineStore('site', () => {
             contactOptInPhone: m.contactOptInPhone === true,
             contactOptInEmail: m.contactOptInEmail === true,
             contactPhone: typeof m.contactPhone === 'string' ? m.contactPhone : '',
+            contactEmail: typeof m.contactEmail === 'string' ? m.contactEmail : '',
+            contactName: typeof m.contactName === 'string' ? m.contactName : '',
           }))
       } else {
         sentMessages.value = []
@@ -853,64 +1239,11 @@ export const useSiteStore = defineStore('site', () => {
   }
 
   function normalizeThreadEntry(raw: unknown): MessageThreadEntry | null {
-    if (!raw || typeof raw !== 'object') {
-      return null
-    }
-    const r = raw as Record<string, unknown>
-    if (
-      typeof r.id !== 'string'
-      || (r.author !== 'public' && r.author !== 'pro')
-      || typeof r.text !== 'string'
-      || typeof r.at !== 'string'
-    ) {
-      return null
-    }
-
-    const listingId =
-      typeof r.listingId === 'string' || typeof r.listingId === 'number'
-        ? String(r.listingId)
-        : (r.listingId === null ? null : undefined)
-    const listingTitle = typeof r.listingTitle === 'string' ? r.listingTitle : undefined
-    return {
-      id: r.id,
-      author: r.author,
-      text: r.text,
-      at: r.at,
-      listingId,
-      listingTitle,
-    }
+    return normalizeStoredThreadEntry(raw)
   }
 
   function normalizeMessageThread(raw: unknown): MessageThread | null {
-    if (!raw || typeof raw !== 'object') {
-      return null
-    }
-    const r = raw as Record<string, unknown>
-    if (
-      typeof r.id !== 'string'
-      || typeof r.publicEmail !== 'string'
-      || typeof r.proAgencyId !== 'string'
-      || typeof r.proAgencyName !== 'string'
-      || typeof r.publicName !== 'string'
-      || !Array.isArray(r.messages)
-    ) {
-      return null
-    }
-    const messages = r.messages
-      .map((m) => normalizeThreadEntry(m))
-      .filter((m): m is MessageThreadEntry => m !== null)
-      .slice(-120)
-    return {
-      id: r.id,
-      publicEmail: r.publicEmail.trim().toLowerCase(),
-      proAgencyId: r.proAgencyId,
-      proAgencyName: r.proAgencyName,
-      publicName: r.publicName,
-      messages,
-      unreadPublic: Math.max(0, Number(r.unreadPublic ?? 0)),
-      unreadPro: Math.max(0, Number(r.unreadPro ?? 0)),
-      updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : (messages.at(-1)?.at ?? new Date().toISOString()),
-    }
+    return normalizeStoredMessageThread(raw)
   }
 
   function loadMessageThreads() {
@@ -943,7 +1276,7 @@ export const useSiteStore = defineStore('site', () => {
       messageThreads.value = parsed
         .map((item) => normalizeMessageThread(item))
         .filter((t): t is MessageThread => t !== null)
-        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      messageThreads.value = sortThreadsByUpdatedAt(messageThreads.value)
       messageThreadsLoaded = true
     } catch {
       messageThreads.value = []
@@ -993,53 +1326,33 @@ export const useSiteStore = defineStore('site', () => {
     if (import.meta.client && !messageThreadsLoaded) {
       loadMessageThreads()
     }
-    const publicEmail = input.publicEmail.trim().toLowerCase()
-    const text = input.text.trim()
-    if (!publicEmail || !input.proAgencyId || !text) {
+    const now = new Date().toISOString()
+    const upserted = upsertMessageThread(messageThreads.value, { ...input, nowIso: now })
+    messageThreads.value = upserted.threads
+    const nextThread = upserted.thread
+    if (!nextThread) {
       return null
     }
-    const now = new Date().toISOString()
-    const existing = messageThreads.value.find(
-      (t) => t.publicEmail === publicEmail && t.proAgencyId === input.proAgencyId,
-    )
-    const nextMsg: MessageThreadEntry = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      author: input.author,
-      text,
-      at: now,
-      listingId: input.listingId ?? null,
-      listingTitle: input.listingTitle,
-    }
-    let nextThread: MessageThread
-    if (existing) {
-      nextThread = {
-        ...existing,
-        publicName: input.publicName || existing.publicName,
-        proAgencyName: input.proAgencyName || existing.proAgencyName,
-        messages: [...existing.messages, nextMsg].slice(-120),
-        unreadPublic: existing.unreadPublic + (input.author === 'pro' ? 1 : 0),
-        unreadPro: existing.unreadPro + (input.author === 'public' ? 1 : 0),
-        updatedAt: now,
-      }
-      messageThreads.value = [
-        nextThread,
-        ...messageThreads.value.filter((t) => t.id !== existing.id),
-      ]
-    } else {
-      nextThread = {
-        id: `thread-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        publicEmail,
-        proAgencyId: input.proAgencyId,
-        proAgencyName: input.proAgencyName,
-        publicName: input.publicName || 'Prospect',
-        messages: [nextMsg],
-        unreadPublic: input.author === 'pro' ? 1 : 0,
-        unreadPro: input.author === 'public' ? 1 : 0,
-        updatedAt: now,
-      }
-      messageThreads.value = [nextThread, ...messageThreads.value]
-    }
     persistMessageThreads()
+    if (import.meta.client && typeof window !== 'undefined') {
+      const recipient = input.author === 'public' ? 'pro' : 'public'
+      const incomingPayload = {
+        recipient,
+        threadId: nextThread.id,
+        publicEmail: nextThread.publicEmail,
+        proAgencyId: nextThread.proAgencyId,
+        author: input.author,
+        at: now,
+      }
+      window.dispatchEvent(new CustomEvent('matchaa:incoming-message', {
+        detail: incomingPayload,
+      }))
+      try {
+        localStorage.setItem('matchaa:incoming-message-event', JSON.stringify(incomingPayload))
+      } catch {
+        /* ignore */
+      }
+    }
     return nextThread
   }
 
@@ -1088,15 +1401,9 @@ export const useSiteStore = defineStore('site', () => {
     if (!email) {
       return
     }
-    let changed = false
-    messageThreads.value = messageThreads.value.map((t) => {
-      if (t.publicEmail !== email || t.unreadPublic === 0) {
-        return t
-      }
-      changed = true
-      return { ...t, unreadPublic: 0 }
-    })
-    if (changed) {
+    const result = markAllMessageThreadsRead(messageThreads.value, 'public', email)
+    messageThreads.value = result.threads
+    if (result.changed) {
       persistMessageThreads()
     }
   }
@@ -1106,15 +1413,9 @@ export const useSiteStore = defineStore('site', () => {
     if (!email || !threadId) {
       return
     }
-    let changed = false
-    messageThreads.value = messageThreads.value.map((t) => {
-      if (t.id !== threadId || t.publicEmail !== email || t.unreadPublic === 0) {
-        return t
-      }
-      changed = true
-      return { ...t, unreadPublic: 0 }
-    })
-    if (changed) {
+    const result = markMessageThreadRead(messageThreads.value, threadId, 'public', email)
+    messageThreads.value = result.threads
+    if (result.changed) {
       persistMessageThreads()
     }
   }
@@ -1124,15 +1425,9 @@ export const useSiteStore = defineStore('site', () => {
     if (!agencyId) {
       return
     }
-    let changed = false
-    messageThreads.value = messageThreads.value.map((t) => {
-      if (t.proAgencyId !== agencyId || t.unreadPro === 0) {
-        return t
-      }
-      changed = true
-      return { ...t, unreadPro: 0 }
-    })
-    if (changed) {
+    const result = markAllMessageThreadsRead(messageThreads.value, 'pro', agencyId)
+    messageThreads.value = result.threads
+    if (result.changed) {
       persistMessageThreads()
     }
   }
@@ -1142,15 +1437,9 @@ export const useSiteStore = defineStore('site', () => {
     if (!agencyId || !threadId) {
       return
     }
-    let changed = false
-    messageThreads.value = messageThreads.value.map((t) => {
-      if (t.id !== threadId || t.proAgencyId !== agencyId || t.unreadPro === 0) {
-        return t
-      }
-      changed = true
-      return { ...t, unreadPro: 0 }
-    })
-    if (changed) {
+    const result = markMessageThreadRead(messageThreads.value, threadId, 'pro', agencyId)
+    messageThreads.value = result.threads
+    if (result.changed) {
       persistMessageThreads()
     }
   }
@@ -1160,18 +1449,9 @@ export const useSiteStore = defineStore('site', () => {
     if (!email || !threadId) {
       return
     }
-    let changed = false
-    messageThreads.value = messageThreads.value.map((t) => {
-      if (t.id !== threadId || t.publicEmail !== email) {
-        return t
-      }
-      if (t.unreadPublic > 0) {
-        return t
-      }
-      changed = true
-      return { ...t, unreadPublic: 1 }
-    })
-    if (changed) {
+    const result = markMessageThreadUnread(messageThreads.value, threadId, 'public', email)
+    messageThreads.value = result.threads
+    if (result.changed) {
       persistMessageThreads()
     }
   }
@@ -1181,18 +1461,9 @@ export const useSiteStore = defineStore('site', () => {
     if (!agencyId || !threadId) {
       return
     }
-    let changed = false
-    messageThreads.value = messageThreads.value.map((t) => {
-      if (t.id !== threadId || t.proAgencyId !== agencyId) {
-        return t
-      }
-      if (t.unreadPro > 0) {
-        return t
-      }
-      changed = true
-      return { ...t, unreadPro: 1 }
-    })
-    if (changed) {
+    const result = markMessageThreadUnread(messageThreads.value, threadId, 'pro', agencyId)
+    messageThreads.value = result.threads
+    if (result.changed) {
       persistMessageThreads()
     }
   }
@@ -1279,6 +1550,7 @@ export const useSiteStore = defineStore('site', () => {
       contactOptInPhone: found.contactOptInPhone ?? false,
       contactOptInEmail: found.contactOptInEmail ?? false,
     }
+    mergeAnonymousProspectDataIntoEmail(found.email)
     if (import.meta.client) {
       localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser.value))
     }
@@ -1299,6 +1571,7 @@ export const useSiteStore = defineStore('site', () => {
       contactOptInPhone: false,
       contactOptInEmail: false,
     }
+    mergeAnonymousProspectDataIntoEmail(nextEmail)
     if (import.meta.client) {
       localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser.value))
     }
@@ -1320,6 +1593,34 @@ export const useSiteStore = defineStore('site', () => {
     }
   }
 
+  function normalizeStoredMember(raw: unknown): ProMember | null {
+    if (!raw || typeof raw !== 'object') {
+      return null
+    }
+    const m = raw as Record<string, unknown>
+    if (
+      typeof m.id !== 'string'
+      || typeof m.agencyId !== 'string'
+      || typeof m.name !== 'string'
+      || typeof m.email !== 'string'
+      || typeof m.password !== 'string'
+      || (m.role !== 'agent' && m.role !== 'manager')
+    ) {
+      return null
+    }
+    return {
+      id: m.id,
+      agencyId: m.agencyId,
+      name: m.name,
+      email: m.email,
+      password: m.password,
+      role: m.role,
+      creditsConsumedTotal: Math.max(0, Math.round(Number(m.creditsConsumedTotal ?? 0))),
+      creditsConsumed30d: Math.max(0, Math.round(Number(m.creditsConsumed30d ?? 0))),
+      lastCreditConsumptionAt: typeof m.lastCreditConsumptionAt === 'string' ? m.lastCreditConsumptionAt : null,
+    }
+  }
+
   function loadStoredProMembers(): ProMember[] {
     if (!import.meta.client) {
       return []
@@ -1333,18 +1634,9 @@ export const useSiteStore = defineStore('site', () => {
       if (!Array.isArray(parsed)) {
         return []
       }
-      return parsed.filter(
-        (m): m is ProMember =>
-          Boolean(
-            m
-            && typeof (m as ProMember).id === 'string'
-            && typeof (m as ProMember).agencyId === 'string'
-            && typeof (m as ProMember).name === 'string'
-            && typeof (m as ProMember).email === 'string'
-            && typeof (m as ProMember).password === 'string'
-            && ((m as ProMember).role === 'agent' || (m as ProMember).role === 'manager')
-          ),
-      )
+      return parsed
+        .map((m) => normalizeStoredMember(m))
+        .filter((m): m is ProMember => m !== null)
     } catch {
       return []
     }
@@ -1370,7 +1662,123 @@ export const useSiteStore = defineStore('site', () => {
       city: typeof a.city === 'string' ? a.city : '',
       address: typeof a.address === 'string' ? a.address : '',
       description: typeof a.description === 'string' ? a.description : '',
+      creditsBalance: Math.max(0, Math.round(Number(a.creditsBalance ?? 0))),
+      creditsPlan: a.creditsPlan === 'annual' ? 'annual' : 'none',
     }
+  }
+
+  function loadStoredCreditsLedger(): AgencyCreditLedgerEntry[] {
+    if (!import.meta.client) {
+      return []
+    }
+    try {
+      const raw = localStorage.getItem(AGENCY_CREDITS_LEDGER_KEY)
+      if (!raw) {
+        return []
+      }
+      const parsed = JSON.parse(raw) as unknown
+      if (!Array.isArray(parsed)) {
+        return []
+      }
+      return parsed
+        .map((entry): AgencyCreditLedgerEntry | null => {
+          if (!entry || typeof entry !== 'object') {
+            return null
+          }
+          const e = entry as Record<string, unknown>
+          if (
+            typeof e.id !== 'string'
+            || typeof e.agencyId !== 'string'
+            || typeof e.amount !== 'number'
+            || typeof e.at !== 'string'
+            || typeof e.note !== 'string'
+          ) {
+            return null
+          }
+          if (
+            e.type !== 'purchase_pack'
+            && e.type !== 'annual_subscription'
+            && e.type !== 'listing_publish'
+          ) {
+            return null
+          }
+          return {
+            id: e.id,
+            agencyId: e.agencyId,
+            type: e.type,
+            amount: Math.round(e.amount),
+            at: e.at,
+            byMemberId: typeof e.byMemberId === 'string' ? e.byMemberId : null,
+            listingId: typeof e.listingId === 'string' ? e.listingId : null,
+            note: e.note,
+          }
+        })
+        .filter((entry): entry is AgencyCreditLedgerEntry => entry !== null)
+        .slice(-3000)
+    } catch {
+      return []
+    }
+  }
+
+  const CREDIT_PACKS = [
+    { id: 'pack-1', label: '1 crédit', credits: 1, price: 19 },
+    { id: 'pack-5', label: '5 crédits', credits: 5, price: 89 },
+    { id: 'pack-10', label: '10 crédits', credits: 10, price: 169 },
+    { id: 'pack-25', label: '25 crédits', credits: 25, price: 389 },
+  ] as const
+
+  const ANNUAL_SUBSCRIPTION = { price: 1290 } as const
+
+  function addMonthsIso(fromIso: string, months: number): string {
+    return addMonthsIsoFromModule(fromIso, months)
+  }
+
+  function listingHasExpiredAt(listing: Pick<ProListing, 'expiresAt'>, nowIso = new Date().toISOString()): boolean {
+    return listingHasExpiredAtFromModule(listing, nowIso)
+  }
+
+  function refreshMemberCreditConsumptionCounters(agencyId: string) {
+    const now = Date.now()
+    const threshold = now - (30 * 24 * 60 * 60 * 1000)
+    for (let i = 0; i < proMembers.value.length; i += 1) {
+      const member = proMembers.value[i]
+      if (member.agencyId !== agencyId) {
+        continue
+      }
+      const memberEntries = agencyCreditsLedger.value.filter((entry) =>
+        entry.type === 'listing_publish'
+        && entry.agencyId === agencyId
+        && entry.byMemberId === member.id,
+      )
+      const total = memberEntries.reduce((acc, entry) => acc + Math.max(0, -entry.amount), 0)
+      const consumed30d = memberEntries.reduce((acc, entry) => {
+        const ts = new Date(entry.at).getTime()
+        if (!Number.isFinite(ts) || ts < threshold) {
+          return acc
+        }
+        return acc + Math.max(0, -entry.amount)
+      }, 0)
+      const latestTs = memberEntries
+        .map((entry) => new Date(entry.at).getTime())
+        .filter((ts) => Number.isFinite(ts))
+        .sort((a, b) => b - a)[0]
+      proMembers.value[i] = {
+        ...member,
+        creditsConsumedTotal: Math.max(0, Math.round(total)),
+        creditsConsumed30d: Math.max(0, Math.round(consumed30d)),
+        lastCreditConsumptionAt: latestTs ? new Date(latestTs).toISOString() : null,
+      }
+    }
+  }
+
+  function appendAgencyCreditLedgerEntry(input: Omit<AgencyCreditLedgerEntry, 'id' | 'at'>) {
+    const entry: AgencyCreditLedgerEntry = {
+      id: `credit-ledger-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      at: new Date().toISOString(),
+      ...input,
+    }
+    agencyCreditsLedger.value = [entry, ...agencyCreditsLedger.value].slice(0, 3000)
+    refreshMemberCreditConsumptionCounters(input.agencyId)
   }
 
   function loadStoredProAgencies(): ProAgency[] {
@@ -1475,6 +1883,16 @@ export const useSiteStore = defineStore('site', () => {
             typeof r.phoneRevealCount === 'number' && Number.isFinite(r.phoneRevealCount)
               ? Math.max(0, Math.round(r.phoneRevealCount))
               : 0,
+          lifetimeMonths:
+            r.lifetimeMonths === 1 || r.lifetimeMonths === 3 || r.lifetimeMonths === 6 || r.lifetimeMonths === 12
+              ? r.lifetimeMonths
+              : 3,
+          lifetimeStartedAt: typeof r.lifetimeStartedAt === 'string' ? r.lifetimeStartedAt : null,
+          expiresAt: typeof r.expiresAt === 'string' ? r.expiresAt : null,
+          publishedCreditsConsumed:
+            typeof r.publishedCreditsConsumed === 'number' && Number.isFinite(r.publishedCreditsConsumed)
+              ? Math.max(0, Math.round(r.publishedCreditsConsumed))
+              : 0,
         }
       }
       return parsed
@@ -1502,6 +1920,7 @@ export const useSiteStore = defineStore('site', () => {
       localStorage.setItem(PRO_MEMBERS_KEY, JSON.stringify(proMembers.value))
       localStorage.setItem(PRO_AGENCIES_KEY, JSON.stringify(proAgencies.value))
       localStorage.setItem(PRO_LISTINGS_KEY, JSON.stringify(proListings.value))
+      localStorage.setItem(AGENCY_CREDITS_LEDGER_KEY, JSON.stringify(agencyCreditsLedger.value))
     } catch {
       /* ignore */
     }
@@ -1511,6 +1930,7 @@ export const useSiteStore = defineStore('site', () => {
     const storedAgencies = loadStoredProAgencies()
     const storedMembers = loadStoredProMembers()
     const storedListings = loadStoredProListings()
+    const storedCreditsLedger = loadStoredCreditsLedger()
     const mergedAgencies = [...DEMO_PRO_AGENCIES]
     for (const agency of storedAgencies) {
       const idx = mergedAgencies.findIndex((a) => a.id === agency.id)
@@ -1589,6 +2009,33 @@ export const useSiteStore = defineStore('site', () => {
     proAgencies.value = mergedAgencies
     proMembers.value = mergedMembers
     proListings.value = mergedListings
+    agencyCreditsLedger.value = storedCreditsLedger
+    for (let i = 0; i < proAgencies.value.length; i += 1) {
+      const agency = proAgencies.value[i]
+      const normalizedPlan = agency.creditsPlan === 'annual' ? 'annual' : 'none'
+      proAgencies.value[i] = {
+        ...agency,
+        creditsBalance: normalizedPlan === 'annual' ? 0 : Math.max(0, Math.round(agency.creditsBalance ?? 0)),
+        creditsPlan: normalizedPlan,
+      }
+    }
+    for (let i = 0; i < proListings.value.length; i += 1) {
+      const listing = proListings.value[i]
+      proListings.value[i] = {
+        ...listing,
+        lifetimeMonths:
+          listing.lifetimeMonths === 1 || listing.lifetimeMonths === 3 || listing.lifetimeMonths === 6 || listing.lifetimeMonths === 12
+            ? listing.lifetimeMonths
+            : 3,
+        lifetimeStartedAt: listing.lifetimeStartedAt ?? null,
+        expiresAt: listing.expiresAt ?? null,
+        publishedCreditsConsumed: Math.max(0, Math.round(listing.publishedCreditsConsumed ?? 0)),
+      }
+    }
+    for (const agency of proAgencies.value) {
+      refreshMemberCreditConsumptionCounters(agency.id)
+    }
+    enforceListingExpiry()
     if (import.meta.client && (removedLegacySeed || addedDemoCatalog > 0 || refreshedDemoCatalog > 0)) {
       persistProData()
     }
@@ -1602,6 +2049,7 @@ export const useSiteStore = defineStore('site', () => {
     }
     proPublicCatalogLoaded = true
     loadProData()
+    enforceListingExpiry()
   }
 
   function recordListingView(listingId: string) {
@@ -1651,7 +2099,7 @@ export const useSiteStore = defineStore('site', () => {
     }
   }
 
-  function recordListingLead(listingId: string) {
+  function recordListingLead(listingId: string, prospectEmailOverride?: string | null) {
     if (!import.meta.client || !listingId) {
       return
     }
@@ -1666,6 +2114,10 @@ export const useSiteStore = defineStore('site', () => {
       leadCount: Math.max(0, (cur.leadCount ?? 0) + 1),
     }
     persistProData()
+    if (prospectEmailOverride && prospectEmailOverride.trim()) {
+      bumpProspectActivityByEmail('lead', prospectEmailOverride.trim().toLowerCase(), listingId)
+      return
+    }
     bumpCurrentUserProspectActivity('lead', listingId)
   }
 
@@ -1689,7 +2141,7 @@ export const useSiteStore = defineStore('site', () => {
 
   const publicActiveSearchListings = computed<SearchListing[]>(() =>
     proListings.value
-      .filter((l) => l.status === 'active')
+      .filter((l) => l.status === 'active' && !listingHasExpiredAt(l))
       .map((p) => proListingToSearchListing(p)),
   )
 
@@ -1722,6 +2174,7 @@ export const useSiteStore = defineStore('site', () => {
 
   function loginPro(email: string, password: string): boolean {
     loadProData()
+    enforceListingExpiry()
     const e = email.trim().toLowerCase()
     const p = password.trim()
     const isPublicCredential = DEMO_USERS.some(
@@ -1769,6 +2222,8 @@ export const useSiteStore = defineStore('site', () => {
         city: '',
         address: '',
         description: '',
+        creditsBalance: 0,
+        creditsPlan: 'none',
       })
     }
     if (input.role === 'agent' && !targetAgencyId) {
@@ -1781,6 +2236,9 @@ export const useSiteStore = defineStore('site', () => {
       email: nextEmail,
       password: nextPassword,
       role: input.role,
+      creditsConsumedTotal: 0,
+      creditsConsumed30d: 0,
+      lastCreditConsumptionAt: null,
     }
     proMembers.value = proMembers.value.filter((m) => m.email.toLowerCase() !== nextEmail)
     proMembers.value.push(nextMember)
@@ -1815,6 +2273,8 @@ export const useSiteStore = defineStore('site', () => {
     loadMessageThreads()
     if (import.meta.client) {
       localStorage.removeItem(SESSION_KEY)
+      localStorage.removeItem(ANON_PROSPECT_ID_KEY)
+      localStorage.removeItem(PREAUTH_IDENTITIES_KEY)
     }
   }
 
@@ -1829,6 +2289,9 @@ export const useSiteStore = defineStore('site', () => {
     }
     const nextName = name.trim() || currentUser.value.name
     const nextEmail = email.trim().toLowerCase() || currentUser.value.email
+    if (nextEmail !== currentUser.value.email.trim().toLowerCase()) {
+      mergeAnonymousProspectDataIntoEmail(nextEmail)
+    }
     currentUser.value = {
       name: nextName,
       email: nextEmail,
@@ -1894,6 +2357,7 @@ export const useSiteStore = defineStore('site', () => {
       }
       const parsed = JSON.parse(raw) as Pick<DemoUser, 'name' | 'email' | 'contactPhone' | 'contactOptInPhone' | 'contactOptInEmail'>
       if (parsed?.name && parsed?.email) {
+        mergeAnonymousProspectDataIntoEmail(parsed.email)
         currentUser.value = {
           name: parsed.name,
           email: parsed.email,
@@ -1929,6 +2393,7 @@ export const useSiteStore = defineStore('site', () => {
       return
     }
     loadProData()
+    enforceListingExpiry()
     try {
       const raw = localStorage.getItem(PRO_SESSION_KEY)
       if (!raw) {
@@ -1958,11 +2423,34 @@ export const useSiteStore = defineStore('site', () => {
   const currentProAgency = computed(() =>
     currentProUser.value ? proAgencies.value.find((a) => a.id === currentProUser.value?.agencyId) ?? null : null,
   )
+  const currentAgencyCreditsBalance = computed(() =>
+    Math.max(0, Math.round(currentProAgency.value?.creditsBalance ?? 0)),
+  )
+  const currentAgencyCreditsPlan = computed(() =>
+    currentProAgency.value?.creditsPlan === 'annual' ? 'annual' : 'none',
+  )
+  const currentAgencyCreditsLedger = computed(() => {
+    const agencyId = currentProUser.value?.agencyId
+    if (!agencyId) {
+      return [] as AgencyCreditLedgerEntry[]
+    }
+    return agencyCreditsLedger.value
+      .filter((entry) => entry.agencyId === agencyId)
+      .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
+  })
   const currentProAgencyMembers = computed(() =>
     currentProUser.value ? proMembers.value.filter((m) => m.agencyId === currentProUser.value?.agencyId) : [],
   )
   const currentProAgencyListings = computed(() =>
-    currentProUser.value ? proListings.value.filter((l) => l.agencyId === currentProUser.value?.agencyId) : [],
+    currentProUser.value
+      ? proListings.value
+          .filter((l) => l.agencyId === currentProUser.value?.agencyId)
+          .map((listing) =>
+            listing.status === 'active' && listingHasExpiredAt(listing)
+              ? { ...listing, status: 'archived' as const }
+              : listing,
+          )
+      : [],
   )
 
   function updateCurrentAgencyInfo(input: {
@@ -2003,6 +2491,78 @@ export const useSiteStore = defineStore('site', () => {
     persistProData()
   }
 
+  function purchaseCreditsPack(packId: string): boolean {
+    if (currentProUser.value?.role !== 'manager') {
+      return false
+    }
+    const pack = CREDIT_PACKS.find((item) => item.id === packId)
+    if (!pack || !currentProUser.value) {
+      return false
+    }
+    if (!updateAgencyCreditsBalance(currentProUser.value.agencyId, pack.credits)) {
+      return false
+    }
+    appendAgencyCreditLedgerEntry({
+      agencyId: currentProUser.value.agencyId,
+      type: 'purchase_pack',
+      amount: pack.credits,
+      byMemberId: currentProUser.value.id,
+      listingId: null,
+      note: `Achat pack ${pack.label}`,
+    })
+    persistProData()
+    return true
+  }
+
+  function activateAnnualSubscription(): boolean {
+    if (currentProUser.value?.role !== 'manager') {
+      return false
+    }
+    const agencyId = currentProUser.value.agencyId
+    const agencyIdx = proAgencies.value.findIndex((a) => a.id === agencyId)
+    if (agencyIdx < 0) {
+      return false
+    }
+    if (proAgencies.value[agencyIdx].creditsPlan === 'annual') {
+      return true
+    }
+    proAgencies.value[agencyIdx] = {
+      ...proAgencies.value[agencyIdx],
+      creditsPlan: 'annual',
+      creditsBalance: 0,
+    }
+    appendAgencyCreditLedgerEntry({
+      agencyId,
+      type: 'annual_subscription',
+      amount: 0,
+      byMemberId: currentProUser.value.id,
+      listingId: null,
+      note: 'Activation abonnement annuel (publications illimitées)',
+    })
+    persistProData()
+    return true
+  }
+
+  function resetCurrentAgencyCreditsAndSubscription(): boolean {
+    if (currentProUser.value?.role !== 'manager') {
+      return false
+    }
+    const agencyId = currentProUser.value.agencyId
+    const agencyIdx = proAgencies.value.findIndex((a) => a.id === agencyId)
+    if (agencyIdx < 0) {
+      return false
+    }
+    proAgencies.value[agencyIdx] = {
+      ...proAgencies.value[agencyIdx],
+      creditsBalance: 0,
+      creditsPlan: 'none',
+    }
+    agencyCreditsLedger.value = agencyCreditsLedger.value.filter((entry) => entry.agencyId !== agencyId)
+    refreshMemberCreditConsumptionCounters(agencyId)
+    persistProData()
+    return true
+  }
+
   function addCurrentAgencyMember(input: { name: string; email: string; password: string; role: ProRole }) {
     if (currentProUser.value?.role !== 'manager') {
       return false
@@ -2018,6 +2578,9 @@ export const useSiteStore = defineStore('site', () => {
       email,
       password: input.password.trim() || 'pro-demo',
       role: input.role,
+      creditsConsumedTotal: 0,
+      creditsConsumed30d: 0,
+      lastCreditConsumptionAt: null,
     })
     persistProData()
     return true
@@ -2051,6 +2614,90 @@ export const useSiteStore = defineStore('site', () => {
     persistProData()
   }
 
+  function enforceListingExpiry(nowIso = new Date().toISOString()) {
+    let changed = false
+    for (let i = 0; i < proListings.value.length; i += 1) {
+      const listing = proListings.value[i]
+      if (listing.status !== 'active') {
+        continue
+      }
+      if (!listingHasExpiredAt(listing, nowIso)) {
+        continue
+      }
+      proListings.value[i] = {
+        ...listing,
+        status: 'archived',
+        updatedAt: nowIso.slice(0, 10),
+      }
+      changed = true
+    }
+    if (changed) {
+      persistProData()
+    }
+    return changed
+  }
+
+  function getCurrentAgencyCreditsBalance(): number {
+    const agencyId = currentProUser.value?.agencyId
+    if (!agencyId) {
+      return 0
+    }
+    const agency = proAgencies.value.find((a) => a.id === agencyId)
+    if (agency?.creditsPlan === 'annual') {
+      return 0
+    }
+    return Math.max(0, Math.round(agency?.creditsBalance ?? 0))
+  }
+
+  function updateAgencyCreditsBalance(agencyId: string, delta: number): boolean {
+    const idx = proAgencies.value.findIndex((a) => a.id === agencyId)
+    if (idx < 0) {
+      return false
+    }
+    const next = Math.max(0, Math.round((proAgencies.value[idx].creditsBalance ?? 0) + delta))
+    proAgencies.value[idx] = {
+      ...proAgencies.value[idx],
+      creditsBalance: next,
+    }
+    return true
+  }
+
+  function getListingPublishEligibility(listingId: string): ListingPublishEligibility {
+    enforceListingExpiry()
+    const agencyId = currentProUser.value?.agencyId
+    if (!agencyId) {
+      return { eligible: false, needsCredit: false, reasons: ['Session pro introuvable.'] }
+    }
+    const listing = proListings.value.find((l) => l.id === listingId && l.agencyId === agencyId)
+    if (!listing) {
+      return { eligible: false, needsCredit: false, reasons: ['Annonce introuvable.'] }
+    }
+    return computeListingPublishEligibility({
+      listingStatus: listing.status,
+      hasAnnualPlan: currentProAgency.value?.creditsPlan === 'annual',
+      hasConsumedCredit: Boolean(listing.lifetimeStartedAt),
+      expired: listingHasExpiredAt(listing, new Date().toISOString()),
+      creditsBalance: getCurrentAgencyCreditsBalance(),
+    })
+  }
+
+  function consumeCreditForListingAction(listingId: string, note: string): boolean {
+    const agencyId = currentProUser.value?.agencyId
+    const memberId = currentProUser.value?.id ?? null
+    if (!agencyId || !updateAgencyCreditsBalance(agencyId, -1)) {
+      return false
+    }
+    appendAgencyCreditLedgerEntry({
+      agencyId,
+      type: 'listing_publish',
+      amount: -1,
+      byMemberId: memberId,
+      listingId,
+      note,
+    })
+    return true
+  }
+
   function createCurrentAgencyListing(input: {
     projectType: 'acheter' | 'louer'
     bedrooms: number
@@ -2082,12 +2729,14 @@ export const useSiteStore = defineStore('site', () => {
     surface: number
     rooms: number
     status: 'active' | 'draft' | 'archived'
+    lifetimeMonths?: 1 | 3 | 6 | 12
   }) {
     if (currentProUser.value?.role !== 'manager') {
       return false
     }
+    const listingId = `pro-listing-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
     proListings.value.push({
-      id: `pro-listing-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      id: listingId,
       agencyId: currentProUser.value.agencyId,
       projectType: input.projectType,
       bedrooms: Math.max(0, Math.round(input.bedrooms)),
@@ -2135,7 +2784,25 @@ export const useSiteStore = defineStore('site', () => {
       favoriteCount: 0,
       leadCount: 0,
       phoneRevealCount: 0,
+      lifetimeMonths: input.lifetimeMonths ?? 3,
+      lifetimeStartedAt: null,
+      expiresAt: null,
+      publishedCreditsConsumed: 0,
     })
+    if (input.status === 'active') {
+      const ok = setCurrentAgencyListingStatus(listingId, 'active')
+      if (!ok) {
+        const idx = proListings.value.findIndex((l) => l.id === listingId)
+        if (idx >= 0) {
+          proListings.value[idx] = { ...proListings.value[idx], status: 'draft' }
+        }
+      }
+    } else if (input.status === 'archived') {
+      const idx = proListings.value.findIndex((l) => l.id === listingId)
+      if (idx >= 0) {
+        proListings.value[idx] = { ...proListings.value[idx], status: 'archived' }
+      }
+    }
     persistProData()
     return true
   }
@@ -2173,6 +2840,7 @@ export const useSiteStore = defineStore('site', () => {
       surface: number
       rooms: number
       status: 'active' | 'draft' | 'archived'
+      lifetimeMonths?: 1 | 3 | 6 | 12
     },
   ) {
     if (currentProUser.value?.role !== 'manager') {
@@ -2184,6 +2852,7 @@ export const useSiteStore = defineStore('site', () => {
     if (idx < 0) {
       return false
     }
+    const prev = proListings.value[idx]
     proListings.value[idx] = {
       ...proListings.value[idx],
       projectType: input.projectType,
@@ -2218,8 +2887,15 @@ export const useSiteStore = defineStore('site', () => {
       price: Math.max(0, Math.round(input.price)),
       surface: Math.max(0, Math.round(input.surface)),
       rooms: Math.max(1, Math.round(input.rooms)),
-      status: input.status,
+      status: input.status === 'active' ? prev.status : input.status,
+      lifetimeMonths: input.lifetimeMonths ?? prev.lifetimeMonths ?? 3,
       updatedAt: new Date().toISOString().slice(0, 10),
+    }
+    if (input.status === 'active') {
+      const ok = setCurrentAgencyListingStatus(listingId, 'active')
+      if (!ok) {
+        return false
+      }
     }
     persistProData()
     return true
@@ -2238,17 +2914,46 @@ export const useSiteStore = defineStore('site', () => {
     if (idx < 0) {
       return false
     }
+    enforceListingExpiry()
     const prev = proListings.value[idx]
     if (prev.status === status) {
       return true
     }
     const nowIso = new Date().toISOString()
-    const publishedAt =
-      status === 'active' && prev.status !== 'active' ? nowIso : prev.publishedAt
+    if (status === 'active') {
+      const eligibility = getListingPublishEligibility(listingId)
+      if (!eligibility.eligible) {
+        return false
+      }
+      const needsCredit = eligibility.needsCredit
+      let consumed = false
+      if (needsCredit) {
+        const reason = prev.lifetimeStartedAt
+          ? 'Réactivation annonce expirée'
+          : 'Publication initiale annonce'
+        consumed = consumeCreditForListingAction(listingId, reason)
+        if (!consumed) {
+          return false
+        }
+      }
+      const lifetimeStartIso = needsCredit ? nowIso : (prev.lifetimeStartedAt ?? nowIso)
+      const expiresAt = addMonthsIso(lifetimeStartIso, prev.lifetimeMonths ?? 3)
+      proListings.value[idx] = {
+        ...prev,
+        status: 'active',
+        publishedAt: prev.status !== 'active' ? nowIso : prev.publishedAt,
+        lifetimeStartedAt: lifetimeStartIso,
+        expiresAt,
+        publishedCreditsConsumed: prev.publishedCreditsConsumed + (consumed ? 1 : 0),
+        updatedAt: nowIso.slice(0, 10),
+      }
+      persistProData()
+      return true
+    }
     proListings.value[idx] = {
       ...prev,
       status,
-      publishedAt,
+      publishedAt: prev.publishedAt,
       updatedAt: nowIso.slice(0, 10),
     }
     persistProData()
@@ -2326,6 +3031,8 @@ export const useSiteStore = defineStore('site', () => {
     listingTitle: string
     listingId: string | null
     messageBody: string
+    contactName?: string
+    contactEmail?: string
     optOutSimilar?: boolean
     optInPartners?: boolean
     desktopPushGranted?: boolean
@@ -2333,7 +3040,16 @@ export const useSiteStore = defineStore('site', () => {
     contactOptInEmail?: boolean
     contactPhone?: string
   }) {
-    const actorEmail = prospectActorEmail()
+    const shouldStayAnonymous = input.optOutSimilar === true
+    if (!currentUser.value && input.contactEmail && !shouldStayAnonymous) {
+      mergeAnonymousProspectDataIntoEmail(input.contactEmail)
+    }
+    const actorEmail = (
+      currentUser.value?.email
+      || (!shouldStayAnonymous ? input.contactEmail : '')
+      || prospectActorEmail()
+    ).trim().toLowerCase()
+    rememberPreAuthIdentity(actorEmail)
     const sentAt = new Date().toLocaleDateString('fr-FR')
     const next: SentMessage = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -2348,6 +3064,8 @@ export const useSiteStore = defineStore('site', () => {
       contactOptInPhone: input.contactOptInPhone === true,
       contactOptInEmail: input.contactOptInEmail === true,
       contactPhone: input.contactPhone?.trim() ?? '',
+      contactEmail: input.contactEmail?.trim().toLowerCase() ?? '',
+      contactName: input.contactName?.trim() ?? '',
     }
     if (currentUser.value) {
       sentMessages.value = [next, ...sentMessages.value].slice(0, 30)
@@ -2364,13 +3082,13 @@ export const useSiteStore = defineStore('site', () => {
       }
     }
     if (input.listingId) {
-      recordListingLead(input.listingId)
+      recordListingLead(input.listingId, actorEmail)
     }
     const agency = findProAgencyForListing(input.listingId)
     if (agency) {
       upsertThreadMessage({
         publicEmail: actorEmail,
-        publicName: currentUser.value?.name ?? 'Prospect',
+        publicName: currentUser.value?.name ?? (shouldStayAnonymous ? 'Prospect' : (input.contactName?.trim() || 'Prospect')),
         proAgencyId: agency.id,
         proAgencyName: agency.name,
         author: 'public',
@@ -2379,6 +3097,7 @@ export const useSiteStore = defineStore('site', () => {
         listingTitle: input.listingTitle,
       })
     }
+    bumpProspectsDataVersion()
   }
 
   function removeSentMessage(id: string) {
@@ -2386,11 +3105,40 @@ export const useSiteStore = defineStore('site', () => {
     persistSentMessages()
   }
 
+  function deleteProspectData(emailInput: string) {
+    const email = emailInput.trim().toLowerCase()
+    if (!email) {
+      return
+    }
+    if (import.meta.client) {
+      try {
+        localStorage.removeItem(searchesStorageKey(email))
+        localStorage.removeItem(latestSearchStorageKey(email))
+        localStorage.removeItem(messagesStorageKey(email))
+        localStorage.removeItem(prospectActivityStorageKey(email))
+        localStorage.removeItem(publicProfileStorageKey(email))
+      } catch {
+        /* ignore */
+      }
+    }
+    messageThreads.value = messageThreads.value.filter((t) => t.publicEmail !== email)
+    persistMessageThreads()
+    if (currentUser.value?.email?.trim().toLowerCase() === email) {
+      savedSearches.value = []
+      latestSearch.value = null
+      sentMessages.value = []
+    }
+    bumpProspectsDataVersion()
+  }
+
   return {
     siteName,
     currentUser,
     currentProUser,
     currentProAgency,
+    currentAgencyCreditsBalance,
+    currentAgencyCreditsPlan,
+    currentAgencyCreditsLedger,
     currentProAgencyMembers,
     currentProAgencyListings,
     proAgencies,
@@ -2407,9 +3155,14 @@ export const useSiteStore = defineStore('site', () => {
     addCurrentAgencyMember,
     removeCurrentAgencyMember,
     setCurrentAgencyMemberRole,
+    purchaseCreditsPack,
+    activateAnnualSubscription,
+    resetCurrentAgencyCreditsAndSubscription,
     createCurrentAgencyListing,
     updateCurrentAgencyListing,
     setCurrentAgencyListingStatus,
+    getListingPublishEligibility,
+    getCurrentAgencyCreditsBalance,
     removeCurrentAgencyListing,
     deleteAccount,
     hydrateSession,
@@ -2422,6 +3175,7 @@ export const useSiteStore = defineStore('site', () => {
     createAlertFromLatestSearch,
     removeSavedSearch,
     sentMessages,
+    prospectsDataVersion,
     messageThreads,
     currentPublicMessageThreads,
     currentProMessageThreads,
@@ -2439,6 +3193,7 @@ export const useSiteStore = defineStore('site', () => {
     sendPublicMessageToAgency,
     addSentMessage,
     removeSentMessage,
+    deleteProspectData,
     ensureProListingsLoadedForPublic,
     publicActiveSearchListings,
     recordListingView,
@@ -2447,5 +3202,8 @@ export const useSiteStore = defineStore('site', () => {
     recordListingPhoneReveal,
     getPublicAgencyByListingAgencyId,
     listProspectActivitySnapshots,
+    enforceListingExpiry,
+    creditPacks: CREDIT_PACKS,
+    annualSubscriptionOffer: ANNUAL_SUBSCRIPTION,
   }
 })

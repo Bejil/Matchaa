@@ -1,0 +1,40 @@
+.desktop-push-settings {
+  margin-top: 0.9rem;
+  padding: 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.7rem;
+  background: var(--color-surface-muted, #fafafa);
+}
+
+.desktop-push-settings__title {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.desktop-push-settings__diag {
+  margin: 0.4rem 0 0;
+  font-size: 0.78rem;
+  color: var(--color-text);
+}
+
+.desktop-push-settings__hint {
+  margin: 0.32rem 0 0;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.desktop-push-settings__actions {
+  margin-top: 0.55rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.desktop-push-settings__feedback {
+  margin-top: 0.55rem;
+  font-size: 0.82rem;
+}
+
+.desktop-push-settings__feedback.is-error {
+  color: #9d2f2f;
+}

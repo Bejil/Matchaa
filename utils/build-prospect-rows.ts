@@ -248,6 +248,12 @@ function dedupeListings(values: Array<SearchListing | null | undefined>, limit =
   return out
 }
 
+function messageTimestamp(messageId: string): number {
+  const head = messageId.split('-', 1)[0] ?? ''
+  const parsed = Number(head)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
 function safeSpread(uniqueCount: number, sampleCount: number): number {
   if (sampleCount <= 0) {
     return 0
@@ -345,27 +351,57 @@ export function buildProspectRows(
         .map((m) => m.listingTitle || null),
       6,
     )
-    const hasAccount = !isAnonymousEmail(p.email)
+    const hasAccount = p.hasAccount === true
+    const latestSentMessage = [...p.sentMessages]
+      .sort((a, b) => messageTimestamp(b.id) - messageTimestamp(a.id))[0]
+    const latestMessageOptOut = latestSentMessage?.optOutSimilar === true
     const hasEligibleOptInMessage = p.sentMessages.some(
       (m) => m.optOutSimilar !== true && m.optInPartners === true,
     )
     const hasDesktopPushConsent = p.sentMessages.some((m) => m.desktopPushGranted === true)
-    const hasFormOrAccountPhoneOptIn = p.sentMessages.some(
-      (m) => m.contactOptInPhone === true || m.optOutSimilar !== true,
-    ) || p.contactOptInPhone === true
-    const hasFormOrAccountEmailOptIn = p.sentMessages.some(
-      (m) => m.contactOptInEmail === true || m.optOutSimilar !== true,
-    )
+    const hasFormOrAccountPhoneOptIn = hasAccount
+      ? p.contactOptInPhone === true
+      : latestSentMessage
+        ? latestSentMessage.optOutSimilar !== true
+        : (
+            p.sentMessages.some((m) => m.contactOptInPhone === true || m.optOutSimilar !== true)
+            || p.contactOptInPhone === true
+          )
+    const hasFormOrAccountEmailOptIn = hasAccount
+      ? p.contactOptInEmail === true
+      : latestSentMessage
+        ? latestSentMessage.optOutSimilar !== true
+        : (
+            p.sentMessages.some((m) => m.contactOptInEmail === true || m.optOutSimilar !== true)
+            || p.contactOptInEmail === true
+          )
     const hasPhoneData = p.sentMessages.some((m) => typeof m.contactPhone === 'string' && m.contactPhone.trim().length > 0)
       || (typeof p.contactPhone === 'string' && p.contactPhone.trim().length > 0)
-    const hasEmailData = p.email.includes('@') && !isAnonymousEmail(p.email)
+    const sentMessageContactEmail = latestSentMessage && latestSentMessage.optOutSimilar !== true
+      ? (typeof latestSentMessage.contactEmail === 'string' ? latestSentMessage.contactEmail.trim().toLowerCase() : '')
+      : ''
+    const sentMessageContactName = latestSentMessage && latestSentMessage.optOutSimilar !== true
+      ? (typeof latestSentMessage.contactName === 'string' ? latestSentMessage.contactName.trim() : '')
+      : ''
+    const resolvedProspectEmail = !isAnonymousEmail(p.email) && p.email.includes('@')
+      ? p.email
+      : (sentMessageContactEmail || p.email)
+    const resolvedProspectName = hasAccount
+      ? p.name
+      : (sentMessageContactName || p.name)
+    const hasEmailData = resolvedProspectEmail.includes('@') && !isAnonymousEmail(resolvedProspectEmail)
     const hasCallConsent = hasPhoneData && hasFormOrAccountPhoneOptIn
     const hasEmailConsent = hasEmailData && hasFormOrAccountEmailOptIn
-    const shouldBlurName = hasAccount || (p.sentMessages.length > 0 && hasEligibleOptInMessage)
+    const shouldRevealContactName = Boolean(sentMessageContactName)
+    const shouldBlurName = latestMessageOptOut === true
+      ? true
+      : (shouldRevealContactName
+          ? false
+          : (hasAccount || (p.sentMessages.length > 0 && hasEligibleOptInMessage)))
 
     rows.push({
-      email: p.email,
-      name: p.name,
+      email: resolvedProspectEmail,
+      name: resolvedProspectName,
       contactPhone:
         p.sentMessages
           .map((m) => (typeof m.contactPhone === 'string' ? m.contactPhone.trim() : ''))

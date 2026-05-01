@@ -1,6 +1,7 @@
 <template>
   <form
     :id="formId"
+    ref="contactFormRef"
     class="listing-contact-form"
     :class="{ 'listing-contact-form--embedded': hideTitle }"
     novalidate
@@ -74,6 +75,7 @@
           class="listing-contact-form__input listing-contact-form__input--phone"
           placeholder="06 12 34 56 78"
           autocomplete="tel-national"
+          required
         >
       </div>
     </div>
@@ -219,6 +221,19 @@ import type { SearchListing } from '~/data/mock-listings'
 import { labelForPropertyType } from '~/data/property-types'
 import { pickSimilarListings } from '~/utils/annonce-detail-related'
 
+/** Brouillon contact pour visiteurs non connectés (préremplissage des prochains envois). */
+const GUEST_CONTACT_FORM_STORAGE_KEY = 'matchaa-guest-contact-form'
+
+type GuestContactFormPersisted = {
+  name: string
+  email: string
+  phoneCc: string
+  phone: string
+  hasSell: 'oui' | 'non'
+  optOutSimilar: boolean
+  optInPartners: boolean
+}
+
 const emit = defineEmits<{
   'request-close-container': []
 }>()
@@ -252,6 +267,8 @@ const showSentModal = ref(false)
 const sendToastVisible = ref(false)
 let sendToastTimer: ReturnType<typeof setTimeout> | null = null
 const siteStore = useSiteStore()
+const desktopPush = useDesktopPush()
+const contactFormRef = ref<HTMLFormElement | null>(null)
 
 const phoneCountries = [
   { dial: '+33', flag: '🇫🇷' },
@@ -271,11 +288,60 @@ const optOutSimilar = ref(false)
 const optInPartners = ref(false)
 const selectedSuggestionIds = ref<string[]>([])
 
-function hasDesktopPushConsent(): boolean {
-  if (!import.meta.client || typeof window === 'undefined' || !('Notification' in window)) {
-    return false
+function loadGuestContactFormDraft(): void {
+  if (!import.meta.client) {
+    return
   }
-  return Notification.permission === 'granted'
+  try {
+    const raw = localStorage.getItem(GUEST_CONTACT_FORM_STORAGE_KEY)
+    if (!raw) {
+      return
+    }
+    const parsed = JSON.parse(raw) as Partial<GuestContactFormPersisted>
+    if (typeof parsed.name === 'string') {
+      name.value = parsed.name
+    }
+    if (typeof parsed.email === 'string') {
+      email.value = parsed.email
+    }
+    if (typeof parsed.phoneCc === 'string' && phoneCountries.some((c) => c.dial === parsed.phoneCc)) {
+      phoneCc.value = parsed.phoneCc
+    }
+    if (typeof parsed.phone === 'string') {
+      phone.value = parsed.phone
+    }
+    if (parsed.hasSell === 'oui' || parsed.hasSell === 'non') {
+      hasSell.value = parsed.hasSell
+    }
+    if (typeof parsed.optOutSimilar === 'boolean') {
+      optOutSimilar.value = parsed.optOutSimilar
+    }
+    if (typeof parsed.optInPartners === 'boolean') {
+      optInPartners.value = parsed.optInPartners
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+function persistGuestContactFormDraft(): void {
+  if (!import.meta.client || siteStore.currentUser) {
+    return
+  }
+  try {
+    const payload: GuestContactFormPersisted = {
+      name: name.value.trim(),
+      email: email.value.trim().toLowerCase(),
+      phoneCc: phoneCc.value,
+      phone: phone.value.trim(),
+      hasSell: hasSell.value,
+      optOutSimilar: optOutSimilar.value,
+      optInPartners: optInPartners.value,
+    }
+    localStorage.setItem(GUEST_CONTACT_FORM_STORAGE_KEY, JSON.stringify(payload))
+  } catch {
+    /* ignore */
+  }
 }
 
 const currentListing = computed(() => {
@@ -297,9 +363,13 @@ watch(similarSuggestions, (items) => {
 function onRevealPhone() {
   showPhoneModal.value = true
   siteStore.recordListingPhoneReveal(props.listingId)
+  desktopPush.openPermissionPromptIfNeeded('public')
 }
 
 function onSubmit() {
+  if (contactFormRef.value && !contactFormRef.value.reportValidity()) {
+    return
+  }
   siteStore.hydrateSession()
   const contactPhone = `${phoneCc.value} ${phone.value}`.trim()
   if (siteStore.currentUser) {
@@ -318,13 +388,19 @@ function onSubmit() {
     listingTitle: currentListing.value?.title ?? 'Annonce immobiliere',
     listingId: currentListing.value?.id ?? null,
     messageBody: message.value || `Bonjour, je souhaite des informations sur cette annonce…`,
+    contactName: name.value,
+    contactEmail: email.value,
     contactOptInPhone: !optOutSimilar.value,
     contactOptInEmail: !optOutSimilar.value,
     contactPhone,
     optOutSimilar: optOutSimilar.value,
     optInPartners: optInPartners.value,
-    desktopPushGranted: hasDesktopPushConsent(),
+    desktopPushGranted: desktopPush.permission() === 'granted',
   })
+  if (!siteStore.currentUser) {
+    persistGuestContactFormDraft()
+  }
+  desktopPush.openPermissionPromptIfNeeded('public')
   if (props.hideTitle) {
     emit('request-close-container')
     if (import.meta.client) {
@@ -392,14 +468,20 @@ function contactSelectedSuggestion() {
       listingTitle: listing.title,
       listingId: listing.id,
       messageBody: `Bonjour, je souhaite des informations sur cette annonce…`,
+      contactName: name.value,
+      contactEmail: email.value,
       contactOptInPhone: !optOutSimilar.value,
       contactOptInEmail: !optOutSimilar.value,
       contactPhone,
       optOutSimilar: optOutSimilar.value,
       optInPartners: optInPartners.value,
-      desktopPushGranted: hasDesktopPushConsent(),
+      desktopPushGranted: desktopPush.permission() === 'granted',
     })
   }
+  if (!siteStore.currentUser) {
+    persistGuestContactFormDraft()
+  }
+  desktopPush.openPermissionPromptIfNeeded('public')
   showSentModal.value = false
   sendToastVisible.value = true
   if (sendToastTimer) {
@@ -418,7 +500,13 @@ watch(
       name.value = ''
       email.value = ''
       phone.value = ''
+      phoneCc.value = '+33'
+      hasSell.value = 'non'
+      showMessage.value = false
+      message.value = ''
       optOutSimilar.value = false
+      optInPartners.value = false
+      loadGuestContactFormDraft()
       return
     }
     name.value = user.name ?? ''

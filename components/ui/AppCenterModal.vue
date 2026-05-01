@@ -2,7 +2,7 @@
   <Teleport to="body">
     <dialog
       ref="dialogRef"
-      :class="['app-center-modal', sizeClass]"
+      :class="['app-center-modal', sizeClass, attrs.class]"
       :aria-labelledby="title ? headingId : undefined"
       @click="onBackdropClick"
     >
@@ -63,6 +63,7 @@ const sizeClass = computed(() => {
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
 }>()
+const attrs = useAttrs()
 
 const dialogRef = ref<HTMLDialogElement | null>(null)
 const headingId = useId()

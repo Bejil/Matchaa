@@ -32,6 +32,16 @@
 
             <button type="submit" class="profil-account__btn profil-account__btn--primary">Enregistrer</button>
           </form>
+          <DesktopPushSettingsCard
+            title-id="desktop-push-settings-pro-title"
+            title="Notifications desktop"
+            hint="Recevez une alerte dès qu’un prospect vous envoie un message."
+            :diagnostics="proPushDiagnostics"
+            :feedback="proPushFeedback"
+            :feedback-is-error="proPushFeedbackIsError"
+            @enable="onEnableProDesktopPush"
+            @test="onTestProDesktopPush"
+          />
           <p v-if="settingsFeedback" class="compte-settings__feedback" role="status">{{ settingsFeedback }}</p>
           <div class="profil-account__actions">
             <button type="button" class="profil-account__btn profil-account__btn--danger" @click="onLogoutPro">
@@ -67,15 +77,20 @@ definePageMeta({ layout: 'pro' })
 useProRouteGuard()
 
 import AppCenterModal from '~/components/ui/AppCenterModal.vue'
+import DesktopPushSettingsCard from '~/components/notifications/DesktopPushSettingsCard.vue'
 
 const siteStore = useSiteStore()
 const router = useRouter()
+const desktopPush = useDesktopPush()
 
 const pro = computed(() => siteStore.currentProUser)
+const proPushDiagnostics = computed(() => desktopPush.diagnostics())
 const settingsName = ref('')
 const settingsEmail = ref('')
 const settingsPassword = ref('')
 const settingsFeedback = ref('')
+const proPushFeedback = ref('')
+const proPushFeedbackIsError = ref(false)
 const showDeleteConfirm = ref(false)
 
 watch(
@@ -114,6 +129,30 @@ function onDeleteProAccount() {
   showDeleteConfirm.value = false
   siteStore.deleteProAccount()
   router.push('/espace-pro')
+}
+
+function onEnableProDesktopPush() {
+  const opened = desktopPush.openPermissionPromptIfNeeded('pro')
+  if (!opened && desktopPush.permission() === 'granted') {
+    proPushFeedbackIsError.value = false
+    proPushFeedback.value = 'Les notifications sont déjà activées.'
+    return
+  }
+  if (!opened) {
+    proPushFeedbackIsError.value = true
+    proPushFeedback.value = 'Impossible d’ouvrir la demande pour le moment. Vérifiez les réglages du navigateur.'
+    return
+  }
+  proPushFeedbackIsError.value = false
+  proPushFeedback.value = 'Confirmez ensuite dans la fenêtre de permission du navigateur.'
+}
+
+function onTestProDesktopPush() {
+  const ok = desktopPush.sendTestNotification('pro')
+  proPushFeedbackIsError.value = !ok
+  proPushFeedback.value = ok
+    ? 'Notification de test envoyée. Si vous ne voyez rien, vérifiez les réglages notifications macOS.'
+    : 'Test impossible: autorisez d’abord les notifications desktop.'
 }
 
 useHead({

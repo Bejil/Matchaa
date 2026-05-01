@@ -251,7 +251,7 @@
                 </article>
               </aside>
               <section v-if="activePublicThread" class="conversation-panel" aria-label="Fil de discussion">
-                <div class="conversation-panel__thread" role="log" aria-live="polite">
+                <div ref="publicThreadContainer" class="conversation-panel__thread" role="log" aria-live="polite">
                   <article
                     v-for="msg in activePublicThread.messages"
                     :key="msg.id"
@@ -300,10 +300,12 @@
                     @input="autoResizeComposer"
                     @keydown="onComposerKeydown"
                   />
-                  <p class="conversation-panel__hint">Entrée pour envoyer · Shift + Entrée pour un saut de ligne</p>
-                  <button type="submit" class="profil-account__btn profil-account__btn--primary" :disabled="!publicThreadDraft.trim()">
-                    Envoyer
-                  </button>
+                  <div class="conversation-panel__composer-actions conversation-panel__composer-actions--public">
+                    <p class="conversation-panel__hint conversation-panel__hint--inline">Entrée pour envoyer · Shift + Entrée pour un saut de ligne</p>
+                    <button type="submit" class="profil-account__btn profil-account__btn--primary" :disabled="!publicThreadDraft.trim()">
+                      Envoyer
+                    </button>
+                  </div>
                 </form>
               </section>
             </div>
@@ -339,6 +341,16 @@
 
               <button type="submit" class="profil-account__btn profil-account__btn--primary">Enregistrer</button>
             </form>
+            <DesktopPushSettingsCard
+              title-id="desktop-push-settings-public-title"
+              title="Notifications desktop"
+              hint="Recevez une alerte à chaque nouveau message agence. Utilisez &quot;Tester&quot; pour vérifier le rendu."
+              :diagnostics="publicPushDiagnostics"
+              :feedback="publicPushFeedback"
+              :feedback-is-error="publicPushFeedbackIsError"
+              @enable="onEnablePublicDesktopPush"
+              @test="onTestPublicDesktopPush"
+            />
             <div class="profil-account__actions">
               <button type="button" class="profil-account__btn profil-account__btn--danger" @click="onLogout">
                 Se deconnecter
@@ -449,6 +461,7 @@ import AppCenterModal from '~/components/ui/AppCenterModal.vue'
 import AppToast from '~/components/ui/AppToast.vue'
 import AccountEmptyState from '~/components/account/AccountEmptyState.vue'
 import AccountNavMenu from '~/components/account/AccountNavMenu.vue'
+import DesktopPushSettingsCard from '~/components/notifications/DesktopPushSettingsCard.vue'
 import ListingCardFavoriteBtn from '~/components/listing/ListingCardFavoriteBtn.vue'
 import ListingCardMedia from '~/components/listing/ListingCardMedia.vue'
 import ListingContactAnnouncerForm from '~/components/listing/ListingContactAnnouncerForm.vue'
@@ -463,6 +476,9 @@ const router = useRouter()
 const route = useRoute()
 
 const currentUser = computed(() => siteStore.currentUser)
+const desktopPush = useDesktopPush()
+const publicPushFeedback = ref('')
+const publicPushFeedbackIsError = ref(false)
 const latestSearch = computed(() => siteStore.latestSearch)
 const alertSearches = computed(() => siteStore.savedSearches)
 const publicUnreadMessagesCount = computed(() => siteStore.publicUnreadMessagesCount)
@@ -470,6 +486,7 @@ const publicMessageThreads = computed(() => siteStore.currentPublicMessageThread
 const selectedPublicThreadId = ref<string | null>(null)
 const publicThreadDraft = ref('')
 const publicComposerInput = ref<HTMLTextAreaElement | null>(null)
+const publicThreadContainer = ref<HTMLElement | null>(null)
 const openThreadMenuId = ref<string | null>(null)
 const deleteThreadConfirmOpen = ref(false)
 const threadToDeleteId = ref<string | null>(null)
@@ -517,6 +534,7 @@ const activePublicThread = computed(() =>
   ?? publicMessageThreads.value[0]
   ?? null,
 )
+const publicPushDiagnostics = computed(() => desktopPush.diagnostics())
 
 const listingById = computed(() => {
   siteStore.ensureProListingsLoadedForPublic()
@@ -563,8 +581,33 @@ function sendPublicThreadMessage() {
     threadId: thread.id,
     text,
   })
+  desktopPush.openPermissionPromptIfNeeded('public')
   publicThreadDraft.value = ''
   resetComposerHeight()
+}
+
+function onEnablePublicDesktopPush() {
+  const opened = desktopPush.openPermissionPromptIfNeeded('public')
+  if (!opened && desktopPush.permission() === 'granted') {
+    publicPushFeedbackIsError.value = false
+    publicPushFeedback.value = 'Les notifications sont déjà activées.'
+    return
+  }
+  if (!opened) {
+    publicPushFeedbackIsError.value = true
+    publicPushFeedback.value = 'Impossible d’ouvrir la demande pour le moment. Vérifiez les réglages du navigateur.'
+    return
+  }
+  publicPushFeedbackIsError.value = false
+  publicPushFeedback.value = 'Confirmez ensuite dans la fenêtre de permission du navigateur.'
+}
+
+function onTestPublicDesktopPush() {
+  const ok = desktopPush.sendTestNotification('public')
+  publicPushFeedbackIsError.value = !ok
+  publicPushFeedback.value = ok
+    ? 'Notification de test envoyée. Si vous ne voyez rien, vérifiez les réglages notifications macOS.'
+    : 'Test impossible: autorisez d’abord les notifications desktop.'
 }
 
 function onComposerKeydown(event: KeyboardEvent) {
@@ -591,6 +634,19 @@ function resetComposerHeight() {
       return
     }
     el.style.height = ''
+  })
+}
+
+function scrollPublicThreadToBottom() {
+  nextTick(() => {
+    if (activeTab.value !== 'messages') {
+      return
+    }
+    const el = publicThreadContainer.value
+    if (!el) {
+      return
+    }
+    el.scrollTop = el.scrollHeight
   })
 }
 
@@ -701,6 +757,16 @@ watch(
   ([threadId, email, tab]) => {
     if (tab === 'messages' && threadId && email) {
       siteStore.markPublicThreadRead(threadId)
+    }
+  },
+  { immediate: true },
+)
+
+watch(
+  [() => activePublicThread.value?.id, () => activePublicThread.value?.messages.length ?? 0, () => activeTab.value],
+  ([, , tab]) => {
+    if (tab === 'messages') {
+      scrollPublicThreadToBottom()
     }
   },
   { immediate: true },

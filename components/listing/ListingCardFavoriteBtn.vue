@@ -53,6 +53,7 @@ const props = defineProps<{
 
 const favorites = useFavoritesStore()
 const siteStore = useSiteStore()
+const desktopPush = useDesktopPush()
 
 const isFavorite = computed(() => favorites.has(props.listingId))
 
@@ -134,6 +135,7 @@ function onClick() {
     animClass.value = nowFavorite ? 'listing-card__favorite-inner--in' : 'listing-card__favorite-inner--out'
     if (nowFavorite) {
       spawnFlyingHearts()
+      desktopPush.openPermissionPromptIfNeeded('public')
     }
   })
 }

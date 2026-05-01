@@ -10,7 +10,49 @@
         role="status"
         aria-live="polite"
       >
-        <img v-if="showLogo" :src="logoSrc" alt="" class="app-toast__logo" width="32" height="22">
+        <span v-if="showLogo" aria-hidden="true" class="app-toast__logo">
+          <svg
+            v-if="variant === 'success'"
+            viewBox="0 0 24 24"
+            class="app-toast__logo-svg"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="m8 12 2.5 2.5L16 9" />
+          </svg>
+          <svg
+            v-else-if="variant === 'error'"
+            viewBox="0 0 24 24"
+            class="app-toast__logo-svg"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="m15 9-6 6" />
+            <path d="m9 9 6 6" />
+          </svg>
+          <svg
+            v-else
+            viewBox="0 0 24 24"
+            class="app-toast__logo-svg"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 10v6" />
+            <path d="M12 7h.01" />
+          </svg>
+        </span>
         <div class="app-toast__body">
           <p v-if="title" class="app-toast__title">{{ title }}</p>
           <p class="app-toast__text">{{ message }}</p>
@@ -21,8 +63,6 @@
 </template>
 
 <script setup lang="ts">
-import logoSrc from '~/assets/images/logo.svg'
-
 const props = withDefaults(defineProps<{
   visible: boolean
   message: string
@@ -131,14 +171,15 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
   width: 2rem;
   height: 2rem;
-  object-fit: contain;
-  filter: brightness(0) invert(1);
   opacity: 0.95;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.app-toast--error .app-toast__logo,
-.app-toast--info .app-toast__logo {
-  filter: none;
+.app-toast__logo-svg {
+  width: 100%;
+  height: 100%;
 }
 
 .app-toast__body {

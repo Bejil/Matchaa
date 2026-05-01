@@ -294,41 +294,61 @@
                 <header class="prospect-detail-hero">
                   <div>
                     <div class="prospect-detail-hero__crm-toolbar" aria-label="Suivi CRM">
-                      <span
-                        class="prospect-btn-tooltip"
-                        :data-tooltip="isProspectSeen(selectedProspect) ? 'Ce prospect reapparaitra comme non ouvert dans le CRM (liste et indicateurs)' : 'Disponible uniquement pour un prospect deja marque comme ouvert'"
-                      >
-                        <button
-                          type="button"
-                          class="prospect-unseen-btn"
-                          :disabled="!isProspectSeen(selectedProspect)"
-                          @click.stop="unmarkProspectSeen(selectedProspect.email)"
+                      <div class="prospect-detail-hero__crm-toolbar-left">
+                        <span
+                          class="prospect-btn-tooltip"
+                          :data-tooltip="isProspectSeen(selectedProspect) ? 'Ce prospect reapparaitra comme non ouvert dans le CRM (liste et indicateurs)' : 'Disponible uniquement pour un prospect deja marque comme ouvert'"
                         >
-                          <svg class="prospect-unseen-btn__ic" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" />
-                            <circle cx="12" cy="12" r="2.8" />
-                            <path d="M4 4l16 16" />
-                          </svg>
-                          <span>Marquer comme non vu</span>
-                        </button>
-                      </span>
-                      <span
-                        class="prospect-btn-tooltip"
-                        :data-tooltip="isProspectCrmFavorite(selectedProspect) ? 'Retirer des favoris' : 'Ajouter aux favoris'"
-                      >
-                        <button
-                          type="button"
-                          class="prospect-favorite-btn"
-                          :class="{ 'is-active': isProspectCrmFavorite(selectedProspect) }"
-                          :aria-pressed="isProspectCrmFavorite(selectedProspect)"
-                          @click.stop="toggleProspectFavorite(selectedProspect.email)"
+                          <button
+                            type="button"
+                            class="prospect-unseen-btn"
+                            :disabled="!isProspectSeen(selectedProspect)"
+                            @click.stop="unmarkProspectSeen(selectedProspect.email)"
+                          >
+                            <svg class="prospect-unseen-btn__ic" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                              <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" />
+                              <circle cx="12" cy="12" r="2.8" />
+                              <path d="M4 4l16 16" />
+                            </svg>
+                            <span>Marquer comme non vu</span>
+                          </button>
+                        </span>
+                        <span
+                          class="prospect-btn-tooltip"
+                          :data-tooltip="isProspectCrmFavorite(selectedProspect) ? 'Retirer des favoris' : 'Ajouter aux favoris'"
                         >
-                          <svg class="prospect-favorite-btn__ic" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M12 21s-6.7-4.1-9-8.5C.5 9.4 2 6 6 6c2.5 0 4.5 2 6 3.5C13.5 8 15.5 6 18 6c4 0 5.5 3.4 3 6.5C18.7 16.9 12 21 12 21z" />
-                          </svg>
-                          <span>Favoris</span>
-                        </button>
-                      </span>
+                          <button
+                            type="button"
+                            class="prospect-favorite-btn"
+                            :class="{ 'is-active': isProspectCrmFavorite(selectedProspect) }"
+                            :aria-pressed="isProspectCrmFavorite(selectedProspect)"
+                            @click.stop="toggleProspectFavorite(selectedProspect.email)"
+                          >
+                            <svg class="prospect-favorite-btn__ic" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                              <path d="M12 21s-6.7-4.1-9-8.5C.5 9.4 2 6 6 6c2.5 0 4.5 2 6 3.5C13.5 8 15.5 6 18 6c4 0 5.5 3.4 3 6.5C18.7 16.9 12 21 12 21z" />
+                            </svg>
+                            <span>Favoris</span>
+                          </button>
+                        </span>
+                      </div>
+                      <div class="prospect-detail-hero__crm-toolbar-right">
+                        <span class="prospect-btn-tooltip" data-tooltip="Supprimer ce prospect du CRM local">
+                          <button
+                            type="button"
+                            class="prospect-delete-btn"
+                            @click.stop="openDeleteProspectConfirm(selectedProspect)"
+                          >
+                            <svg class="prospect-delete-btn__ic" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                              <path d="M3 6h18" />
+                              <path d="M8 6V4h8v2" />
+                              <path d="M6 6l1 14h10l1-14" />
+                              <path d="M10 11v6" />
+                              <path d="M14 11v6" />
+                            </svg>
+                            <span>Supprimer</span>
+                          </button>
+                        </span>
+                      </div>
                     </div>
                     <p class="pro-members-list__headline">
                       <span class="pro-members-list__name" :class="{ 'prospect-anon': shouldBlurProspectName(selectedProspect) }">
@@ -369,24 +389,6 @@
                               <path d="M8 8h8" />
                             </svg>
                             <span>Message</span>
-                          </button>
-                        </span>
-                        <span
-                          class="prospect-btn-tooltip"
-                          :data-tooltip="selectedProspect.hasDesktopPushConsent ? 'Envoyer une notification push desktop' : 'Action indisponible : notifications push desktop non autorisees'"
-                        >
-                          <button
-                            type="button"
-                            class="prospect-hero-contact-btn prospect-hero-contact-btn--push"
-                            :disabled="!selectedProspect.hasDesktopPushConsent"
-                          >
-                            <svg class="prospect-hero-contact-btn__ic" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                              <path d="M15 17H5a2 2 0 0 1-2-2V9a7 7 0 0 1 14 0v6a2 2 0 0 1-2 2z" />
-                              <path d="M9 21a3 3 0 0 0 6 0" />
-                              <path d="M17 11h4" />
-                              <path d="M19 9v4" />
-                            </svg>
-                            <span>Push desktop</span>
                           </button>
                         </span>
                       </div>
@@ -638,7 +640,13 @@
             <strong>{{ activeChatProspect ? displayProspectName(activeChatProspect) : 'ce prospect' }}</strong>
           </p>
         </div>
-        <div class="prospect-chat-modal__thread" role="log" aria-live="polite" aria-label="Historique des messages">
+        <div
+          ref="prospectChatThreadContainer"
+          class="prospect-chat-modal__thread"
+          role="log"
+          aria-live="polite"
+          aria-label="Historique des messages"
+        >
           <div
             v-for="msg in activeProspectChatMessages"
             :key="msg.id"
@@ -677,18 +685,76 @@
             <span class="prospect-chat-msg__time">{{ formatChatTime(msg.at) }}</span>
           </div>
         </div>
-        <form class="prospect-chat-modal__composer" @submit.prevent="sendProspectChatMessage">
+        <form class="conversation-panel__composer conversation-panel__composer--pro-actions-under" @submit.prevent="sendProspectChatMessage">
+          <div v-if="prospectChatSelectedListing" class="prospects-listing-picker__selected conversation-panel__selected-listing">
+            <img :src="prospectChatSelectedListing.images[0] || ''" alt="" class="prospects-listing-picker__selected-thumb">
+            <div class="prospects-listing-picker__selected-text">
+              <p class="prospects-listing-picker__selected-title">{{ prospectChatSelectedListing.title }}</p>
+              <p class="prospects-listing-picker__selected-meta">
+                {{ prospectChatSelectedListing.city }} · {{ labelForPropertyType(prospectChatSelectedListing.propertyType) }} · {{ formatListingPrice(prospectChatSelectedListing) }}
+              </p>
+            </div>
+            <button type="button" class="prospects-listing-picker__selected-clear" @click="prospectChatSelectedListing = null">✕</button>
+          </div>
           <label for="prospect-chat-input" class="visually-hidden">Message</label>
           <textarea
+            ref="prospectChatComposerInput"
             id="prospect-chat-input"
             v-model="prospectChatDraft"
-            class="prospect-chat-modal__input"
-            rows="2"
-            placeholder="Écrire un message..."
+            class="conversation-panel__input"
+            rows="1"
+            placeholder="Écrire un message au prospect…"
+            @input="autoResizeProspectChatComposer"
+            @keydown="onProspectChatComposerKeydown"
           />
-          <button type="submit" class="profil-account__btn profil-account__btn--primary" :disabled="!prospectChatDraft.trim()">
-            Envoyer
-          </button>
+          <div class="conversation-panel__composer-actions">
+            <div class="conversation-panel__listing-pick">
+              <button
+                type="button"
+                class="profil-account__btn profil-account__btn--ghost conversation-panel__attach-btn"
+                @click="toggleProspectChatListingPicker"
+              >
+                Joindre une annonce
+              </button>
+              <div
+                v-if="prospectChatListingPickerOpen"
+                class="prospects-listing-picker__popover conversation-panel__listing-popover"
+                @click.stop
+              >
+                <input
+                  v-model.trim="prospectChatListingPickerSearch"
+                  class="prospects-listing-picker__search-input"
+                  type="search"
+                  placeholder="Rechercher une annonce…"
+                >
+                <ul v-if="filteredProspectChatListingOptions.length" class="prospects-listing-picker__results">
+                  <li v-for="entry in filteredProspectChatListingOptions" :key="entry.id">
+                    <button
+                      type="button"
+                      class="prospects-listing-picker__result-btn"
+                      @click="selectProspectChatListing(entry)"
+                    >
+                      <img :src="entry.images[0] || ''" alt="" class="prospects-listing-picker__result-thumb">
+                      <span class="prospects-listing-picker__result-content">
+                        <span class="prospects-listing-picker__result-title">{{ entry.title }}</span>
+                        <span class="prospects-listing-picker__result-meta">
+                          {{ entry.city }} · {{ labelForPropertyType(entry.propertyType) }} · {{ formatListingPrice(entry) }}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <p class="conversation-panel__hint conversation-panel__hint--inline">Entrée pour envoyer · Shift + Entrée pour un saut de ligne</p>
+            <button type="submit" class="profil-account__btn profil-account__btn--primary conversation-panel__send-btn" :disabled="!prospectChatDraft.trim()">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M22 2 11 13" />
+                <path d="m22 2-7 20-4-9-9-4 20-7Z" />
+              </svg>
+              Envoyer
+            </button>
+          </div>
         </form>
       </div>
     </AppCenterModal>
@@ -739,6 +805,20 @@
       message="Votre e-mail a bien été enregistré."
       variant="success"
     />
+
+    <AppCenterModal v-model="deleteProspectConfirmOpen" title="Supprimer le prospect" size="sm">
+      <p class="compte-settings__confirm-text">
+        Voulez-vous vraiment supprimer ce prospect du CRM local ?
+      </p>
+      <div class="compte-settings__confirm-actions">
+        <button type="button" class="profil-account__btn profil-account__btn--ghost" @click="deleteProspectConfirmOpen = false">
+          Annuler
+        </button>
+        <button type="button" class="profil-account__btn profil-account__btn--danger" @click="confirmDeleteProspect">
+          Supprimer
+        </button>
+      </div>
+    </AppCenterModal>
   </div>
 </template>
 
@@ -785,12 +865,20 @@ const previewListingId = ref<string | null>(null)
 const prospectCallModalOpen = ref(false)
 const prospectChatModalOpen = ref(false)
 const prospectEmailModalOpen = ref(false)
+const deleteProspectConfirmOpen = ref(false)
+const prospectEmailPendingDeletion = ref<string | null>(null)
 const prospectEmailSubject = ref('')
 const prospectEmailMessage = ref('')
 const prospectChatDraft = ref('')
+const prospectChatComposerInput = ref<HTMLTextAreaElement | null>(null)
+const prospectChatThreadContainer = ref<HTMLElement | null>(null)
+const prospectChatListingPickerOpen = ref(false)
+const prospectChatListingPickerSearch = ref('')
+const prospectChatSelectedListing = ref<SearchListing | null>(null)
 const activeChatProspectEmail = ref<string | null>(null)
 const emailSentToastVisible = ref(false)
 let emailSentToastTimer: ReturnType<typeof setTimeout> | null = null
+let prospectChatScrollTimer: ReturnType<typeof setTimeout> | null = null
 const listingCriteriaPickerRef = ref<HTMLElement | null>(null)
 const listingCriteriaPickerOpen = ref(false)
 const listingCriteriaSearch = ref('')
@@ -916,6 +1004,8 @@ function openProspectChat() {
   }
   activeChatProspectEmail.value = selectedProspect.value.email
   prospectChatDraft.value = ''
+  prospectChatSelectedListing.value = null
+  prospectChatListingPickerOpen.value = false
   prospectChatModalOpen.value = true
 }
 
@@ -929,8 +1019,80 @@ function sendProspectChatMessage() {
     prospectEmail: prospect.email,
     prospectName: prospect.name,
     text,
+    listingId: prospectChatSelectedListing.value?.id ?? null,
+    listingTitle: prospectChatSelectedListing.value?.title,
   })
   prospectChatDraft.value = ''
+  resetProspectChatComposerHeight()
+  prospectChatSelectedListing.value = null
+  prospectChatListingPickerOpen.value = false
+}
+
+function onProspectChatComposerKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Enter' || event.shiftKey) {
+    return
+  }
+  event.preventDefault()
+  sendProspectChatMessage()
+}
+
+function autoResizeProspectChatComposer(event: Event) {
+  const el = event.target as HTMLTextAreaElement | null
+  if (!el) {
+    return
+  }
+  el.style.height = 'auto'
+  el.style.height = `${Math.max(el.scrollHeight, 42)}px`
+}
+
+function resetProspectChatComposerHeight() {
+  nextTick(() => {
+    const el = prospectChatComposerInput.value
+    if (!el) {
+      return
+    }
+    el.style.height = ''
+  })
+}
+
+function toggleProspectChatListingPicker() {
+  prospectChatListingPickerOpen.value = !prospectChatListingPickerOpen.value
+  if (prospectChatListingPickerOpen.value) {
+    prospectChatListingPickerSearch.value = ''
+  }
+}
+
+function selectProspectChatListing(item: SearchListing) {
+  prospectChatSelectedListing.value = item
+  prospectChatListingPickerOpen.value = false
+}
+
+function scrollProspectChatToBottom() {
+  nextTick(() => {
+    if (!prospectChatModalOpen.value) {
+      return
+    }
+    const runScroll = () => {
+      const el = prospectChatThreadContainer.value
+      if (!el) {
+        return
+      }
+      el.scrollTop = el.scrollHeight
+    }
+    runScroll()
+    if (import.meta.client) {
+      requestAnimationFrame(() => {
+        runScroll()
+      })
+    }
+    if (prospectChatScrollTimer) {
+      clearTimeout(prospectChatScrollTimer)
+    }
+    prospectChatScrollTimer = setTimeout(() => {
+      runScroll()
+      prospectChatScrollTimer = null
+    }, 180)
+  })
 }
 
 function openProspectEmailModal() {
@@ -941,6 +1103,24 @@ function openProspectEmailModal() {
   prospectEmailSubject.value = prefill.subject
   prospectEmailMessage.value = prefill.message
   prospectEmailModalOpen.value = true
+}
+
+function openDeleteProspectConfirm(prospect: ProspectMatchRow) {
+  prospectEmailPendingDeletion.value = prospect.email
+  deleteProspectConfirmOpen.value = true
+}
+
+function confirmDeleteProspect() {
+  const email = prospectEmailPendingDeletion.value
+  if (!email) {
+    deleteProspectConfirmOpen.value = false
+    return
+  }
+  siteStore.deleteProspectData(email)
+  deleteProspectConfirmOpen.value = false
+  prospectEmailPendingDeletion.value = null
+  const first = filteredProspects.value[0]
+  selectedProspectEmail.value = first ? first.email : null
 }
 
 function sendProspectEmail() {
@@ -965,7 +1145,15 @@ watch(
   (open) => {
     if (open) {
       siteStore.markCurrentProMessagesRead()
+      scrollProspectChatToBottom()
     }
+  },
+)
+
+watch(
+  () => activeProspectChatMessages.value.length,
+  () => {
+    scrollProspectChatToBottom()
   },
 )
 
@@ -973,6 +1161,10 @@ onBeforeUnmount(() => {
   if (emailSentToastTimer) {
     clearTimeout(emailSentToastTimer)
     emailSentToastTimer = null
+  }
+  if (prospectChatScrollTimer) {
+    clearTimeout(prospectChatScrollTimer)
+    prospectChatScrollTimer = null
   }
 })
 
@@ -997,6 +1189,21 @@ const filteredListingCriteriaOptions = computed<SearchListing[]>(() => {
   }
   return listingCriteriaOptions.value.filter((item) => {
     const hay = `${item.title} ${item.city} ${labelForPropertyType(item.propertyType)} ${item.propertyType}`.toLowerCase()
+    return hay.includes(q)
+  }).slice(0, 24)
+})
+
+const filteredProspectChatListingOptions = computed<SearchListing[]>(() => {
+  const q = prospectChatListingPickerSearch.value.trim().toLowerCase()
+  const options = [...siteStore.currentProAgencyListings]
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .map((l) => siteStore.publicActiveSearchListings.find((p) => p.id === l.id))
+    .filter((l): l is SearchListing => Boolean(l))
+  if (!q) {
+    return options.slice(0, 24)
+  }
+  return options.filter((item) => {
+    const hay = `${item.title} ${item.city} ${item.propertyType}`.toLowerCase()
     return hay.includes(q)
   }).slice(0, 24)
 })
@@ -1194,9 +1401,10 @@ function prospectMatchesPotentialSegment(p: ProspectMatchRow): boolean {
   return !isProspectSeen(p) && p.score > 70
 }
 
-const prospectRowsBase = computed<ProspectMatchRow[]>(() =>
-  buildProspectRows(criteriaFromParsed(parsed.value), siteStore),
-)
+const prospectRowsBase = computed<ProspectMatchRow[]>(() => {
+  void siteStore.prospectsDataVersion
+  return buildProspectRows(criteriaFromParsed(parsed.value), siteStore)
+})
 const prospectSort = ref<ProspectListSortKey>('proximity')
 const PROSPECT_SORT_PHRASES: Record<ProspectListSortKey, string> = {
   proximity: 'triés par proximité avec vos critères',
@@ -1368,6 +1576,9 @@ function isAnonymousEmail(email: string): boolean {
 function displayProspectName(prospect: ProspectMatchRow): string {
   if (prospect.shouldBlurName) {
     return 'Utilisateur anonymisé'
+  }
+  if (prospect.name?.trim()) {
+    return prospect.name
   }
   if (!isAnonymousEmail(prospect.email)) {
     return prospect.name
