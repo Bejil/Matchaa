@@ -84,7 +84,7 @@ function onIncomingMessage(event: Event) {
     return
   }
   desktopPush.notify({
-    title: 'Nouveau message prospect',
+    title: 'Matchaa - Nouveau message prospect',
     body: 'Un prospect vous a envoyé un message.',
   })
   incomingToastVisible.value = true
