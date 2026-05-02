@@ -211,22 +211,11 @@ watch(
 
 onMounted(() => {
   siteStore.hydrateSession()
-  siteStore.ensureProListingsLoadedForPublic()
   favoritesStore.loadFromStorage(true)
   if (siteStore.currentUser) {
     router.replace({ path: '/compte', query: { tab: 'favoris' } })
   }
 })
-
-watch(
-  () => siteStore.currentUser,
-  (user) => {
-    if (!import.meta.client || !user) {
-      return
-    }
-    router.replace({ path: '/compte', query: { tab: 'favoris' } })
-  },
-)
 
 useHead({
   title: 'Mes favoris — Matchaa',

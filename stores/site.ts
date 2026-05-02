@@ -2047,15 +2047,12 @@ export const useSiteStore = defineStore('site', () => {
   let proPublicCatalogLoaded = false
 
   function ensureProListingsLoadedForPublic() {
-    if (!import.meta.client) {
+    if (!import.meta.client || proPublicCatalogLoaded) {
       return
     }
-    if (!proPublicCatalogLoaded) {
-      proPublicCatalogLoaded = true
-      loadProData()
-      enforceListingExpiry()
-    }
-    prunePublicFavoritesAgainstCatalog()
+    proPublicCatalogLoaded = true
+    loadProData()
+    enforceListingExpiry()
   }
 
   function recordListingView(listingId: string) {
@@ -2624,19 +2621,6 @@ export const useSiteStore = defineStore('site', () => {
     persistProData()
   }
 
-  /** IDs des annonces visibles catalogue public (actives & non expirées). */
-  function prunePublicFavoritesAgainstCatalog() {
-    if (!import.meta.client || !proPublicCatalogLoaded) {
-      return
-    }
-    const available = new Set(
-      proListings.value
-        .filter((l) => l.status === 'active' && !listingHasExpiredAt(l))
-        .map((l) => l.id),
-    )
-    useFavoritesStore().pruneToAvailableIds(available)
-  }
-
   function enforceListingExpiry(nowIso = new Date().toISOString()) {
     let changed = false
     for (let i = 0; i < proListings.value.length; i += 1) {
@@ -2656,9 +2640,6 @@ export const useSiteStore = defineStore('site', () => {
     }
     if (changed) {
       persistProData()
-    }
-    if (import.meta.client) {
-      prunePublicFavoritesAgainstCatalog()
     }
     return changed
   }

@@ -171,7 +171,6 @@ const espaceProLink = computed(() =>
 onMounted(() => {
   siteStore.hydrateSession()
   siteStore.hydrateProSession()
-  siteStore.ensureProListingsLoadedForPublic()
-  favoritesStore.loadFromStorage(true)
+  favoritesStore.loadFromStorage()
 })
 </script>

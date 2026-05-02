@@ -135,25 +135,6 @@ export const useFavoritesStore = defineStore('favorites', () => {
     }
   }
 
-  /**
-   * Retire les IDs qui ne correspondent plus à une annonce publique active (expirée, archivée, supprimée).
-   * Évite écart entre badge header et liste affichée ; ids rest synchrones avec le catalogue.
-   */
-  function pruneToAvailableIds(available: ReadonlySet<string>): number {
-    if (!import.meta.client) {
-      return 0
-    }
-    loadFromStorage(true)
-    const before = ids.value.length
-    const next = ids.value.filter((id) => available.has(id))
-    if (next.length === ids.value.length) {
-      return 0
-    }
-    ids.value = next
-    persist()
-    return before - next.length
-  }
-
   function migrateFavoritesToNewEmail(prevEmail: string, nextEmail: string) {
     if (!import.meta.client) {
       return
@@ -185,6 +166,5 @@ export const useFavoritesStore = defineStore('favorites', () => {
     loadFromStorage,
     mergeGuestFavoritesIntoAccount,
     migrateFavoritesToNewEmail,
-    pruneToAvailableIds,
   }
 })

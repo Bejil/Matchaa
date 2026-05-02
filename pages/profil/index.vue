@@ -217,7 +217,6 @@ useHead({
 
 onMounted(() => {
   siteStore.hydrateSession()
-  siteStore.ensureProListingsLoadedForPublic()
   favoritesStore.loadFromStorage(true)
   if (siteStore.currentUser) {
     router.replace('/compte')
