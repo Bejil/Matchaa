@@ -57,8 +57,10 @@ a.article-card:focus-visible {
 }
 
 .article-card:hover {
-  border-color: rgba(45, 106, 79, 0.35);
-  box-shadow: 0 10px 32px rgba(26, 26, 26, 0.07);
+  border-color: color-mix(in srgb, var(--color-accent) 52%, var(--color-accent-secondary));
+  box-shadow:
+    0 10px 32px rgba(26, 26, 26, 0.07),
+    0 8px 22px rgba(45, 106, 79, 0.06);
 }
 
 .article-card__meta {
@@ -73,7 +75,7 @@ a.article-card:focus-visible {
 
 .article-card__cat {
   font-weight: 700;
-  color: var(--color-accent);
+  color: var(--color-accent-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }

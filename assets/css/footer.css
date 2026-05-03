@@ -75,7 +75,7 @@
 
 .footer__social-link:hover {
   color: var(--color-accent);
-  background: #e8f0ec;
+  background: var(--color-accent-secondary-soft);
   text-decoration: none;
 }
 
@@ -85,7 +85,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--color-text-muted);
+  color: var(--color-accent-secondary);
 }
 
 .footer__links {

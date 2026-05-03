@@ -15,7 +15,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--color-accent);
+  color: var(--color-accent-secondary);
 }
 
 .hero__title {
@@ -71,8 +71,8 @@
 }
 
 .hero__btn--secondary:hover {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 62%, var(--color-accent-secondary));
+  color: color-mix(in srgb, var(--color-accent) 55%, var(--color-accent-secondary));
 }
 
 .hero__panel {

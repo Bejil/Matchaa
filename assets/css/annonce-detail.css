@@ -542,12 +542,13 @@
 
 .annonce-detail__notice {
   margin: 1rem 0 0;
-  padding: 0.75rem;
+  padding: 0.75rem 0.75rem 0.75rem 0.85rem;
   font-size: 0.75rem;
   line-height: 1.5;
   color: var(--color-text-muted);
-  background: rgba(0, 0, 0, 0.04);
+  background: linear-gradient(90deg, var(--color-accent-secondary-soft) 0%, rgba(0, 0, 0, 0.03) 28%);
   border-radius: 0.5rem;
+  border-left: 3px solid color-mix(in srgb, var(--color-accent-secondary) 55%, transparent);
 }
 
 .annonce-detail__empty {
@@ -1009,7 +1010,7 @@
 .listing-contact-form__select:focus {
   outline: none;
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.15);
+  box-shadow: 0 0 0 3px rgba(219, 56, 70, 0.15);
 }
 
 .listing-contact-form__textarea {
@@ -1160,4 +1161,258 @@
 
 .listing-contact-form__legal a:hover {
   color: var(--color-accent);
+}
+
+/* Localisation fiche annonce : carte pleine largeur, POI en dessous (noms non tronqués) */
+.listing-loc__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.listing-loc__lead {
+  margin: 0 0 1.25rem;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--color-text-muted);
+  max-width: 52rem;
+}
+
+.listing-loc__lead strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.listing-loc__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-radius: 0.85rem;
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+  background: var(--color-surface);
+  box-shadow: 0 10px 36px rgba(26, 26, 26, 0.07);
+}
+
+.listing-loc__map-wrap {
+  border: none;
+  border-radius: 0;
+  background: var(--color-surface-muted, #eceae7);
+}
+
+.listing-loc__map {
+  display: block;
+  width: 100%;
+  height: min(56vw, 14rem);
+  min-height: 13.5rem;
+  border: 0;
+}
+
+@media (min-width: 520px) {
+  .listing-loc__map {
+    height: min(42vw, 18rem);
+    min-height: 16rem;
+  }
+}
+
+@media (min-width: 960px) {
+  .listing-loc__map {
+    height: 22rem;
+    min-height: 20rem;
+  }
+}
+
+.listing-loc__map-footer {
+  display: flex;
+  justify-content: center;
+  padding: 0.45rem 0.75rem;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+}
+
+.listing-loc__map-link {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--color-link-accent, var(--color-accent));
+}
+
+.listing-loc__map-link:hover {
+  text-decoration: underline;
+  color: var(--color-link-accent-hover, var(--color-accent-hover));
+}
+
+.listing-loc__poi {
+  padding: 1.15rem 1.15rem 1.2rem;
+  border: none;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0;
+  background: linear-gradient(180deg, var(--color-bg) 0%, var(--color-surface) 38%);
+}
+
+.listing-loc__poi-head {
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px dashed color-mix(in srgb, var(--color-border) 85%, var(--color-accent-secondary) 15%);
+}
+
+.listing-loc__poi-title {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+
+.listing-loc__poi-sub {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.listing-loc__poi-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.listing-loc__poi-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.listing-loc__poi-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.listing-loc__poi-item:first-child {
+  padding-top: 0;
+}
+
+.listing-loc__poi-ic {
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin-top: 0.1rem;
+  border-radius: 0.55rem;
+  display: grid;
+  place-items: center;
+  color: var(--color-link-accent, var(--color-accent));
+  background: color-mix(in srgb, var(--color-accent-soft) 55%, var(--color-surface));
+  border: 1px solid var(--color-accent-soft-border);
+}
+
+.listing-loc__poi-ic .listing-poi-icon {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.listing-loc__poi-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.listing-loc__poi-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 1rem;
+}
+
+.listing-loc__poi-cat {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-accent-secondary, #2d6a4f);
+}
+
+.listing-loc__poi-meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-align: right;
+}
+
+.listing-loc__poi-dist {
+  color: var(--color-text);
+}
+
+.listing-loc__poi-walk {
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.listing-loc__poi-walk::before {
+  content: '·';
+  margin-right: 0.35rem;
+  font-weight: 400;
+  opacity: 0.55;
+}
+
+.listing-loc__poi-name {
+  margin: 0.35rem 0 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--color-text);
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+.listing-loc__more {
+  margin-top: 0.25rem;
+  padding-top: 0.85rem;
+  display: flex;
+  justify-content: center;
+}
+
+.listing-loc__more-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.55rem 1.15rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 28%, var(--color-accent-secondary));
+  background: var(--color-surface);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-link-accent, var(--color-accent));
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.listing-loc__more-btn:hover {
+  background: linear-gradient(180deg, var(--color-accent-soft) 0%, var(--color-accent-secondary-soft) 100%);
+  border-color: color-mix(in srgb, var(--color-accent) 38%, var(--color-accent-secondary));
+  color: var(--color-link-accent-hover, var(--color-accent-hover));
+}
+
+.listing-loc__more-btn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 45%, var(--color-accent-secondary));
+  outline-offset: 2px;
+}
+
+.listing-loc__more-count {
+  font-weight: 600;
+  opacity: 0.85;
 }

@@ -61,17 +61,17 @@
 }
 
 .annonces-filters__pill:hover {
-  border-color: rgba(45, 106, 79, 0.45);
-  box-shadow: 0 2px 8px rgba(45, 106, 79, 0.12);
+  border-color: rgba(219, 56, 70, 0.45);
+  box-shadow: 0 2px 8px rgba(219, 56, 70, 0.12);
 }
 
 .annonces-filters__pill.is-open {
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.22);
+  box-shadow: 0 0 0 3px rgba(219, 56, 70, 0.22);
 }
 
 .annonces-filters__pill.has-value:not(.is-open) {
-  border-color: rgba(45, 106, 79, 0.5);
+  border-color: rgba(219, 56, 70, 0.5);
   background: var(--color-accent-soft);
   color: var(--color-accent-hover);
 }
@@ -187,7 +187,7 @@
 .annonces-popover__select:focus {
   outline: none;
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px rgba(45, 106, 79, 0.2);
+  box-shadow: 0 0 0 2px rgba(219, 56, 70, 0.2);
 }
 
 .annonces-popover__location {
@@ -329,13 +329,13 @@
   color: #fff;
   background: var(--color-accent);
   cursor: pointer;
-  box-shadow: 0 2px 10px rgba(45, 106, 79, 0.35);
+  box-shadow: 0 2px 10px rgba(219, 56, 70, 0.35);
   transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
 }
 
 .annonces-popover__submit:hover {
   background: var(--color-accent-hover);
-  box-shadow: 0 3px 12px rgba(45, 106, 79, 0.42);
+  box-shadow: 0 3px 12px rgba(219, 56, 70, 0.42);
 }
 
 .annonces-popover__submit:active {
@@ -550,9 +550,16 @@ ul.listing-grid.annonces-listing--horizontal {
   margin-bottom: 2rem;
   padding: 1.25rem 1.35rem;
   border-radius: 0.875rem;
-  background: linear-gradient(135deg, var(--color-accent-soft) 0%, var(--color-surface) 55%, #f5f2ed 100%);
+  background: linear-gradient(
+    135deg,
+    var(--color-accent-soft) 0%,
+    var(--color-surface) 48%,
+    var(--color-accent-secondary-soft) 100%
+  );
   border: 1px solid var(--color-accent-soft-border);
-  box-shadow: 0 8px 28px rgba(45, 106, 79, 0.06);
+  box-shadow:
+    0 8px 28px rgba(219, 56, 70, 0.06),
+    0 3px 16px rgba(45, 106, 79, 0.05);
 }
 
 .annonces-save__icon {
@@ -598,11 +605,13 @@ ul.listing-grid.annonces-listing--horizontal {
   background: var(--color-accent);
   color: #fff;
   cursor: pointer;
+  text-decoration: none;
   transition: background 0.15s ease, transform 0.1s ease;
 }
 
 .annonces-save__btn:hover {
   background: var(--color-accent-hover);
+  text-decoration: none;
 }
 
 .annonces-save__btn:active {

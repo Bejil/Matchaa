@@ -544,49 +544,58 @@
           @update:model-value="setListingFormStep"
         />
         <aside
-          class="pro-listing-form__prospects-card"
+          class="annonces-save compte-panel__save pro-listing-form__prospects-save"
           aria-labelledby="listing-draft-prospects-title"
           aria-live="polite"
         >
-          <div class="pro-listing-form__prospects-card__intro">
-            <h3 id="listing-draft-prospects-title" class="pro-listing-form__prospects-card__title">
+          <div class="annonces-save__icon" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+          </div>
+          <div class="annonces-save__text">
+            <h3 id="listing-draft-prospects-title" class="annonces-save__title">
               {{ draftProspectTotal }} {{ draftProspectTotal === 1 ? 'prospect potentiel' : 'prospects potentiels' }}
             </h3>
-            <p class="pro-listing-form__prospects-card__laius">
+            <p class="annonces-save__desc">
               À mesure que vous renseignez l’annonce, nous rapprochons vos critères des profils enregistrés.
               Les pastilles indiquent combien sont <strong>chauds</strong> ou <strong>tièdes</strong>, c’est-à-dire proches
               de votre bien sur le plan du projet, du budget et du typage.
             </p>
-          </div>
-          <template v-if="draftProspectTotal > 0">
-            <div class="pro-listing-form__prospects-card__pills" role="list">
+            <div v-if="draftProspectTotal > 0" class="pro-listing-form__prospects-pills" role="list">
               <span
                 v-if="draftProspectHeatCounts.hot > 0"
                 role="listitem"
-                class="pro-listing-form__prospects-card__pill pro-listing-form__prospects-card__pill--hot"
+                class="pro-listing-form__prospect-pill pro-listing-form__prospect-pill--hot"
               >
                 {{ draftProspectHeatCounts.hot }} chaud{{ draftProspectHeatCounts.hot === 1 ? '' : 's' }}
               </span>
               <span
                 v-if="draftProspectHeatCounts.warm > 0"
                 role="listitem"
-                class="pro-listing-form__prospects-card__pill pro-listing-form__prospects-card__pill--warm"
+                class="pro-listing-form__prospect-pill pro-listing-form__prospect-pill--warm"
               >
                 {{ draftProspectHeatCounts.warm }} tiède{{ draftProspectHeatCounts.warm === 1 ? '' : 's' }}
               </span>
               <span
                 v-if="draftProspectHeatCounts.cold > 0"
                 role="listitem"
-                class="pro-listing-form__prospects-card__pill pro-listing-form__prospects-card__pill--cold"
+                class="pro-listing-form__prospect-pill pro-listing-form__prospect-pill--cold"
               >
                 {{ draftProspectHeatCounts.cold }} froid{{ draftProspectHeatCounts.cold === 1 ? '' : 's' }}
               </span>
             </div>
-          </template>
-          <p v-else class="pro-listing-form__prospects-card__empty">
-            Aucun profil ne ressort encore : renseignez au minimum la <strong>ville</strong> et les informations clés du bien
-            (prix, surface, typologie) pour lancer le croisement.
-          </p>
+            <p v-else class="pro-listing-form__prospects-empty-note">
+              Aucun profil ne ressort encore : renseignez au minimum la <strong>ville</strong> et les informations clés du bien
+              (prix, surface, typologie) pour lancer le croisement.
+            </p>
+          </div>
+          <NuxtLink to="/espace-pro/prospects" class="annonces-save__btn">
+            Voir les prospects
+          </NuxtLink>
         </aside>
         <section v-show="listingFormStep === 1" class="pro-listing-form__step-panel">
         <h3 class="pro-listing-form__section-title pro-listing-form__section-title--first">Informations principales</h3>
@@ -1770,7 +1779,7 @@ function formatListingStatNumber(n?: number): string {
 
 function listingPlaceholderThumb(listingId: string): string {
   const label = listingId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4) || 'pro'
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='128' height='96' viewBox='0 0 128 96'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='#eaf4ef'/><stop offset='100%' stop-color='#d9ece2'/></linearGradient></defs><rect width='128' height='96' rx='14' fill='url(#g)'/><path d='M24 56 64 26l40 30' fill='none' stroke='#2d6a4f' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><rect x='36' y='54' width='56' height='26' rx='4' fill='#fff' stroke='#2d6a4f' stroke-width='3'/><rect x='60' y='61' width='10' height='19' rx='2' fill='#dcece4'/><text x='64' y='18' text-anchor='middle' fill='#2d6a4f' font-family='Arial,sans-serif' font-size='9' font-weight='700'>Matchaa ${label}</text></svg>`
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='128' height='96' viewBox='0 0 128 96'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='#fce8ea'/><stop offset='100%' stop-color='#f9d4d8'/></linearGradient></defs><rect width='128' height='96' rx='14' fill='url(#g)'/><path d='M24 56 64 26l40 30' fill='none' stroke='#db3846' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><rect x='36' y='54' width='56' height='26' rx='4' fill='#fff' stroke='#db3846' stroke-width='3'/><rect x='60' y='61' width='10' height='19' rx='2' fill='#f5d0d4'/><text x='64' y='18' text-anchor='middle' fill='#db3846' font-family='Arial,sans-serif' font-size='9' font-weight='700'>Matchaa ${label}</text></svg>`
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
 }
 

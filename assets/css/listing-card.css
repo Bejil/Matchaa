@@ -442,7 +442,7 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   background: rgba(255, 255, 255, 0.95);
-  color: var(--color-accent);
+  color: color-mix(in srgb, var(--color-accent) 42%, var(--color-accent-secondary));
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
@@ -540,7 +540,7 @@
   flex-shrink: 0;
   width: 0.875rem;
   height: 0.875rem;
-  color: var(--color-accent);
+  color: var(--color-accent-secondary);
   opacity: 0.88;
 }
 
