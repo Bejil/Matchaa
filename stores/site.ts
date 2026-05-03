@@ -263,9 +263,7 @@ export const useSiteStore = defineStore('site', () => {
   }
 
   const DEMO_USERS: DemoUser[] = [
-    { name: 'Thomas Blutard', email: 'tblutard@yopmail.com', password: 'demo' },
-    { name: 'Sylvie Esse', email: 'sesse@yopmail.com', password: 'demo' },
-    { name: 'Martin Tamard', email: 'ttamard@yopmail.com', password: 'demo' },
+    { name: 'Thomas Blutard', email: 'public@yopmail.com', password: 'public' },
   ]
 
   const DEMO_PRO_AGENCIES: ProAgency[] = [
@@ -281,62 +279,16 @@ export const useSiteStore = defineStore('site', () => {
       creditsBalance: 24,
       creditsPlan: 'none',
     },
-    {
-      id: 'agency-demo-toits',
-      name: 'Agence Les Toits Verts',
-      logo: '',
-      contactEmail: 'agence@toitsverts.demo',
-      contactPhone: '01 80 00 00 02',
-      city: 'Lyon',
-      address: '8 avenue des Acacias',
-      description: 'Spécialiste des biens avec extérieur et maisons familiales en métropole lyonnaise.',
-      creditsBalance: 24,
-      creditsPlan: 'none',
-    },
-    {
-      id: 'agency-demo-central',
-      name: 'Immobilier Central',
-      logo: '',
-      contactEmail: 'contact@immo-central.demo',
-      contactPhone: '01 80 00 00 03',
-      city: 'Bordeaux',
-      address: '31 quai des Chartrons',
-      description: 'Transactions et locations au cœur de Bordeaux et en Nouvelle-Aquitaine.',
-      creditsBalance: 24,
-      creditsPlan: 'none',
-    },
   ]
   /** Comptes démo réservés à l’espace pro (emails distincts des comptes publics). */
   const DEMO_PRO_MEMBERS: ProMember[] = [
     {
       id: 'pro-test-manager',
       agencyId: 'agency-demo-test',
-      name: 'Compte Test',
-      email: 'test.pro@matchaa.demo',
-      password: 'matchaa-pro-test',
+      name: 'Compte pro',
+      email: 'pro@yopmail.com',
+      password: 'pro',
       role: 'manager',
-      creditsConsumedTotal: 0,
-      creditsConsumed30d: 0,
-      lastCreditConsumptionAt: null,
-    },
-    {
-      id: 'pro-camille-manager',
-      agencyId: 'agency-demo-toits',
-      name: 'Camille Marchand',
-      email: 'pro.toitsverts@matchaa.demo',
-      password: 'pro-demo',
-      role: 'manager',
-      creditsConsumedTotal: 0,
-      creditsConsumed30d: 0,
-      lastCreditConsumptionAt: null,
-    },
-    {
-      id: 'pro-julien-agent',
-      agencyId: 'agency-demo-central',
-      name: 'Julien Paret',
-      email: 'julien.paret@immo-central.demo',
-      password: 'pro-demo',
-      role: 'agent',
       creditsConsumedTotal: 0,
       creditsConsumed30d: 0,
       lastCreditConsumptionAt: null,

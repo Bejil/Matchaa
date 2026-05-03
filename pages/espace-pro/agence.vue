@@ -439,7 +439,7 @@
             v-model.trim="cardOwner"
             class="compte-settings__input"
             type="text"
-            placeholder="Ex. Camille Marchand"
+            placeholder="Ex. Marie Dupont"
             autocomplete="cc-name"
             required
           >

@@ -4,8 +4,6 @@ import { ALL_PROPERTY_TYPE_SLUGS, type PropertyTypeSlug } from '~/data/property-
 /** Correspondance démo agence pro (id string) → entrée `MOCK_AGENCIES` (id numérique). */
 const PRO_AGENCY_STRING_TO_NUMERIC: Record<string, number> = {
   'agency-demo-test': 1,
-  'agency-demo-toits': 2,
-  'agency-demo-central': 3,
 }
 
 export function proAgencyIdToPublicNumeric(agencyId: string): number {
