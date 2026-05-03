@@ -4,7 +4,6 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, #f0e8ea 0%, #f6f1f2 38%, #faf7f8 100%);
   color: var(--color-text);
 }
 
