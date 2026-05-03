@@ -543,6 +543,51 @@
           :steps="listingFormSteps"
           @update:model-value="setListingFormStep"
         />
+        <aside
+          class="pro-listing-form__prospects-card"
+          aria-labelledby="listing-draft-prospects-title"
+          aria-live="polite"
+        >
+          <div class="pro-listing-form__prospects-card__intro">
+            <h3 id="listing-draft-prospects-title" class="pro-listing-form__prospects-card__title">
+              {{ draftProspectTotal }} {{ draftProspectTotal === 1 ? 'prospect potentiel' : 'prospects potentiels' }}
+            </h3>
+            <p class="pro-listing-form__prospects-card__laius">
+              À mesure que vous renseignez l’annonce, nous rapprochons vos critères des profils enregistrés.
+              Les pastilles indiquent combien sont <strong>chauds</strong> ou <strong>tièdes</strong>, c’est-à-dire proches
+              de votre bien sur le plan du projet, du budget et du typage.
+            </p>
+          </div>
+          <template v-if="draftProspectTotal > 0">
+            <div class="pro-listing-form__prospects-card__pills" role="list">
+              <span
+                v-if="draftProspectHeatCounts.hot > 0"
+                role="listitem"
+                class="pro-listing-form__prospects-card__pill pro-listing-form__prospects-card__pill--hot"
+              >
+                {{ draftProspectHeatCounts.hot }} chaud{{ draftProspectHeatCounts.hot === 1 ? '' : 's' }}
+              </span>
+              <span
+                v-if="draftProspectHeatCounts.warm > 0"
+                role="listitem"
+                class="pro-listing-form__prospects-card__pill pro-listing-form__prospects-card__pill--warm"
+              >
+                {{ draftProspectHeatCounts.warm }} tiède{{ draftProspectHeatCounts.warm === 1 ? '' : 's' }}
+              </span>
+              <span
+                v-if="draftProspectHeatCounts.cold > 0"
+                role="listitem"
+                class="pro-listing-form__prospects-card__pill pro-listing-form__prospects-card__pill--cold"
+              >
+                {{ draftProspectHeatCounts.cold }} froid{{ draftProspectHeatCounts.cold === 1 ? '' : 's' }}
+              </span>
+            </div>
+          </template>
+          <p v-else class="pro-listing-form__prospects-card__empty">
+            Aucun profil ne ressort encore : renseignez au minimum la <strong>ville</strong> et les informations clés du bien
+            (prix, surface, typologie) pour lancer le croisement.
+          </p>
+        </aside>
         <section v-show="listingFormStep === 1" class="pro-listing-form__step-panel">
         <h3 class="pro-listing-form__section-title pro-listing-form__section-title--first">Informations principales</h3>
         <label class="compte-settings__field">
@@ -950,7 +995,11 @@ import {
   type ListingFeatureId,
   type PropertyTypeSlug,
 } from '~/data/property-types'
-import { buildProspectRows, criteriaFromLocationQuery } from '~/utils/build-prospect-rows'
+import {
+  buildProspectRows,
+  criteriaFromListingDraftFields,
+  type ProspectMatchRow,
+} from '~/utils/build-prospect-rows'
 
 definePageMeta({ layout: 'pro' })
 
@@ -1109,6 +1158,88 @@ const listingFormSteps = [
   { id: 'comfort', label: 'Confort & description' },
   { id: 'media', label: 'Photos & équipements' },
 ] as const
+
+const draftProspectRowsDebounced = ref<ProspectMatchRow[]>([])
+let draftProspectsDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
+function scheduleDraftProspectsPreview() {
+  if (!import.meta.client) {
+    return
+  }
+  if (draftProspectsDebounceTimer) {
+    clearTimeout(draftProspectsDebounceTimer)
+  }
+  draftProspectsDebounceTimer = setTimeout(() => {
+    draftProspectsDebounceTimer = null
+    const f = editForm.value
+    const criteria = criteriaFromListingDraftFields({
+      projectType: f.projectType,
+      city: f.city,
+      propertyType: f.propertyType,
+      price: f.price,
+      surface: f.surface,
+      rooms: f.rooms,
+      bedrooms: f.bedrooms,
+      dpe: f.dpe,
+      featureSlugs: f.features,
+    })
+    const rows = buildProspectRows(criteria, siteStore)
+    draftProspectRowsDebounced.value = [...rows].sort((a, b) => {
+      const d = b.maxProximity - a.maxProximity
+      if (d !== 0) {
+        return d
+      }
+      return b.score - a.score
+    })
+  }, 320)
+}
+
+watch(
+  () => editForm.value,
+  () => {
+    if (listingModalOpen.value) {
+      scheduleDraftProspectsPreview()
+    }
+  },
+  { deep: true },
+)
+
+watch(listingModalOpen, (open) => {
+  if (open) {
+    scheduleDraftProspectsPreview()
+  } else {
+    if (draftProspectsDebounceTimer) {
+      clearTimeout(draftProspectsDebounceTimer)
+      draftProspectsDebounceTimer = null
+    }
+    draftProspectRowsDebounced.value = []
+  }
+})
+
+const draftProspectHeatCounts = computed(() => {
+  let hot = 0
+  let warm = 0
+  let cold = 0
+  for (const row of draftProspectRowsDebounced.value) {
+    if (row.heatLevel === 'hot') {
+      hot += 1
+    } else if (row.heatLevel === 'warm') {
+      warm += 1
+    } else {
+      cold += 1
+    }
+  }
+  return { hot, warm, cold }
+})
+
+const draftProspectTotal = computed(() => draftProspectRowsDebounced.value.length)
+
+onBeforeUnmount(() => {
+  if (draftProspectsDebounceTimer) {
+    clearTimeout(draftProspectsDebounceTimer)
+    draftProspectsDebounceTimer = null
+  }
+})
 
 function listingFeatureLabel(id: string): string {
   const o = LISTING_FEATURE_OPTIONS.find((f) => f.id === id)
@@ -2076,21 +2207,16 @@ function prospectsHeatCountsForListing(item: AgencyListingItem): ProspectHeatCou
     return cached
   }
   const rows = buildProspectRows(
-    criteriaFromLocationQuery({
-      projet: item.projectType,
-      ville: item.city || undefined,
-      types: item.propertyType || undefined,
-      pmin: undefined,
-      pmax: String(Math.max(0, item.price ?? 0)),
-      smin: String(Math.max(0, item.surface ?? 0)),
-      smax: undefined,
-      pimin: String(Math.max(1, item.rooms ?? 1)),
-      pimax: undefined,
-      chmin: (item.bedrooms ?? 0) > 0 ? String(item.bedrooms) : undefined,
-      chmax: undefined,
-      dpe: item.dpe ?? undefined,
-      eq: item.features.length ? item.features.join(',') : undefined,
-      page: undefined,
+    criteriaFromListingDraftFields({
+      projectType: item.projectType,
+      city: item.city ?? '',
+      propertyType: item.propertyType,
+      price: item.price ?? null,
+      surface: item.surface ?? null,
+      rooms: item.rooms ?? null,
+      bedrooms: item.bedrooms ?? null,
+      dpe: item.dpe ?? null,
+      featureSlugs: item.features,
     }),
     siteStore,
   )

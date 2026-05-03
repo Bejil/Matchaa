@@ -86,3 +86,83 @@
     display: none;
   }
 }
+
+/* Aperçu prospects (création / édition d’annonce) */
+.pro-listing-form__prospects-card {
+  margin: 0.35rem 0 1rem;
+  padding: 1.1rem 1.15rem 1.05rem;
+  border-radius: 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--color-accent, #db3846) 22%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent, #db3846) 5.5%, var(--color-surface));
+  box-shadow: 0 1px 0 rgb(17 24 39 / 0.04);
+}
+
+.pro-listing-form__prospects-card__intro {
+  min-width: 0;
+}
+
+.pro-listing-form__prospects-card__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: var(--color-text);
+}
+
+.pro-listing-form__prospects-card__laius {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.55;
+  color: var(--color-text-muted);
+}
+
+.pro-listing-form__prospects-card__laius strong {
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.pro-listing-form__prospects-card__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 1rem;
+}
+
+.pro-listing-form__prospects-card__pill {
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+
+.pro-listing-form__prospects-card__pill--hot {
+  color: #991b1b;
+  background: color-mix(in srgb, #fecaca 55%, transparent);
+  border-color: color-mix(in srgb, #f87171 45%, transparent);
+}
+
+.pro-listing-form__prospects-card__pill--warm {
+  color: #9a3412;
+  background: color-mix(in srgb, #fed7aa 55%, transparent);
+  border-color: color-mix(in srgb, #fb923c 40%, transparent);
+}
+
+.pro-listing-form__prospects-card__pill--cold {
+  color: var(--color-text-muted);
+  background: rgb(17 24 39 / 0.05);
+  border-color: var(--color-border);
+  font-weight: 600;
+}
+
+.pro-listing-form__prospects-card__empty {
+  margin: 0.85rem 0 0;
+  font-size: 0.84rem;
+  line-height: 1.55;
+  color: var(--color-text-muted);
+}
+
+.pro-listing-form__prospects-card__empty strong {
+  color: var(--color-text);
+}

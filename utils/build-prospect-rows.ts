@@ -2,7 +2,7 @@ import type { AnnoncesParsedQuery } from '~/composables/useAnnoncesSearch'
 import { parseAnnoncesQuery } from '~/composables/useAnnoncesSearch'
 import type { LocationQuery } from 'vue-router'
 import type { SearchListing } from '~/data/mock-listings'
-import { labelForPropertyType } from '~/data/property-types'
+import { labelForPropertyType, type PropertyTypeSlug } from '~/data/property-types'
 import {
   maxProximityFromMessagedListings,
   proximityFromParsedQuery,
@@ -83,6 +83,49 @@ export function criteriaFromParsed(p: AnnoncesParsedQuery): ProspectsCriteria {
 
 export function criteriaFromLocationQuery(q: LocationQuery): ProspectsCriteria {
   return criteriaFromParsed(parseAnnoncesQuery(q))
+}
+
+/** Critères « appétence » alignés sur une fiche annonce (brouillon ou publiée) — même logique que le filtre prospects. */
+export function criteriaFromListingDraftFields(input: {
+  projectType: 'acheter' | 'louer'
+  city: string
+  propertyType: PropertyTypeSlug
+  price: number | null
+  surface: number | null
+  rooms: number | null
+  bedrooms: number | null
+  dpe?: string | null
+  featureSlugs?: string[]
+}): ProspectsCriteria {
+  const price = input.price != null && Number.isFinite(input.price) && input.price > 0
+    ? Math.max(0, Math.round(input.price))
+    : null
+  const surface = input.surface != null && Number.isFinite(input.surface) && input.surface > 0
+    ? Math.max(0, Math.round(input.surface))
+    : null
+  const rooms = input.rooms != null && Number.isFinite(input.rooms) && input.rooms > 0
+    ? Math.max(1, Math.round(input.rooms))
+    : null
+  const bedrooms = input.bedrooms != null && Number.isFinite(input.bedrooms) && input.bedrooms > 0
+    ? Math.round(input.bedrooms)
+    : null
+  const q: LocationQuery = {
+    projet: input.projectType,
+    ville: input.city?.trim() || undefined,
+    types: input.propertyType || undefined,
+    pmin: undefined,
+    pmax: price != null ? String(price) : undefined,
+    smin: surface != null ? String(surface) : undefined,
+    smax: undefined,
+    pimin: rooms != null ? String(rooms) : undefined,
+    pimax: undefined,
+    chmin: bedrooms != null ? String(bedrooms) : undefined,
+    chmax: undefined,
+    dpe: input.dpe?.trim() || undefined,
+    eq: input.featureSlugs?.length ? input.featureSlugs.join(',') : undefined,
+    page: undefined,
+  }
+  return criteriaFromLocationQuery(q)
 }
 
 function uniqQueriesForProspect(input: {
