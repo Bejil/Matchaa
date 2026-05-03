@@ -87,49 +87,19 @@
   }
 }
 
-/* Aperçu prospects (création / édition d’annonce) */
-.pro-listing-form__prospects-card {
-  margin: 0.35rem 0 1rem;
-  padding: 1.1rem 1.15rem 1.05rem;
-  border-radius: 0.85rem;
-  border: 1px solid color-mix(in srgb, var(--color-accent, #db3846) 22%, var(--color-border));
-  background: color-mix(in srgb, var(--color-accent, #db3846) 5.5%, var(--color-surface));
-  box-shadow: 0 1px 0 rgb(17 24 39 / 0.04);
+/* Aperçu prospects (création / édition) — même base que annonces-save + pastilles */
+.pro-listing-form .pro-listing-form__prospects-save.annonces-save {
+  margin: 0.35rem 0 1.15rem;
 }
 
-.pro-listing-form__prospects-card__intro {
-  min-width: 0;
-}
-
-.pro-listing-form__prospects-card__title {
-  margin: 0 0 0.5rem;
-  font-size: 1.35rem;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 1.15;
-  color: var(--color-text);
-}
-
-.pro-listing-form__prospects-card__laius {
-  margin: 0;
-  font-size: 0.84rem;
-  line-height: 1.55;
-  color: var(--color-text-muted);
-}
-
-.pro-listing-form__prospects-card__laius strong {
-  color: var(--color-text);
-  font-weight: 700;
-}
-
-.pro-listing-form__prospects-card__pills {
+.pro-listing-form__prospects-pills {
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
-  margin-top: 1rem;
+  margin-top: 0.85rem;
 }
 
-.pro-listing-form__prospects-card__pill {
+.pro-listing-form__prospect-pill {
   padding: 0.35rem 0.65rem;
   border-radius: 999px;
   font-size: 0.8rem;
@@ -137,32 +107,33 @@
   border: 1px solid transparent;
 }
 
-.pro-listing-form__prospects-card__pill--hot {
+.pro-listing-form__prospect-pill--hot {
   color: #991b1b;
   background: color-mix(in srgb, #fecaca 55%, transparent);
   border-color: color-mix(in srgb, #f87171 45%, transparent);
 }
 
-.pro-listing-form__prospects-card__pill--warm {
+.pro-listing-form__prospect-pill--warm {
   color: #9a3412;
   background: color-mix(in srgb, #fed7aa 55%, transparent);
   border-color: color-mix(in srgb, #fb923c 40%, transparent);
 }
 
-.pro-listing-form__prospects-card__pill--cold {
+.pro-listing-form__prospect-pill--cold {
   color: var(--color-text-muted);
   background: rgb(17 24 39 / 0.05);
   border-color: var(--color-border);
   font-weight: 600;
 }
 
-.pro-listing-form__prospects-card__empty {
+.pro-listing-form__prospects-empty-note {
   margin: 0.85rem 0 0;
-  font-size: 0.84rem;
+  font-size: 0.875rem;
   line-height: 1.55;
   color: var(--color-text-muted);
 }
 
-.pro-listing-form__prospects-card__empty strong {
+.pro-listing-form__prospects-empty-note strong {
   color: var(--color-text);
+  font-weight: 700;
 }

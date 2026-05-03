@@ -80,6 +80,8 @@
             </dl>
           </section>
 
+          <ListingDetailLocationSection :listing-id="listing.id" :city="listing.city" />
+
           <section class="annonce-detail__section" aria-labelledby="ann-energy">
             <h2 id="ann-energy">Performance énergétique</h2>
             <p class="annonce-detail__section-lead">
@@ -396,6 +398,7 @@
 </template>
 
 <script setup lang="ts">
+import ListingDetailLocationSection from '~/components/listing/ListingDetailLocationSection.vue'
 import AppCenterModal from '~/components/ui/AppCenterModal.vue'
 import { formatListingPrice } from '~/composables/useAnnoncesSearch'
 import { editoArticles } from '~/data/articles'

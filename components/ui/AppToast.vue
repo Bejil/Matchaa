@@ -150,8 +150,8 @@ onBeforeUnmount(() => {
 }
 
 .app-toast--success {
-  border: 1px solid #6fb79a;
-  background: linear-gradient(135deg, #2d6a4f 0%, #1f5a42 100%);
+  border: 1px solid #f5a8b0;
+  background: linear-gradient(135deg, #db3846 0%, #9f1e2e 100%);
   color: #fff;
 }
 

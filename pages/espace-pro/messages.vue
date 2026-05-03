@@ -20,7 +20,7 @@
                 :key="thread.id"
                 class="conversation-list__item"
                 :class="{ 'is-active': activeProThread?.id === thread.id }"
-                @click="selectedProThreadId = thread.id"
+                @click="selectProThread(thread.id)"
               >
                 <span class="conversation-list__title-wrap">
                   <span v-if="thread.unreadPro > 0" class="conversation-list__dot" aria-hidden="true" />
@@ -209,6 +209,8 @@ import type { SearchListing } from '~/data/mock-listings'
 import { labelForPropertyType } from '~/data/property-types'
 import { formatListingPrice } from '~/composables/useAnnoncesSearch'
 const siteStore = useSiteStore()
+const route = useRoute()
+const router = useRouter()
 const proMessageThreads = computed(() => siteStore.currentProMessageThreads)
 const selectedProThreadId = ref<string | null>(null)
 const proThreadDraft = ref('')
@@ -222,11 +224,58 @@ const deleteThreadConfirmOpen = ref(false)
 const threadToDeleteId = ref<string | null>(null)
 const previewModalOpen = ref(false)
 const previewListingId = ref<string | null>(null)
-const activeProThread = computed(() =>
-  proMessageThreads.value.find((t) => t.id === selectedProThreadId.value)
-  ?? proMessageThreads.value[0]
-  ?? null,
-)
+const activeProThread = computed(() => {
+  const id = selectedProThreadId.value
+  if (!id) {
+    return null
+  }
+  return proMessageThreads.value.find((t) => t.id === id) ?? null
+})
+
+function threadIdFromRouteQuery(): string | null {
+  const raw = route.query.thread
+  const id = typeof raw === 'string' ? raw.trim() : Array.isArray(raw) ? (raw[0]?.trim() ?? '') : ''
+  return id || null
+}
+
+function replaceMessagesQuery(query: Record<string, string>) {
+  if (!import.meta.client) {
+    return
+  }
+  void router.replace({ path: '/espace-pro/messages', query })
+}
+
+function selectProThread(threadId: string) {
+  selectedProThreadId.value = threadId
+  replaceMessagesQuery({ thread: threadId })
+}
+
+function syncSelectedThreadFromRouteAndList() {
+  const threads = proMessageThreads.value
+  if (!threads.length) {
+    selectedProThreadId.value = null
+    if (threadIdFromRouteQuery()) {
+      replaceMessagesQuery({})
+    }
+    return
+  }
+  const q = threadIdFromRouteQuery()
+  if (q) {
+    if (threads.some((t) => t.id === q)) {
+      selectedProThreadId.value = q
+      return
+    }
+    const fallback = threads[0].id
+    selectedProThreadId.value = fallback
+    replaceMessagesQuery({ thread: fallback })
+    return
+  }
+  if (selectedProThreadId.value && threads.some((t) => t.id === selectedProThreadId.value)) {
+    return
+  }
+  selectedProThreadId.value = threads[0].id
+  replaceMessagesQuery({ thread: threads[0].id })
+}
 
 const listingById = computed(() => {
   siteStore.ensureProListingsLoadedForPublic()
@@ -275,10 +324,6 @@ useProRouteGuard()
 
 useHead({
   title: 'Messages — Espace Pro Matchaa',
-})
-
-onMounted(() => {
-  siteStore.hydrateProSession()
 })
 
 // Marquage en "lu" uniquement sur le thread actif (et via le bouton dédié),
@@ -369,9 +414,16 @@ function confirmDeleteThread() {
     deleteThreadConfirmOpen.value = false
     return
   }
-  siteStore.deleteMessageThread(threadToDeleteId.value)
+  const deletedId = threadToDeleteId.value
+  siteStore.deleteMessageThread(deletedId)
   threadToDeleteId.value = null
   deleteThreadConfirmOpen.value = false
+  if (selectedProThreadId.value === deletedId) {
+    selectedProThreadId.value = null
+  }
+  nextTick(() => {
+    syncSelectedThreadFromRouteAndList()
+  })
 }
 
 function toggleThreadMenu(threadId: string) {
@@ -385,6 +437,8 @@ function closeThreadMenuOnOutsideClick() {
 }
 
 onMounted(() => {
+  siteStore.hydrateProSession()
+  syncSelectedThreadFromRouteAndList()
   window.addEventListener('click', closeThreadMenuOnOutsideClick)
 })
 
@@ -405,17 +459,11 @@ function selectListingToSend(item: SearchListing) {
 }
 
 watch(
-  () => proMessageThreads.value,
-  (threads) => {
-    if (!threads.length) {
-      selectedProThreadId.value = null
-      return
-    }
-    if (!selectedProThreadId.value || !threads.some((t) => t.id === selectedProThreadId.value)) {
-      selectedProThreadId.value = threads[0].id
-    }
+  () => [proMessageThreads.value, route.query.thread] as const,
+  () => {
+    syncSelectedThreadFromRouteAndList()
   },
-  { immediate: true },
+  { immediate: true, deep: true },
 )
 
 watch(

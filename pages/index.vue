@@ -66,23 +66,6 @@
     </section>
 
     <div class="home-main">
-      <section class="home-trust" aria-label="Chiffres">
-        <div class="home-trust__inner">
-          <div class="home-trust__item">
-            <span class="home-trust__value">12k+</span>
-            <span class="home-trust__label">Annonces vérifiées (démo)</span>
-          </div>
-          <div class="home-trust__item">
-            <span class="home-trust__value">48</span>
-            <span class="home-trust__label">Villes couvertes</span>
-          </div>
-          <div class="home-trust__item">
-            <span class="home-trust__value">4,8</span>
-            <span class="home-trust__label">Satisfaction utilisateurs</span>
-          </div>
-        </div>
-      </section>
-
       <section class="home-section" aria-labelledby="home-listings-title">
         <div class="home-section__head">
           <div>
@@ -242,6 +225,93 @@
           </div>
         </div>
       </section>
+
+      <section class="home-section home-section--testimonials" aria-labelledby="home-testimonials-title">
+        <div class="home-section__head">
+          <div>
+            <p class="home-section__eyebrow">Témoignages</p>
+            <h2 id="home-testimonials-title" class="home-section__title">Ils ont trouvé avec Matchaa</h2>
+            <p class="home-section__lead">
+              Retours fictifs pour illustrer la confiance autour du parcours de recherche, des annonces et des professionnels.
+            </p>
+          </div>
+        </div>
+        <p id="home-testimonials-carousel-label" class="home-testimonials-marquee__sr-only">
+          Défilement automatique des avis — survolez pour mettre en pause.
+        </p>
+        <div
+          class="home-testimonials-marquee"
+          role="region"
+          aria-labelledby="home-testimonials-title"
+          aria-describedby="home-testimonials-carousel-label"
+        >
+          <div class="home-testimonials-marquee__viewport">
+            <div class="home-testimonials-marquee__track">
+              <ul class="home-testimonials-marquee__chunk" role="list">
+                <li
+                  v-for="item in homeTestimonials"
+                  :key="`a-${item.id}`"
+                  class="home-testimonials-marquee__cell"
+                  role="listitem"
+                >
+                  <figure class="home-testimonial-card">
+                    <div class="home-testimonial-card__top">
+                      <span class="home-testimonial-card__avatar" aria-hidden="true">{{ item.initials }}</span>
+                      <div class="home-testimonial-card__headtext">
+                        <div class="home-testimonial-card__stars" aria-hidden="true">
+                          <span
+                            v-for="s in 5"
+                            :key="s"
+                            class="home-testimonial-card__star"
+                            :class="{ 'is-filled': s <= item.stars }"
+                          >★</span>
+                        </div>
+                        <div class="home-testimonial-card__who">
+                          <span class="home-testimonial-card__author">{{ item.author }}</span>
+                          <span class="home-testimonial-card__role">{{ item.role }}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <blockquote class="home-testimonial-card__quote">
+                      <p>«&nbsp;{{ item.quote }}&nbsp;»</p>
+                    </blockquote>
+                  </figure>
+                </li>
+              </ul>
+              <ul class="home-testimonials-marquee__chunk" role="presentation" aria-hidden="true">
+                <li
+                  v-for="item in homeTestimonials"
+                  :key="`b-${item.id}`"
+                  class="home-testimonials-marquee__cell"
+                >
+                  <figure class="home-testimonial-card">
+                    <div class="home-testimonial-card__top">
+                      <span class="home-testimonial-card__avatar" aria-hidden="true">{{ item.initials }}</span>
+                      <div class="home-testimonial-card__headtext">
+                        <div class="home-testimonial-card__stars" aria-hidden="true">
+                          <span
+                            v-for="s in 5"
+                            :key="s"
+                            class="home-testimonial-card__star"
+                            :class="{ 'is-filled': s <= item.stars }"
+                          >★</span>
+                        </div>
+                        <div class="home-testimonial-card__who">
+                          <span class="home-testimonial-card__author">{{ item.author }}</span>
+                          <span class="home-testimonial-card__role">{{ item.role }}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <blockquote class="home-testimonial-card__quote">
+                      <p>«&nbsp;{{ item.quote }}&nbsp;»</p>
+                    </blockquote>
+                  </figure>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
 
     <AppCenterModal
@@ -321,6 +391,55 @@ function selectCommune(c: CommuneResult) {
 }
 
 const featuredArticles = editoArticles.slice(0, 6)
+
+/** Témoignages de démonstration (contenu fictif). */
+const homeTestimonials = [
+  {
+    id: 't1',
+    initials: 'CM',
+    stars: 5 as const,
+    quote:
+      'J’ai trouvé mon appartement très rapidement : critères simples, annonces cohérentes avec la visite, et une agence qui a pris le temps de m’expliquer le dossier.',
+    author: 'Claire M.',
+    role: 'Locataire · Toulouse',
+  },
+  {
+    id: 't2',
+    initials: 'JL',
+    stars: 5 as const,
+    quote:
+      'Le site est agréable à parcourir. Les fiches sont complètes (DPE, charges, quartier) : on sait tout de suite si le bien vaut le déplacement.',
+    author: 'Jean-Rémy L.',
+    role: 'Acheteur · Nantes',
+  },
+  {
+    id: 't3',
+    initials: 'SV',
+    stars: 4 as const,
+    quote:
+      'Notre agence reçoit des demandes mieux cadrées : moins de messages vagues, des visiteurs qui ont déjà filtré ce qui les intéresse.',
+    author: 'Sandrine V.',
+    role: 'Agent immobilier · Lyon',
+  },
+  {
+    id: 't4',
+    initials: 'AK',
+    stars: 5 as const,
+    quote:
+      'J’ai loué ma première colocation sans stress : favoris partagés avec ma coloc, et rappels sur les annonces qui correspondaient vraiment à notre budget.',
+    author: 'Amine K.',
+    role: 'Étudiant · Montpellier',
+  },
+  {
+    id: 't5',
+    initials: 'ÉP',
+    stars: 5 as const,
+    quote:
+      'Les annonces sont mises à jour et les photos reflètent le bien. J’ai signé après deux visites — rare sur les sites où tout est « à titre indicatif ».',
+    author: 'Élodie P.',
+    role: 'Acheteuse · Bordeaux',
+  },
+] as const
 
 const contactModalOpen = ref(false)
 const contactListing = ref<SearchListing | null>(null)

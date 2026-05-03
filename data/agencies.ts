@@ -20,7 +20,7 @@ export type Agency = {
 
 function logoForName(name: string): string {
   const encoded = encodeURIComponent(name.slice(0, 24))
-  return `https://ui-avatars.com/api/?name=${encoded}&size=128&background=e8f2ec&color=1a1a1a&bold=true`
+  return `https://ui-avatars.com/api/?name=${encoded}&size=128&background=fce8ea&color=1a1a1a&bold=true`
 }
 
 export const MOCK_AGENCIES: Agency[] = [

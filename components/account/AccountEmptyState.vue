@@ -2,13 +2,13 @@
   <section class="account-empty">
     <div class="account-empty__image" aria-hidden="true">
       <svg viewBox="0 0 160 120" role="presentation">
-        <rect x="10" y="18" width="140" height="92" rx="12" fill="#f3f8f4" />
-        <rect x="22" y="30" width="62" height="8" rx="4" fill="#d2e8d8" />
-        <rect x="22" y="44" width="95" height="6" rx="3" fill="#dce9df" />
-        <rect x="22" y="54" width="80" height="6" rx="3" fill="#dce9df" />
-        <circle cx="124" cy="56" r="18" fill="#d2e8d8" />
-        <path d="M124 46v10h8" stroke="#2d6a4f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-        <circle cx="124" cy="56" r="2.5" fill="#2d6a4f" />
+        <rect x="10" y="18" width="140" height="92" rx="12" fill="#fdf2f3" />
+        <rect x="22" y="30" width="62" height="8" rx="4" fill="#f5cbd1" />
+        <rect x="22" y="44" width="95" height="6" rx="3" fill="#fadce0" />
+        <rect x="22" y="54" width="80" height="6" rx="3" fill="#fadce0" />
+        <circle cx="124" cy="56" r="18" fill="#f5cbd1" />
+        <path d="M124 46v10h8" stroke="#db3846" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+        <circle cx="124" cy="56" r="2.5" fill="#db3846" />
       </svg>
     </div>
     <h3 class="account-empty__title">{{ title }}</h3>

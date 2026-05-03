@@ -4,7 +4,7 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, #e8eef0 0%, #f2f5f4 38%, #f7f8f7 100%);
+  background: linear-gradient(180deg, #f0e8ea 0%, #f6f1f2 38%, #faf7f8 100%);
   color: var(--color-text);
 }
 
@@ -19,7 +19,7 @@
   position: sticky;
   top: 0;
   z-index: 80;
-  background: linear-gradient(180deg, #0f2a27 0%, #143d36 100%);
+  background: linear-gradient(180deg, #2a1014 0%, #451820 100%);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
 }
@@ -40,7 +40,7 @@
   gap: 0.5rem;
   flex-shrink: 0;
   text-decoration: none;
-  color: #f4faf7;
+  color: #fdf5f6;
 }
 
 .pro-header__brand:hover {
@@ -72,7 +72,7 @@
   text-transform: uppercase;
   border-radius: 0.3rem;
   background: rgba(212, 232, 222, 0.22);
-  color: #b8e0cc;
+  color: #f5c2c8;
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
@@ -100,7 +100,7 @@
 .pro-header__link {
   font-weight: 500;
   font-size: 0.9375rem;
-  color: rgba(244, 250, 247, 0.92);
+  color: rgba(253, 245, 246, 0.92);
   text-decoration: none;
   white-space: nowrap;
   border-bottom: 2px solid transparent;
@@ -114,7 +114,7 @@
 
 .pro-header__link.is-active {
   color: #fff;
-  border-bottom-color: #7ecfae;
+  border-bottom-color: #fca5a5;
 }
 
 .pro-header__link--prospects {
@@ -152,7 +152,7 @@
   font-size: 0.65rem;
   font-weight: 800;
   line-height: 1;
-  box-shadow: 0 0 0 2px rgba(15, 42, 30, 0.95);
+  box-shadow: 0 0 0 2px rgba(42, 16, 20, 0.95);
 }
 
 .pro-header__prospect-badge__n {
@@ -198,7 +198,7 @@
 }
 
 .pro-header__link--muted {
-  color: rgba(244, 250, 247, 0.88);
+  color: rgba(253, 245, 246, 0.88);
   font-weight: 500;
   display: inline-flex;
   align-items: center;

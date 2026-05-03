@@ -20,7 +20,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--color-accent);
+  color: var(--color-accent-secondary);
 }
 
 .edito-list__title {
@@ -131,7 +131,7 @@
 
 .edito-article__cat {
   font-weight: 700;
-  color: var(--color-accent);
+  color: var(--color-accent-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
