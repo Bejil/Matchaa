@@ -1,12 +1,12 @@
 <template>
-  <div class="layout">
-    <AppHeader v-if="!isEmbedPreview" />
-    <main class="layout__main">
+  <div class="pro-layout">
+    <ProAppHeader />
+    <main class="pro-layout__main">
       <slot />
     </main>
-    <AppFooter v-if="!isEmbedPreview" />
+    <AppFooter />
     <AppCenterModal
-      v-if="desktopPushPromptSource === 'public'"
+      v-if="desktopPushPromptSource === 'pro'"
       v-model="desktopPushPromptOpen"
       title="Activer les notifications desktop"
       size="sm"
@@ -21,65 +21,44 @@
             <circle cx="90" cy="36" r="10" class="desktop-push-modal__illu-dot" />
           </svg>
         </div>
-        <p class="desktop-push-modal__title">Ne manquez aucun message</p>
+        <p class="desktop-push-modal__title">Ne manquez aucun prospect</p>
         <p class="desktop-push-modal__text">
-          <template v-if="desktopPushPermission === 'denied'">
-            Les notifications sont actuellement bloquées par votre navigateur. Autorisez-les dans les réglages du site pour recevoir les nouveaux messages.
-          </template>
-          <template v-else>
-            Activez les notifications pour être informé immédiatement des nouveaux messages, même si l’onglet Matchaa n’est pas au premier plan.
-          </template>
+          Activez les notifications pour être alerté des nouveaux messages prospects dès leur arrivée.
         </p>
-        <div v-if="desktopPushPermission === 'denied'" class="desktop-push-modal__help">
-          <p class="desktop-push-modal__help-title">Comment réactiver</p>
-          <ul class="desktop-push-modal__help-list">
-            <li><strong>Chrome</strong> : icône cadenas dans la barre d’adresse → Notifications → Autoriser.</li>
-            <li><strong>Safari</strong> : Réglages du site web pour ce domaine → Notifications → Autoriser.</li>
-            <li><strong>Firefox</strong> : icône permissions dans la barre d’adresse → Notifications → Autoriser.</li>
-          </ul>
-        </div>
       </div>
       <div class="compte-settings__confirm-actions desktop-push-modal__actions">
         <button type="button" class="profil-account__btn profil-account__btn--ghost" @click="desktopPush.closePermissionPrompt()">
           Plus tard
         </button>
-        <button type="button" class="profil-account__btn profil-account__btn--primary" @click="onEnableDesktopPushClick">
-          {{ desktopPushPermission === 'denied' ? 'Compris' : 'Activer les notifications' }}
+        <button type="button" class="profil-account__btn profil-account__btn--primary" @click="desktopPush.confirmPermissionFromPrompt()">
+          Activer les notifications
         </button>
       </div>
     </AppCenterModal>
     <AppToast
       :visible="incomingToastVisible"
-      title="Nouveau message"
-      message="Vous avez reçu un nouveau message."
+      title="Nouveau message prospect"
+      message="Un prospect vous a envoyé un message."
       variant="info"
     />
   </div>
 </template>
 
 <script setup lang="ts">
+import ProAppHeader from '~/components/pro/ProAppHeader.vue'
 import AppCenterModal from '~/components/ui/AppCenterModal.vue'
 import AppToast from '~/components/ui/AppToast.vue'
-const route = useRoute()
-const isEmbedPreview = computed(() => route.query.embed === '1')
+
 const siteStore = useSiteStore()
 const desktopPush = useDesktopPush()
 const desktopPushPromptOpen = desktopPush.promptOpen
 const desktopPushPromptSource = desktopPush.promptSource
-const desktopPushPermission = computed(() => desktopPush.permission())
 const incomingToastVisible = ref(false)
 let incomingToastTimer: ReturnType<typeof setTimeout> | null = null
 
-async function onEnableDesktopPushClick() {
-  if (desktopPushPermission.value === 'denied') {
-    desktopPush.closePermissionPrompt()
-    return
-  }
-  await desktopPush.confirmPermissionFromPrompt()
-}
-
 onMounted(() => {
-  siteStore.hydrateSession()
+  siteStore.hydrateProSession()
+  desktopPush.openPermissionPromptIfNeeded('pro')
   window.addEventListener('matchaa:incoming-message', onIncomingMessage as EventListener)
   window.addEventListener('storage', onIncomingMessageStorage)
 })
@@ -92,21 +71,21 @@ onBeforeUnmount(() => {
 function onIncomingMessage(event: Event) {
   const custom = event as CustomEvent<{
     recipient?: string
-    publicEmail?: string
+    proAgencyId?: string
   }>
-  const email = siteStore.currentUser?.email?.trim().toLowerCase()
-  if (!email) {
+  const agencyId = siteStore.currentProUser?.agencyId
+  if (!agencyId) {
     return
   }
-  if (custom.detail?.recipient !== 'public') {
+  if (custom.detail?.recipient !== 'pro') {
     return
   }
-  if ((custom.detail?.publicEmail ?? '').trim().toLowerCase() !== email) {
+  if ((custom.detail?.proAgencyId ?? '') !== agencyId) {
     return
   }
   desktopPush.notify({
-    title: 'Matchaa - Nouveau message',
-    body: 'Vous avez reçu un nouveau message d’une agence.',
+    title: 'Matchaa - Nouveau message prospect',
+    body: 'Un prospect vous a envoyé un message.',
   })
   incomingToastVisible.value = true
   if (incomingToastTimer) {
@@ -123,7 +102,7 @@ function onIncomingMessageStorage(event: StorageEvent) {
     return
   }
   try {
-    const detail = JSON.parse(event.newValue) as { recipient?: string; publicEmail?: string }
+    const detail = JSON.parse(event.newValue) as { recipient?: string; proAgencyId?: string }
     onIncomingMessage(new CustomEvent('matchaa:incoming-message', { detail }))
   } catch {
     /* ignore */

@@ -1,0 +1,53 @@
+.conversation-panel__composer--pro-actions-under {
+  grid-template-columns: 1fr;
+}
+
+.conversation-panel__composer-actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.conversation-panel__composer-actions--public {
+  grid-template-columns: 1fr auto;
+}
+
+.conversation-panel__composer-actions .conversation-panel__listing-pick {
+  grid-column: auto;
+}
+
+.conversation-panel__attach-btn {
+  width: auto;
+  justify-content: center;
+}
+
+.conversation-panel__send-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.conversation-panel__composer-actions .conversation-panel__hint--inline {
+  margin: 0;
+  grid-column: auto;
+  align-self: center;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .conversation-panel__composer-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .conversation-panel__composer-actions .conversation-panel__hint--inline {
+    order: 3;
+    white-space: normal;
+  }
+}

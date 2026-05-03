@@ -34,6 +34,8 @@
   height: 1.75rem;
   width: auto;
   flex-shrink: 0;
+  color: var(--color-accent);
+  fill: currentColor;
 }
 
 .header__logo {
@@ -51,6 +53,26 @@
 
 .header__nav--primary {
   flex-shrink: 0;
+}
+
+.header__nav--primary .header__link {
+  padding: 0.15rem 0;
+  border-bottom: 2px solid transparent;
+}
+
+.header__nav--primary .header__link.is-active {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+}
+
+.header__nav--account .header__link--muted {
+  padding: 0.15rem 0;
+  border-bottom: 2px solid transparent;
+}
+
+.header__nav--account .header__link--muted.is-active {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
 }
 
 .header__divider {
@@ -80,6 +102,86 @@
 .header__link--muted {
   color: var(--color-text-muted);
   font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.header__account-ic {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex-shrink: 0;
+}
+
+.header__messages-badge {
+  margin-left: 0.2rem;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0 0.26rem;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.header__fav-ic {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex-shrink: 0;
+}
+
+.header__favorites-badge {
+  margin-left: 0.15rem;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0 0.26rem;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.header__account-menu {
+  position: relative;
+  padding-bottom: 0.45rem;
+  margin-bottom: -0.45rem;
+}
+
+.header__account-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  min-width: 13rem;
+  padding: 0.45rem;
+  border-radius: 0.6rem;
+  border: 1px solid var(--color-border);
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(26, 26, 26, 0.12);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 60;
+}
+
+.header__account-dropdown.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.header__account-dropdown .account-nav {
+  gap: 0.2rem;
 }
 
 .header__link--cta {

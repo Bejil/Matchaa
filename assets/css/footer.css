@@ -32,9 +32,11 @@
 
 .footer__logo-mark {
   display: block;
+  width: 2.5rem;
   height: 1.75rem;
-  width: auto;
   flex-shrink: 0;
+  color: var(--color-accent);
+  fill: currentColor;
 }
 
 .footer__logo {

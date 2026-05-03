@@ -1,0 +1,249 @@
+/* Layout shell — espace professionnel */
+
+.pro-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #e8eef0 0%, #f2f5f4 38%, #f7f8f7 100%);
+  color: var(--color-text);
+}
+
+.pro-layout__main {
+  flex: 1;
+  width: 100%;
+}
+
+/* Pro header : même hauteur minimale que le header public (--header-height) */
+
+.pro-header {
+  position: sticky;
+  top: 0;
+  z-index: 80;
+  background: linear-gradient(180deg, #0f2a27 0%, #143d36 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
+}
+
+.pro-header__inner {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 1.25rem;
+  min-height: var(--header-height);
+  display: flex;
+  align-items: center;
+  gap: 2.5rem;
+}
+
+.pro-header__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  text-decoration: none;
+  color: #f4faf7;
+}
+
+.pro-header__brand:hover {
+  text-decoration: none;
+  color: #fff;
+}
+
+.pro-header__logo-mark {
+  display: block;
+  height: 1.75rem;
+  width: auto;
+  flex-shrink: 0;
+  filter: brightness(0) invert(1);
+  opacity: 0.92;
+}
+
+.pro-header__wordmark {
+  font-weight: 700;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+}
+
+.pro-header__badge {
+  margin-left: 0.15rem;
+  padding: 0.12rem 0.45rem;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 0.3rem;
+  background: rgba(212, 232, 222, 0.22);
+  color: #b8e0cc;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.pro-header__divider {
+  flex: 1;
+  min-width: 1rem;
+}
+
+.pro-header__nav {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.pro-header__nav--primary {
+  flex-shrink: 0;
+}
+
+.pro-header__nav--account {
+  flex-shrink: 0;
+  margin-left: auto;
+  gap: 2rem;
+}
+
+.pro-header__link {
+  font-weight: 500;
+  font-size: 0.9375rem;
+  color: rgba(244, 250, 247, 0.92);
+  text-decoration: none;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  padding: 0.15rem 0;
+}
+
+.pro-header__link:hover {
+  color: #fff;
+  text-decoration: none;
+}
+
+.pro-header__link.is-active {
+  color: #fff;
+  border-bottom-color: #7ecfae;
+}
+
+.pro-header__link--prospects {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.pro-header__link--annonces {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.pro-header__link--messages {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.pro-header__link-text {
+  display: inline-block;
+}
+
+.pro-header__prospect-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.28rem;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 0 0 2px rgba(15, 42, 30, 0.95);
+}
+
+.pro-header__prospect-badge__n {
+  font-variant-numeric: tabular-nums;
+}
+
+.pro-header__prospect-total-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.28rem;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.95);
+  color: #334155;
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.pro-header__prospect-total-badge__n {
+  font-variant-numeric: tabular-nums;
+}
+
+.pro-header__annonces-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.28rem;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.95);
+  color: #334155;
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.pro-header__annonces-badge__n {
+  font-variant-numeric: tabular-nums;
+}
+
+.pro-header__link--muted {
+  color: rgba(244, 250, 247, 0.88);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.pro-header__link--muted:hover {
+  color: #fff;
+}
+
+.pro-header__account-ic {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex-shrink: 0;
+}
+
+.pro-header__link--cta {
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: #fff;
+  font-weight: 600;
+  border-bottom: none;
+}
+
+.pro-header__link--cta:hover {
+  background: var(--color-accent-hover);
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  .pro-header__inner {
+    flex-wrap: wrap;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .pro-header__divider {
+    order: 3;
+    flex: 1 1 100%;
+    min-height: 0;
+  }
+
+  .pro-header__nav--account {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
