@@ -90,7 +90,85 @@
         </template>
         <NuxtLink :to="espaceProLink" class="header__link header__link--cta">Espace Pro</NuxtLink>
       </nav>
+
+      <div class="header__mobile-actions" aria-label="Actions principales">
+        <NuxtLink
+          v-if="!currentUser"
+          to="/favoris"
+          class="header__icon-link"
+          :class="{ 'is-active': favorisNavActive }"
+          aria-label="Favoris"
+        >
+          <svg class="header__mobile-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+          </svg>
+          <span
+            v-if="favoriteCount > 0"
+            class="header__mobile-badge"
+            :aria-label="favoriteCount === 1 ? '1 favori' : `${favoriteCount} favoris`"
+          >
+            {{ favoriteCount > 9 ? '9+' : favoriteCount }}
+          </span>
+        </NuxtLink>
+
+        <NuxtLink
+          :to="accountLink"
+          class="header__icon-link"
+          :class="{ 'is-active': accountNavActive }"
+          aria-label="Compte"
+        >
+          <svg class="header__mobile-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="12" cy="8" r="4" />
+            <path d="M4 20c1.2-3.7 4.1-5.5 8-5.5s6.8 1.8 8 5.5" />
+          </svg>
+          <span
+            v-if="messagesCount > 0"
+            class="header__mobile-badge header__mobile-badge--alert"
+            :aria-label="messagesCount === 1 ? '1 nouveau message' : `${messagesCount} nouveaux messages`"
+          >
+            {{ messagesCount > 9 ? '9+' : messagesCount }}
+          </span>
+        </NuxtLink>
+
+        <button
+          type="button"
+          class="header__icon-link header__icon-link--burger"
+          :aria-expanded="mobileMenuOpen ? 'true' : 'false'"
+          aria-controls="mobile-main-menu"
+          aria-label="Ouvrir le menu principal"
+          @click="toggleMobileMenu"
+        >
+          <svg v-if="!mobileMenuOpen" class="header__mobile-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+          <svg v-else class="header__mobile-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
     </div>
+    <nav
+      id="mobile-main-menu"
+      class="header__mobile-menu"
+      :class="{ 'is-open': mobileMenuOpen }"
+      aria-label="Navigation principale mobile"
+    >
+      <NuxtLink to="/edito" class="header__mobile-menu-link" :class="{ 'is-active': navEditoActive }" @click="closeMobileMenu">
+        Conseils & actualites
+      </NuxtLink>
+      <NuxtLink to="/annonces?projet=acheter" class="header__mobile-menu-link" :class="{ 'is-active': navAcheterActive }" @click="closeMobileMenu">
+        Acheter
+      </NuxtLink>
+      <NuxtLink to="/annonces?projet=louer" class="header__mobile-menu-link" :class="{ 'is-active': navLouerActive }" @click="closeMobileMenu">
+        Louer
+      </NuxtLink>
+      <NuxtLink :to="espaceProLink" class="header__mobile-menu-link" @click="closeMobileMenu">
+        Espace Pro
+      </NuxtLink>
+    </nav>
   </header>
 </template>
 
@@ -151,6 +229,7 @@ const alertSearchCount = computed(() => siteStore.savedSearches.length)
 const messagesCount = computed(() => siteStore.publicUnreadMessagesCount)
 const favoriteCount = computed(() => favoritesStore.ids.length)
 const accountMenuOpen = ref(false)
+const mobileMenuOpen = ref(false)
 
 function openAccountMenu() {
   accountMenuOpen.value = true
@@ -164,6 +243,14 @@ function onSelectAccountMenuItem() {
   closeAccountMenu()
 }
 
+function toggleMobileMenu() {
+  mobileMenuOpen.value = !mobileMenuOpen.value
+}
+
+function closeMobileMenu() {
+  mobileMenuOpen.value = false
+}
+
 const espaceProLink = computed(() =>
   siteStore.currentProUser ? '/espace-pro/dashboard' : '/espace-pro',
 )
@@ -173,4 +260,11 @@ onMounted(() => {
   siteStore.hydrateProSession()
   favoritesStore.loadFromStorage()
 })
+
+watch(
+  () => route.fullPath,
+  () => {
+    mobileMenuOpen.value = false
+  },
+)
 </script>

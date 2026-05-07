@@ -51,3 +51,11 @@
     white-space: normal;
   }
 }
+
+@media (max-width: 640px) {
+  .conversation-panel__attach-btn,
+  .conversation-panel__send-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

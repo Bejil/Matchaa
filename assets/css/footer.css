@@ -127,5 +127,16 @@
   .footer__inner {
     grid-template-columns: 1fr;
     gap: 2rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .footer__tagline {
+    max-width: 100%;
+  }
+
+  .footer__bottom {
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
 }

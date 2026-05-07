@@ -1,7 +1,31 @@
 <template>
   <div ref="filtersRootRef" class="annonces-filters">
     <div class="annonces-filters__inner">
-      <div class="annonces-filters__pills" role="toolbar" aria-label="Critères de recherche">
+      <div class="annonces-filters__mobile-row">
+        <button
+          type="button"
+          class="annonces-filters__mobile-toggle"
+          :aria-expanded="mobileFiltersOpen ? 'true' : 'false'"
+          aria-controls="annonces-mobile-filters-panel"
+          @click="openMobileFilters"
+        >
+          <span>Affiner</span>
+          <svg class="annonces-filters__chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M3 12h18" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M7 7h10" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M9 17h6" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+        <div v-if="$slots.actions" class="annonces-filters__actions">
+          <slot name="actions" />
+        </div>
+      </div>
+      <div
+        id="annonces-filters-pills"
+        class="annonces-filters__pills"
+        role="toolbar"
+        aria-label="Critères de recherche"
+      >
         <div class="annonces-filters__pill-wrap">
           <button
             ref="refProjet"
@@ -98,14 +122,166 @@
             </svg>
           </button>
         </div>
-        <div v-if="$slots.actions" class="annonces-filters__actions">
-          <slot name="actions" />
-        </div>
       </div>
     </div>
   </div>
 
   <ClientOnly>
+    <Teleport to="body">
+      <div
+        v-if="mobileFiltersOpen"
+        id="annonces-mobile-filters-panel"
+        class="annonces-mobile-filters"
+        role="dialog"
+        aria-modal="true"
+      >
+        <header class="annonces-mobile-filters__head">
+          <h2 class="annonces-mobile-filters__title">Affiner ma recherche</h2>
+          <button type="button" class="annonces-mobile-filters__close" @click="closeMobileFilters">Fermer</button>
+        </header>
+        <div class="annonces-mobile-filters__body">
+          <section class="annonces-mobile-filters__section">
+            <h3 class="annonces-mobile-filters__section-title">Projet et localisation</h3>
+            <div class="annonces-popover__segment" role="group" aria-label="Projet">
+              <button
+                v-for="opt in projetOptions"
+                :key="opt.value"
+                type="button"
+                class="annonces-popover__segment-btn"
+                :class="{ 'is-active': draft.projet === opt.value }"
+                @click="draft.projet = opt.value"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+            <label class="annonces-popover__field">
+              <span class="annonces-popover__label">Ville ou code postal</span>
+              <div class="annonces-popover__location">
+                <input
+                  v-model="draft.ville"
+                  type="search"
+                  class="annonces-popover__input"
+                  placeholder="Ex. Lyon, 69001…"
+                  autocomplete="off"
+                  @input="onDraftVilleInput"
+                  @focus="onLocationFocus"
+                  @blur="onLocationBlur"
+                >
+                <ul
+                  v-show="locationOpen && suggestions.length"
+                  class="annonces-popover__suggestions"
+                  role="listbox"
+                >
+                  <li v-for="c in suggestions" :key="c.code" role="presentation">
+                    <button type="button" class="annonces-popover__suggestion" @mousedown.prevent="pickCommune(c)">
+                      {{ communeLabel(c) }}
+                    </button>
+                  </li>
+                </ul>
+              </div>
+            </label>
+          </section>
+
+          <section class="annonces-mobile-filters__section">
+            <h3 class="annonces-mobile-filters__section-title">Types de bien</h3>
+            <fieldset v-for="group in propertyGroups" :key="group.id" class="annonces-popover__type-group">
+              <legend class="annonces-popover__type-legend">{{ group.label }}</legend>
+              <div class="annonces-popover__checks">
+                <label v-for="t in group.types" :key="t.slug" class="annonces-popover__check">
+                  <input
+                    type="checkbox"
+                    :checked="draft.typeSlugs.includes(t.slug)"
+                    @change="toggleDraftType(t.slug, ($event.target as HTMLInputElement).checked)"
+                  >
+                  <span>{{ t.label }}</span>
+                </label>
+              </div>
+            </fieldset>
+          </section>
+
+          <section class="annonces-mobile-filters__section">
+            <h3 class="annonces-mobile-filters__section-title">Budget</h3>
+            <div class="annonces-popover__row2">
+              <label class="annonces-popover__field">
+                <span class="annonces-popover__label">Budget min. (€)</span>
+                <input v-model="draft.pmin" type="number" min="0" class="annonces-popover__input" placeholder="Min">
+              </label>
+              <label class="annonces-popover__field">
+                <span class="annonces-popover__label">Budget max. (€)</span>
+                <input v-model="draft.pmax" type="number" min="0" class="annonces-popover__input" placeholder="Max">
+              </label>
+            </div>
+          </section>
+
+          <section class="annonces-mobile-filters__section">
+            <h3 class="annonces-mobile-filters__section-title">Surface</h3>
+            <div class="annonces-popover__row2">
+              <label class="annonces-popover__field">
+                <span class="annonces-popover__label">Min. (m²)</span>
+                <input v-model="draft.smin" type="number" min="0" class="annonces-popover__input" placeholder="Min">
+              </label>
+              <label class="annonces-popover__field">
+                <span class="annonces-popover__label">Max. (m²)</span>
+                <input v-model="draft.smax" type="number" min="0" class="annonces-popover__input" placeholder="Max">
+              </label>
+            </div>
+          </section>
+
+          <section class="annonces-mobile-filters__section">
+            <h3 class="annonces-mobile-filters__section-title">Pièces et chambres</h3>
+            <div class="annonces-popover__row2">
+              <label class="annonces-popover__field">
+                <span class="annonces-popover__label">Pièces min.</span>
+                <input v-model="draft.pimin" type="number" min="1" class="annonces-popover__input" placeholder="Min">
+              </label>
+              <label class="annonces-popover__field">
+                <span class="annonces-popover__label">Pièces max.</span>
+                <input v-model="draft.pimax" type="number" min="1" class="annonces-popover__input" placeholder="Max">
+              </label>
+            </div>
+            <div class="annonces-popover__row2">
+              <label class="annonces-popover__field">
+                <span class="annonces-popover__label">Chambres min.</span>
+                <input v-model="draft.chmin" type="number" min="0" class="annonces-popover__input" placeholder="Min">
+              </label>
+              <label class="annonces-popover__field">
+                <span class="annonces-popover__label">Chambres max.</span>
+                <input v-model="draft.chmax" type="number" min="0" class="annonces-popover__input" placeholder="Max">
+              </label>
+            </div>
+          </section>
+
+          <section class="annonces-mobile-filters__section">
+            <h3 class="annonces-mobile-filters__section-title">Performance et équipements</h3>
+            <label class="annonces-popover__field">
+              <span class="annonces-popover__label">DPE — performance minimale</span>
+              <select v-model="draft.dpe" class="annonces-popover__select">
+                <option value="">Indifférent</option>
+                <option v-for="l in dpeLetters" :key="l" :value="l">{{ l }} ou mieux (A à {{ l }})</option>
+              </select>
+            </label>
+            <div class="annonces-popover__equip">
+              <span class="annonces-popover__label">Équipements</span>
+              <div class="annonces-popover__checks">
+                <label v-for="eq in featureOptions" :key="eq.id" class="annonces-popover__check">
+                  <input
+                    type="checkbox"
+                    :checked="draft.featureIds.includes(eq.id)"
+                    @change="toggleDraftFeature(eq.id, ($event.target as HTMLInputElement).checked)"
+                  >
+                  <span>{{ eq.label }}</span>
+                </label>
+              </div>
+            </div>
+          </section>
+        </div>
+        <footer class="annonces-mobile-filters__footer">
+          <button type="button" class="annonces-popover__cancel" @click="closeMobileFilters">Annuler</button>
+          <div v-if="showResultCount" class="annonces-popover__count">{{ draftPreviewCount.toLocaleString('fr-FR') }} annonces</div>
+          <button type="button" class="annonces-popover__submit" @click="applyMobileAll">Voir les offres</button>
+        </footer>
+      </div>
+    </Teleport>
     <Teleport to="body">
       <div
         v-show="openPopover === 'projet'"
@@ -363,6 +539,7 @@ const refMore = ref<HTMLButtonElement | null>(null)
 
 const openPopover = ref<PopoverId | null>(null)
 const locationOpen = ref(false)
+const mobileFiltersOpen = ref(false)
 
 const positionTick = ref(0)
 
@@ -482,6 +659,9 @@ watch(openPopover, () => {
 })
 
 function onDocClick(e: MouseEvent) {
+  if (mobileFiltersOpen.value) {
+    return
+  }
   const el = e.target
   if (el instanceof Node && filtersRootRef.value?.contains(el)) {
     return
@@ -506,6 +686,16 @@ onUnmounted(() => {
   document.removeEventListener('click', onDocClick)
   window.removeEventListener('scroll', onScrollResize, true)
   window.removeEventListener('resize', onScrollResize)
+  if (typeof document !== 'undefined') {
+    document.body.classList.remove('has-mobile-filters-open')
+  }
+})
+
+watch(mobileFiltersOpen, (open) => {
+  if (typeof document === 'undefined') {
+    return
+  }
+  document.body.classList.toggle('has-mobile-filters-open', open)
 })
 
 const labelProjetLieu = computed(() => {
@@ -628,6 +818,37 @@ function numOrUndef(s: string): string | undefined {
   }
   const n = Number(t)
   return Number.isFinite(n) ? String(n) : undefined
+}
+
+function openMobileFilters() {
+  syncDraftFromParsed()
+  openPopover.value = null
+  mobileFiltersOpen.value = true
+}
+
+function closeMobileFilters() {
+  mobileFiltersOpen.value = false
+  locationOpen.value = false
+}
+
+function applyMobileAll() {
+  props.mergeQuery({
+    projet: draft.projet === 'tous' ? undefined : draft.projet,
+    ville: draft.ville.trim() || undefined,
+    types: draft.typeSlugs.length ? draft.typeSlugs.join(',') : undefined,
+    pmin: numOrUndef(draft.pmin),
+    pmax: numOrUndef(draft.pmax),
+    smin: numOrUndef(draft.smin),
+    smax: numOrUndef(draft.smax),
+    pimin: numOrUndef(draft.pimin),
+    pimax: numOrUndef(draft.pimax),
+    chmin: numOrUndef(draft.chmin),
+    chmax: numOrUndef(draft.chmax),
+    dpe: draft.dpe || undefined,
+    eq: draft.featureIds.length ? draft.featureIds.join(',') : undefined,
+    page: undefined,
+  })
+  closeMobileFilters()
 }
 
 function applyProjet() {

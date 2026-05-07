@@ -418,6 +418,13 @@
   }
 }
 
+@media (max-width: 959px) {
+  .annonce-detail__aside {
+    position: static;
+    top: auto;
+  }
+}
+
 /* Colonne droite : prix + agence + formulaire (un seul bloc) */
 .annonce-detail__aside-panel {
   padding: 1.25rem;
@@ -763,6 +770,43 @@
   .annonce-detail__cross-head {
     flex-direction: column;
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .annonce-detail__layout {
+    padding-left: 1rem;
+    padding-right: 1rem;
+    gap: 1.4rem;
+  }
+
+  .annonce-detail__aside-panel {
+    padding: 1rem;
+  }
+
+  .listing-contact-form {
+    padding: 1.1rem 1rem;
+  }
+
+  .listing-contact-form__suggestion-row {
+    grid-template-columns: auto 1fr;
+  }
+
+  .listing-contact-form__suggestion-thumb {
+    display: none;
+  }
+
+  .listing-contact-form__phone-row {
+    flex-direction: column;
+  }
+
+  .listing-contact-form__select {
+    width: 100%;
+  }
+
+  .annonce-detail__below-inner {
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
 }
 
