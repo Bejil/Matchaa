@@ -184,6 +184,7 @@ export const useSiteStore = defineStore('site', () => {
     description: string
     creditsBalance: number
     creditsPlan: 'none' | 'annual'
+    agencyKind: 'standard' | 'individual'
   }
   type ProMember = {
     id: string
@@ -278,6 +279,7 @@ export const useSiteStore = defineStore('site', () => {
       description: 'Agence de démonstration Matchaa pour tester la publication et le suivi des annonces.',
       creditsBalance: 24,
       creditsPlan: 'none',
+      agencyKind: 'standard',
     },
   ]
   /** Comptes démo réservés à l’espace pro (emails distincts des comptes publics). */
@@ -1060,6 +1062,34 @@ export const useSiteStore = defineStore('site', () => {
       savedSearches.value = []
       return
     }
+    const supabase = useSupabaseClient()
+    const session = useSupabaseSession().value
+    if (supabase && session?.user) {
+      void supabase
+        .from('saved_searches')
+        .select('id, title, description, to_path, query')
+        .eq('user_id', session.user.id)
+        .order('updated_at', { ascending: false })
+        .then(({ data, error }) => {
+          if (error) {
+            console.warn('[Matchaa] saved_searches load', error.message)
+            return
+          }
+          savedSearches.value = (data ?? []).map((row) => {
+            const query = (row.query ?? {}) as Record<string, string>
+            return {
+              id: row.id,
+              title: row.title ?? 'Recherche',
+              description: row.description ?? '',
+              to: {
+                path: row.to_path === '/annonces' ? '/annonces' : '/annonces',
+                query,
+              },
+            } as SavedSearch
+          })
+        })
+      return
+    }
     try {
       const raw = localStorage.getItem(searchesStorageKey(currentUser.value.email))
       if (!raw) {
@@ -1080,6 +1110,28 @@ export const useSiteStore = defineStore('site', () => {
   function loadLatestSearch() {
     if (!import.meta.client || !currentUser.value) {
       latestSearch.value = null
+      return
+    }
+    const supabase = useSupabaseClient()
+    const session = useSupabaseSession().value
+    if (supabase && session?.user) {
+      void supabase
+        .from('user_search_state')
+        .select('last_search')
+        .eq('user_id', session.user.id)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (error) {
+            console.warn('[Matchaa] user_search_state load', error.message)
+            return
+          }
+          const rawSearch = data?.last_search as SavedSearch | null | undefined
+          if (rawSearch?.id && rawSearch?.to?.path === '/annonces') {
+            latestSearch.value = rawSearch
+          } else {
+            latestSearch.value = null
+          }
+        })
       return
     }
     try {
@@ -1103,6 +1155,48 @@ export const useSiteStore = defineStore('site', () => {
     if (!import.meta.client || !currentUser.value) {
       return
     }
+    const supabase = useSupabaseClient()
+    const session = useSupabaseSession().value
+    if (supabase && session?.user) {
+      const rows = savedSearches.value.map((search) => ({
+        user_id: session.user.id,
+        title: search.title,
+        description: search.description,
+        to_path: '/annonces',
+        query: search.to.query,
+      }))
+      void (async () => {
+        const { error: delErr } = await supabase
+          .from('saved_searches')
+          .delete()
+          .eq('user_id', session.user.id)
+        if (delErr) {
+          console.warn('[Matchaa] saved_searches clear', delErr.message)
+          return
+        }
+        if (!rows.length) {
+          return
+        }
+        const { data, error: insErr } = await supabase
+          .from('saved_searches')
+          .insert(rows)
+          .select('id, title, description, to_path, query')
+        if (insErr) {
+          console.warn('[Matchaa] saved_searches persist', insErr.message)
+          return
+        }
+        savedSearches.value = (data ?? []).map((row) => ({
+          id: row.id,
+          title: row.title ?? 'Recherche',
+          description: row.description ?? '',
+          to: {
+            path: row.to_path === '/annonces' ? '/annonces' : '/annonces',
+            query: (row.query ?? {}) as Record<string, string>,
+          },
+        }))
+      })()
+      return
+    }
     try {
       localStorage.setItem(
         searchesStorageKey(currentUser.value.email),
@@ -1115,6 +1209,30 @@ export const useSiteStore = defineStore('site', () => {
 
   function persistLatestSearch() {
     if (!import.meta.client || !currentUser.value) {
+      return
+    }
+    const supabase = useSupabaseClient()
+    const session = useSupabaseSession().value
+    if (supabase && session?.user) {
+      void (async () => {
+        if (!latestSearch.value) {
+          const { error } = await supabase
+            .from('user_search_state')
+            .delete()
+            .eq('user_id', session.user.id)
+          if (error) {
+            console.warn('[Matchaa] user_search_state delete', error.message)
+          }
+          return
+        }
+        const { error } = await supabase.from('user_search_state').upsert({
+          user_id: session.user.id,
+          last_search: latestSearch.value,
+        })
+        if (error) {
+          console.warn('[Matchaa] user_search_state upsert', error.message)
+        }
+      })()
       return
     }
     try {
@@ -1619,6 +1737,7 @@ export const useSiteStore = defineStore('site', () => {
       description: typeof a.description === 'string' ? a.description : '',
       creditsBalance: Math.max(0, Math.round(Number(a.creditsBalance ?? 0))),
       creditsPlan: a.creditsPlan === 'annual' ? 'annual' : 'none',
+      agencyKind: a.agencyKind === 'individual' ? 'individual' : 'standard',
     }
   }
 
@@ -2179,6 +2298,7 @@ export const useSiteStore = defineStore('site', () => {
         description: '',
         creditsBalance: 0,
         creditsPlan: 'none',
+        agencyKind: 'standard',
       })
     }
     if (input.role === 'agent' && !targetAgencyId) {
@@ -2308,6 +2428,38 @@ export const useSiteStore = defineStore('site', () => {
     if (!import.meta.client || currentUser.value) {
       return
     }
+    const supabase = useSupabaseClient()
+    if (supabase) {
+      void supabase.auth.getSession().then(async ({ data }) => {
+        const session = data.session
+        if (!session?.user || currentUser.value) {
+          return
+        }
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('display_name, account_kind')
+          .eq('id', session.user.id)
+          .maybeSingle()
+        if (profile?.account_kind !== 'public') {
+          return
+        }
+        currentUser.value = {
+          name: (profile.display_name || session.user.email || 'Utilisateur Matchaa').trim(),
+          email: (session.user.email || '').trim().toLowerCase(),
+          contactPhone: '',
+          contactOptInPhone: false,
+          contactOptInEmail: false,
+        }
+        if (currentUser.value.email) {
+          mergeAnonymousProspectDataIntoEmail(currentUser.value.email)
+          useFavoritesStore().mergeGuestFavoritesIntoAccount(currentUser.value.email)
+        }
+        loadSavedSearches()
+        loadLatestSearch()
+        loadSentMessages()
+        loadMessageThreads()
+      })
+    }
     try {
       const raw = localStorage.getItem(SESSION_KEY)
       if (!raw) {
@@ -2348,7 +2500,48 @@ export const useSiteStore = defineStore('site', () => {
   }
 
   function hydrateProSession() {
-    if (!import.meta.client || currentProUser.value) {
+    if (!import.meta.client) {
+      return
+    }
+    const supabase = useSupabaseClient()
+    if (supabase) {
+      void supabase.auth.getSession().then(async ({ data }) => {
+        const session = data.session
+        if (!session?.user) {
+          return
+        }
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('account_kind')
+          .eq('id', session.user.id)
+          .maybeSingle()
+        if (profile?.account_kind !== 'pro') {
+          return
+        }
+        const { data: membership } = await supabase
+          .from('agency_members')
+          .select('id, agency_id, role, display_name')
+          .eq('user_id', session.user.id)
+          .limit(1)
+          .maybeSingle()
+        const hasAgency = Boolean(membership?.agency_id)
+        const { data: agency } = hasAgency
+          ? await supabase
+              .from('agencies')
+              .select('name')
+              .eq('id', membership?.agency_id ?? '')
+              .maybeSingle()
+          : { data: null as { name?: string } | null }
+        currentProUser.value = {
+          id: session.user.id,
+          agencyId: membership?.agency_id ?? '',
+          name: ((membership?.display_name as string | undefined) || session.user.email || 'Compte pro').trim(),
+          email: (session.user.email || '').trim().toLowerCase(),
+          role: membership?.role === 'manager' ? 'manager' : 'agent',
+          companyName: agency?.name || 'Agence non renseignee',
+        }
+        loadMessageThreads()
+      })
       return
     }
     loadProData()
@@ -2412,7 +2605,7 @@ export const useSiteStore = defineStore('site', () => {
       : [],
   )
 
-  function updateCurrentAgencyInfo(input: {
+  async function updateCurrentAgencyInfo(input: {
     name: string
     logo: string
     contactEmail: string
@@ -2420,17 +2613,39 @@ export const useSiteStore = defineStore('site', () => {
     city: string
     address: string
     description: string
-  }) {
+  }): Promise<{ ok: boolean; message?: string }> {
     if (currentProUser.value?.role !== 'manager') {
-      return
+      return { ok: false, message: 'Action reservee aux gestionnaires.' }
     }
     const idx = proAgencies.value.findIndex((a) => a.id === currentProUser.value?.agencyId)
     if (idx < 0) {
-      return
+      return { ok: false, message: 'Agence introuvable pour ce compte.' }
+    }
+    const supabase = useSupabaseClient()
+    if (!supabase) {
+      return { ok: false, message: 'Supabase indisponible: aucune requete base possible.' }
+    }
+    const agencyId = currentProUser.value?.agencyId ?? ''
+    const nextName = input.name.trim() || proAgencies.value[idx].name
+    const { error: updateErr } = await supabase
+      .from('agencies')
+      .update({
+        name: nextName,
+        logo_url: input.logo.trim(),
+        contact_email: input.contactEmail.trim(),
+        contact_phone: input.contactPhone.trim(),
+        city: input.city.trim(),
+        address: input.address.trim(),
+        description: input.description.trim(),
+      })
+      .eq('id', agencyId)
+    if (updateErr) {
+      console.warn('[Matchaa] update agency', updateErr.message)
+      return { ok: false, message: `Mise a jour refusee: ${updateErr.message}` }
     }
     proAgencies.value[idx] = {
       ...proAgencies.value[idx],
-      name: input.name.trim() || proAgencies.value[idx].name,
+      name: nextName,
       logo: input.logo.trim(),
       contactEmail: input.contactEmail.trim(),
       contactPhone: input.contactPhone.trim(),
@@ -2448,6 +2663,244 @@ export const useSiteStore = defineStore('site', () => {
       }
     }
     persistProData()
+    return { ok: true }
+  }
+
+  async function createAgencyForCurrentPro(input: {
+    name: string
+    city?: string
+    address?: string
+    contactPhone?: string
+    description?: string
+    logo?: string
+    agencyKind?: 'standard' | 'individual'
+  }): Promise<{ ok: boolean; message?: string }> {
+    if (!currentProUser.value) {
+      return { ok: false, message: 'Compte pro introuvable dans la session.' }
+    }
+    if ((currentProUser.value.agencyId ?? '').trim()) {
+      return { ok: false, message: 'Ce compte est deja rattache a une agence.' }
+    }
+    const name = input.name.trim()
+    if (!name) {
+      return { ok: false, message: 'Le nom de l agence est obligatoire.' }
+    }
+    const agencyId = `agency-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
+    const supabase = useSupabaseClient()
+    if (!supabase) {
+      return { ok: false, message: 'Supabase indisponible: aucune requete base possible.' }
+    }
+    const localSession = useSupabaseSession().value
+    const { data: sessionData } = await supabase.auth.getSession()
+    const authUserId = sessionData.session?.user?.id ?? localSession?.user?.id ?? null
+    if (!authUserId) {
+      return { ok: false, message: 'Session Supabase introuvable. Reconnectez-vous.' }
+    }
+    const agencyKind = input.agencyKind === 'individual' ? 'individual' : 'standard'
+    const { error: agencyErr } = await supabase.from('agencies').insert({
+      id: agencyId,
+      name,
+      logo_url: input.logo?.trim() ?? '',
+      contact_email: currentProUser.value.email,
+      contact_phone: input.contactPhone?.trim() ?? '',
+      city: input.city?.trim() ?? '',
+      address: input.address?.trim() ?? '',
+      description: input.description?.trim() ?? '',
+      credits_balance: 1,
+      metadata: {
+        agency_kind: agencyKind,
+      },
+    })
+    if (agencyErr) {
+      console.warn('[Matchaa] create agency', agencyErr.message)
+      return { ok: false, message: `Creation agence refusee: ${agencyErr.message}` }
+    }
+    const { error: memberErr } = await supabase.from('agency_members').insert({
+      user_id: authUserId,
+      agency_id: agencyId,
+      role: 'manager',
+      display_name: currentProUser.value.name,
+    })
+    if (memberErr) {
+      console.warn('[Matchaa] create agency member', memberErr.message)
+      return { ok: false, message: `Rattachement manager refuse: ${memberErr.message}` }
+    }
+    proAgencies.value.push({
+      id: agencyId,
+      name,
+      logo: input.logo?.trim() ?? '',
+      contactEmail: currentProUser.value.email,
+      contactPhone: input.contactPhone?.trim() ?? '',
+      city: input.city?.trim() ?? '',
+      address: input.address?.trim() ?? '',
+      description: input.description?.trim() ?? '',
+      creditsBalance: 1,
+      creditsPlan: 'none',
+      agencyKind,
+    })
+    currentProUser.value = {
+      ...currentProUser.value,
+      agencyId,
+      role: 'manager',
+      companyName: name,
+    }
+    const existingMemberIdx = proMembers.value.findIndex((m) => m.id === currentProUser.value?.id)
+    if (existingMemberIdx >= 0) {
+      proMembers.value[existingMemberIdx] = {
+        ...proMembers.value[existingMemberIdx],
+        agencyId,
+        role: 'manager',
+      }
+    } else {
+      proMembers.value.push({
+        id: currentProUser.value.id,
+        agencyId,
+        name: currentProUser.value.name,
+        email: currentProUser.value.email,
+        password: 'supabase-managed',
+        role: 'manager',
+        creditsConsumedTotal: 0,
+        creditsConsumed30d: 0,
+        lastCreditConsumptionAt: null,
+      })
+    }
+    appendAgencyCreditLedgerEntry({
+      agencyId,
+      type: 'purchase_pack',
+      amount: 1,
+      byMemberId: currentProUser.value.id,
+      listingId: null,
+      note: 'Credit de bienvenue agence',
+    })
+    persistProData()
+    if (import.meta.client) {
+      localStorage.setItem(PRO_SESSION_KEY, JSON.stringify(currentProUser.value))
+    }
+    return { ok: true }
+  }
+
+  async function ensureCurrentProPersonalAgency(): Promise<{ ok: boolean; created?: boolean; message?: string }> {
+    if (!currentProUser.value) {
+      return { ok: false, message: 'Session pro introuvable.' }
+    }
+    const existingAgencyId = (currentProUser.value.agencyId ?? '').trim()
+    if (existingAgencyId) {
+      const hasLocalAgency = proAgencies.value.some((agency) => agency.id === existingAgencyId)
+      if (hasLocalAgency) {
+        return { ok: true, created: false }
+      }
+      const synced = await syncCurrentAgencyFromCloud()
+      if (synced.ok) {
+        return { ok: true, created: false }
+      }
+      return { ok: false, message: synced.message || 'Agence introuvable pour ce compte.' }
+    }
+    const company = currentProUser.value.companyName?.trim() || ''
+    const ownerName = currentProUser.value.name?.trim() || 'Vendeur individuel'
+    const agencyName = company
+      ? company
+      : ownerName.toLowerCase().startsWith('agence')
+        ? ownerName
+        : `Agence de ${ownerName}`
+    const created = await createAgencyForCurrentPro({
+      name: agencyName,
+      description: 'Agence personnelle creee automatiquement pour publier en nom propre.',
+      contactPhone: '',
+      city: '',
+      address: '',
+      logo: '',
+      agencyKind: 'individual',
+    })
+    if (!created.ok) {
+      return { ok: false, message: created.message || 'Creation auto de l agence personnelle impossible.' }
+    }
+    return { ok: true, created: true }
+  }
+
+  async function syncCurrentAgencyMembersFromCloud(): Promise<{ ok: boolean; message?: string }> {
+    const supabase = useSupabaseClient()
+    const agencyId = (currentProUser.value?.agencyId ?? '').trim()
+    if (!supabase || !agencyId) {
+      return { ok: false, message: 'Synchronisation membres indisponible.' }
+    }
+    const { data, error } = await supabase
+      .from('agency_members')
+      .select('user_id, agency_id, role, display_name')
+      .eq('agency_id', agencyId)
+      .order('created_at', { ascending: true })
+    if (error) {
+      return { ok: false, message: error.message }
+    }
+    const fallbackDomain = 'membre.local'
+    const cloudMembers = (data ?? []).map((m) => {
+      const userId = (m.user_id || '').trim()
+      const existing = proMembers.value.find((member) => member.id === userId)
+      const displayName = (m.display_name || '').trim() || existing?.name || 'Membre agence'
+      const sanitizedName = displayName.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/(^\.|\.$)/g, '')
+      return {
+        id: userId,
+        agencyId: (m.agency_id || agencyId).trim(),
+        name: displayName,
+        email: existing?.email || `${sanitizedName || userId.slice(0, 8)}@${fallbackDomain}`,
+        password: existing?.password || 'supabase-managed',
+        role: m.role === 'manager' ? 'manager' : 'agent',
+        creditsConsumedTotal: existing?.creditsConsumedTotal ?? 0,
+        creditsConsumed30d: existing?.creditsConsumed30d ?? 0,
+        lastCreditConsumptionAt: existing?.lastCreditConsumptionAt ?? null,
+      } satisfies ProMember
+    }).filter((m) => Boolean(m.id))
+    const others = proMembers.value.filter((member) => member.agencyId !== agencyId)
+    proMembers.value = [...others, ...cloudMembers]
+    persistProData()
+    return { ok: true }
+  }
+
+  async function syncCurrentAgencyFromCloud(): Promise<{ ok: boolean; message?: string }> {
+    const supabase = useSupabaseClient()
+    const agencyId = (currentProUser.value?.agencyId ?? '').trim()
+    if (!supabase || !agencyId) {
+      return { ok: false, message: 'Synchronisation agence indisponible.' }
+    }
+    const { data, error } = await supabase
+      .from('agencies')
+      .select('id, name, logo_url, contact_email, contact_phone, city, address, description, credits_balance, credits_plan, metadata')
+      .eq('id', agencyId)
+      .maybeSingle()
+    if (error || !data) {
+      return { ok: false, message: error?.message || 'Agence introuvable.' }
+    }
+    const idx = proAgencies.value.findIndex((a) => a.id === agencyId)
+    const nextAgency = {
+      id: String(data.id || agencyId),
+      name: String(data.name || currentProUser.value?.companyName || 'Agence'),
+      logo: String(data.logo_url || ''),
+      contactEmail: String(data.contact_email || ''),
+      contactPhone: String(data.contact_phone || ''),
+      city: String(data.city || ''),
+      address: String(data.address || ''),
+      description: String(data.description || ''),
+      creditsBalance: Math.max(0, Number(data.credits_balance || 0)),
+      creditsPlan: data.credits_plan === 'annual' ? 'annual' : 'none' as const,
+      agencyKind: (data.metadata && typeof data.metadata === 'object' && (data.metadata as Record<string, unknown>).agency_kind === 'individual')
+        ? 'individual'
+        : 'standard',
+    }
+    if (idx >= 0) {
+      proAgencies.value[idx] = nextAgency
+    } else {
+      proAgencies.value.push(nextAgency)
+    }
+    if (currentProUser.value) {
+      currentProUser.value = {
+        ...currentProUser.value,
+        companyName: nextAgency.name,
+      }
+      if (import.meta.client) {
+        localStorage.setItem(PRO_SESSION_KEY, JSON.stringify(currentProUser.value))
+      }
+    }
+    persistProData()
+    return { ok: true }
   }
 
   function purchaseCreditsPack(packId: string): boolean {
@@ -2526,6 +2979,10 @@ export const useSiteStore = defineStore('site', () => {
     if (currentProUser.value?.role !== 'manager') {
       return false
     }
+    const agency = proAgencies.value.find((a) => a.id === currentProUser.value?.agencyId)
+    if (agency?.agencyKind === 'individual') {
+      return false
+    }
     const email = input.email.trim().toLowerCase()
     if (!email || proMembers.value.some((m) => m.email.toLowerCase() === email)) {
       return false
@@ -2545,32 +3002,58 @@ export const useSiteStore = defineStore('site', () => {
     return true
   }
 
-  function removeCurrentAgencyMember(memberId: string) {
+  async function removeCurrentAgencyMember(memberId: string): Promise<{ ok: boolean; message?: string }> {
     if (currentProUser.value?.role !== 'manager') {
-      return
+      return { ok: false, message: 'Action reservee aux gestionnaires.' }
     }
     if (memberId === currentProUser.value.id) {
-      return
+      return { ok: false, message: 'Suppression de votre propre compte impossible ici.' }
+    }
+    const supabase = useSupabaseClient()
+    const agencyId = currentProUser.value.agencyId
+    if (supabase && agencyId) {
+      const { error } = await supabase
+        .from('agency_members')
+        .delete()
+        .eq('agency_id', agencyId)
+        .eq('user_id', memberId)
+      if (error) {
+        return { ok: false, message: error.message }
+      }
     }
     proMembers.value = proMembers.value.filter((m) => m.id !== memberId)
     persistProData()
+    return { ok: true }
   }
 
-  function setCurrentAgencyMemberRole(memberId: string, role: ProRole) {
+  async function setCurrentAgencyMemberRole(memberId: string, role: ProRole): Promise<{ ok: boolean; message?: string }> {
     if (currentProUser.value?.role !== 'manager') {
-      return
+      return { ok: false, message: 'Action reservee aux gestionnaires.' }
     }
     const idx = proMembers.value.findIndex(
       (m) => m.id === memberId && m.agencyId === currentProUser.value?.agencyId,
     )
     if (idx < 0) {
-      return
+      return { ok: false, message: 'Membre introuvable.' }
+    }
+    const supabase = useSupabaseClient()
+    const agencyId = currentProUser.value?.agencyId ?? ''
+    if (supabase && agencyId) {
+      const { error } = await supabase
+        .from('agency_members')
+        .update({ role })
+        .eq('agency_id', agencyId)
+        .eq('user_id', memberId)
+      if (error) {
+        return { ok: false, message: error.message }
+      }
     }
     proMembers.value[idx] = {
       ...proMembers.value[idx],
       role,
     }
     persistProData()
+    return { ok: true }
   }
 
   function enforceListingExpiry(nowIso = new Date().toISOString()) {
@@ -3111,6 +3594,10 @@ export const useSiteStore = defineStore('site', () => {
     logoutPro,
     deleteProAccount,
     updateCurrentAgencyInfo,
+    createAgencyForCurrentPro,
+    ensureCurrentProPersonalAgency,
+    syncCurrentAgencyFromCloud,
+    syncCurrentAgencyMembersFromCloud,
     addCurrentAgencyMember,
     removeCurrentAgencyMember,
     setCurrentAgencyMemberRole,
@@ -3164,5 +3651,36 @@ export const useSiteStore = defineStore('site', () => {
     enforceListingExpiry,
     creditPacks: CREDIT_PACKS,
     annualSubscriptionOffer: ANNUAL_SUBSCRIPTION,
+    setCurrentUserForSession: (input: {
+      name: string
+      email: string
+      contactPhone?: string
+      contactOptInPhone?: boolean
+      contactOptInEmail?: boolean
+    }) => {
+      const nextEmail = input.email.trim().toLowerCase()
+      currentUser.value = {
+        name: input.name.trim() || 'Utilisateur Matchaa',
+        email: nextEmail,
+        contactPhone: input.contactPhone?.trim() ?? '',
+        contactOptInPhone: input.contactOptInPhone === true,
+        contactOptInEmail: input.contactOptInEmail === true,
+      }
+      if (import.meta.client && nextEmail) {
+        localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser.value))
+        useFavoritesStore().mergeGuestFavoritesIntoAccount(nextEmail)
+      }
+      loadSavedSearches()
+      loadLatestSearch()
+      loadSentMessages()
+      loadMessageThreads()
+    },
+    setCurrentProUserForSession: (input: CurrentProUser) => {
+      currentProUser.value = { ...input }
+      if (import.meta.client) {
+        localStorage.setItem(PRO_SESSION_KEY, JSON.stringify(currentProUser.value))
+      }
+      loadMessageThreads()
+    },
   }
 })

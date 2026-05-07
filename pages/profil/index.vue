@@ -179,6 +179,8 @@
 const siteStore = useSiteStore()
 const favoritesStore = useFavoritesStore()
 const router = useRouter()
+const auth = useSupabaseAuth()
+const supabase = useSupabaseClient()
 
 const guestFavoriteCount = computed(() => favoritesStore.ids.length)
 
@@ -191,35 +193,70 @@ const registerPassword = ref('')
 
 const feedback = ref('')
 
-function onLoginSubmit() {
-  const ok = siteStore.login(loginEmail.value, loginPassword.value)
-  if (!ok) {
-    if (siteStore.matchesProDemoCredentials(loginEmail.value, loginPassword.value)) {
+async function onLoginSubmit() {
+  try {
+    const { session } = await auth.signInWithEmail(loginEmail.value, loginPassword.value)
+    const uid = session?.user?.id
+    const email = session?.user?.email?.trim().toLowerCase() || ''
+    if (!uid || !email || !supabase) {
+      feedback.value = 'Session Supabase introuvable après connexion.'
+      return
+    }
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('account_kind, display_name')
+      .eq('id', uid)
+      .maybeSingle()
+    if (profile?.account_kind === 'pro') {
+      await auth.signOut()
       feedback.value = 'Ce compte est réservé aux professionnels. Connectez-vous depuis Espace Pro.'
       return
     }
-    feedback.value = 'Identifiants invalides. Utilisez un compte de démonstration.'
-    return
+    siteStore.setCurrentUserForSession({
+      name: (profile?.display_name || session.user.email || 'Utilisateur Matchaa').trim(),
+      email,
+    })
+    feedback.value = `Bienvenue ${siteStore.currentUser?.name}. Redirection...`
+    await router.push('/compte')
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Connexion impossible.'
+    feedback.value = `Connexion échouée : ${message}`
   }
-  feedback.value = `Bienvenue ${siteStore.currentUser?.name}. Redirection...`
-  router.push('/compte')
 }
 
-function onRegisterSubmit() {
-  siteStore.createDemoAccount(registerName.value, registerEmail.value)
-  feedback.value = `Compte créé pour ${siteStore.currentUser?.name}. Redirection...`
-  router.push('/compte')
+async function onRegisterSubmit() {
+  try {
+    const { session, user } = await auth.signUpWithKind(
+      registerEmail.value,
+      registerPassword.value,
+      'public',
+      registerName.value,
+    )
+    if (!session) {
+      feedback.value = `Compte créé pour ${user?.email ?? registerEmail.value}. Vérifiez votre e-mail pour confirmer la création du compte.`
+      return
+    }
+    siteStore.setCurrentUserForSession({
+      name: registerName.value.trim() || session.user.email || 'Utilisateur Matchaa',
+      email: session.user.email || registerEmail.value,
+    })
+    feedback.value = `Compte créé pour ${siteStore.currentUser?.name}. Redirection...`
+    await router.push('/compte')
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Inscription impossible.'
+    feedback.value = `Inscription échouée : ${message}`
+  }
 }
 
 useHead({
   title: 'Identification — Matchaa',
 })
 
-onMounted(() => {
+onMounted(async () => {
   siteStore.hydrateSession()
-  favoritesStore.loadFromStorage(true)
+  await favoritesStore.ensureRemoteHydration()
   if (siteStore.currentUser) {
-    router.replace('/compte')
+    await router.replace('/compte')
   }
 })
 </script>

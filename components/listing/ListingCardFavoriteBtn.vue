@@ -54,6 +54,7 @@ const props = defineProps<{
 const favorites = useFavoritesStore()
 const siteStore = useSiteStore()
 const desktopPush = useDesktopPush()
+const toggling = ref(false)
 
 const isFavorite = computed(() => favorites.has(props.listingId))
 
@@ -125,19 +126,27 @@ onMounted(() => {
   favorites.loadFromStorage()
 })
 
-function onClick() {
-  const wasFavorite = favorites.has(props.listingId)
-  favorites.toggle(props.listingId)
-  siteStore.applyListingFavoriteDelta(props.listingId, wasFavorite ? -1 : 1)
-  const nowFavorite = favorites.has(props.listingId)
-  animClass.value = null
-  nextTick(() => {
-    animClass.value = nowFavorite ? 'listing-card__favorite-inner--in' : 'listing-card__favorite-inner--out'
-    if (nowFavorite) {
-      spawnFlyingHearts()
-      desktopPush.openPermissionPromptIfNeeded('public')
-    }
-  })
+async function onClick() {
+  if (toggling.value) {
+    return
+  }
+  toggling.value = true
+  try {
+    const wasFavorite = favorites.has(props.listingId)
+    await favorites.toggle(props.listingId)
+    siteStore.applyListingFavoriteDelta(props.listingId, wasFavorite ? -1 : 1)
+    const nowFavorite = favorites.has(props.listingId)
+    animClass.value = null
+    nextTick(() => {
+      animClass.value = nowFavorite ? 'listing-card__favorite-inner--in' : 'listing-card__favorite-inner--out'
+      if (nowFavorite) {
+        spawnFlyingHearts()
+        desktopPush.openPermissionPromptIfNeeded('public')
+      }
+    })
+  } finally {
+    toggling.value = false
+  }
 }
 
 function onFavoriteAnimEnd(e: AnimationEvent) {

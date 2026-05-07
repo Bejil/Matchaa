@@ -3,6 +3,15 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-04-01',
   devtools: { enabled: true },
   modules: ['@pinia/nuxt'],
+  runtimeConfig: {
+    // Cle privee serveur uniquement pour operations admin (ex: suppression compte).
+    supabaseServiceRoleKey: '',
+    public: {
+      // Valeurs par defaut; Nuxt injecte automatiquement NUXT_PUBLIC_SUPABASE_* au runtime.
+      supabaseUrl: '',
+      supabaseKey: '',
+    },
+  },
   css: [
     '~/assets/css/main.css',
     '~/assets/css/app-modal.css',

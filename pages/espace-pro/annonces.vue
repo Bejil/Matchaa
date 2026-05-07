@@ -894,7 +894,7 @@
             >
               Étape suivante
             </button>
-            <button v-else type="submit" class="profil-account__btn profil-account__btn--primary">
+            <button v-else type="submit" class="profil-account__btn profil-account__btn--primary" :disabled="listingSubmitPending">
               {{ isEditingListing ? 'Enregistrer' : 'Créer l\'annonce' }}
             </button>
           </div>
@@ -1109,6 +1109,7 @@ function normalizeListingGeneralCondition(value: string): string {
 }
 
 const listingModalOpen = ref(false)
+const listingSubmitPending = ref(false)
 const previewModalOpen = ref(false)
 const deleteModalOpen = ref(false)
 const bulkDeleteModalOpen = ref(false)
@@ -2480,10 +2481,15 @@ function collectListingFormContentIssues(): string[] {
   return missing
 }
 
-function onSubmitListing() {
+async function onSubmitListing() {
+  if (listingSubmitPending.value) {
+    return
+  }
   if (!isManager.value) {
     return
   }
+  listingSubmitPending.value = true
+  try {
   if (editForm.value.projectType === 'acheter') {
     editForm.value.chargesMonthly = null
     editForm.value.furnished = null
@@ -2557,6 +2563,9 @@ function onSubmitListing() {
     closeListingModal()
     currentPage.value = 1
     showToast('Annonce créée', 'L’annonce a bien été ajoutée.')
+  }
+  } finally {
+    listingSubmitPending.value = false
   }
 }
 

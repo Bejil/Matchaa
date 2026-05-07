@@ -3,16 +3,16 @@
   --color-surface: #ffffff;
   --color-text: #1a1a1a;
   --color-text-muted: #5c5c5c;
-  --color-accent: #db3846;
-  --color-accent-hover: #b91c1c;
-  /* Fond pâle dérivé de l’accent corail (avis, encadrés) */
-  --color-accent-soft: #fce8ea;
-  --color-accent-soft-mid: #f9d4d8;
-  --color-accent-soft-border: rgba(219, 56, 70, 0.28);
-  /* Ancienne couleur principale — duo avec le corail (hero, repères discrets) */
-  --color-accent-secondary: #2d6a4f;
-  --color-accent-secondary-hover: #1b4332;
-  --color-accent-secondary-soft: #e8f2ec;
+  /* Couleur principale restaurée : vert Matchaa */
+  --color-accent: #2d6a4f;
+  --color-accent-hover: #1b4332;
+  --color-accent-soft: #e8f2ec;
+  --color-accent-soft-mid: #d5e7dc;
+  --color-accent-soft-border: rgba(45, 106, 79, 0.28);
+  /* Couleur secondaire : corail */
+  --color-accent-secondary: #db3846;
+  --color-accent-secondary-hover: #b91c1c;
+  --color-accent-secondary-soft: #fce8ea;
   --color-border: #e8e6e3;
   --header-height: 4rem;
   --footer-padding: 3rem 1.5rem 2rem;
