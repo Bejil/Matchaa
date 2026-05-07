@@ -115,6 +115,13 @@
                     <button type="button" class="profil-account__btn profil-account__btn--ghost conversation-panel__attach-btn" @click="toggleListingPicker">
                       Joindre une annonce
                     </button>
+                    <button
+                      type="button"
+                      class="profil-account__btn profil-account__btn--ghost conversation-panel__signature-btn"
+                      @click="insertProSignature"
+                    >
+                      Insérer la signature
+                    </button>
                     <div v-if="listingPickerOpen" class="prospects-listing-picker__popover conversation-panel__listing-popover" @click.stop>
                       <input
                         v-model.trim="listingPickerSearch"
@@ -281,6 +288,7 @@ const listingById = computed(() => {
   siteStore.ensureProListingsLoadedForPublic()
   return new Map(siteStore.publicActiveSearchListings.map((l) => [l.id, l]))
 })
+const currentProAgency = computed(() => siteStore.currentProAgency)
 
 function listingForThreadMessage(msg: { listingId?: string | null }): SearchListing | null {
   const id = msg.listingId ?? null
@@ -355,6 +363,36 @@ function sendProThreadMessage() {
   resetComposerHeight()
   selectedListingToSend.value = null
   listingPickerOpen.value = false
+}
+
+function insertProSignature() {
+  const proUser = siteStore.currentProUser
+  const agency = currentProAgency.value
+  if (!proUser) {
+    return
+  }
+  const lines = [
+    '',
+    `${proUser.name}`,
+    `${agency?.name || proUser.companyName || ''}`,
+    `${agency?.address || ''}`,
+    `${agency?.contactPhone || ''}`,
+  ]
+  const signature = lines.join('\n').trim()
+  if (!signature) {
+    return
+  }
+  const base = proThreadDraft.value.trimEnd()
+  proThreadDraft.value = base ? `${base}\n\n${signature}` : signature
+  nextTick(() => {
+    const el = proComposerInput.value
+    if (!el) {
+      return
+    }
+    el.focus()
+    el.style.height = 'auto'
+    el.style.height = `${Math.max(el.scrollHeight, 42)}px`
+  })
 }
 
 function onComposerKeydown(event: KeyboardEvent) {

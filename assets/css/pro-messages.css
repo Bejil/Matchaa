@@ -23,6 +23,11 @@
   justify-content: center;
 }
 
+.conversation-panel__signature-btn {
+  width: auto;
+  justify-content: center;
+}
+
 .conversation-panel__send-btn {
   display: inline-flex;
   align-items: center;
@@ -54,6 +59,7 @@
 
 @media (max-width: 640px) {
   .conversation-panel__attach-btn,
+  .conversation-panel__signature-btn,
   .conversation-panel__send-btn {
     width: 100%;
     justify-content: center;
