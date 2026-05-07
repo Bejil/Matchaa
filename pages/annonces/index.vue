@@ -1,6 +1,34 @@
 <template>
   <div class="annonces-page">
-    <AnnoncesFilterBar :parsed="parsed" :merge-query="mergeQuery" />
+    <AnnoncesFilterBar :parsed="parsed" :merge-query="mergeQuery">
+      <template #actions>
+        <label class="annonces-sort annonces-sort--mobile">
+          <span class="annonces-sort__label">Trier</span>
+          <select
+            class="annonces-sort__select"
+            :value="parsed.tri"
+            @change="onTri($event)"
+          >
+            <option value="pertinence">Pertinence</option>
+            <option value="prix_asc">Prix croissant</option>
+            <option value="prix_desc">Prix décroissant</option>
+            <option value="date">Date</option>
+            <option value="surface_asc">Surface croissante</option>
+            <option value="surface_desc">Surface décroissante</option>
+            <option value="pieces_asc">Pièces croissant</option>
+            <option value="pieces_desc">Pièces décroissant</option>
+          </select>
+        </label>
+        <button
+          v-if="hasActiveSearchCriteria"
+          type="button"
+          class="annonces-mobile-alert-btn"
+          @click="onCreateSearchAlert"
+        >
+          Créer une alerte
+        </button>
+      </template>
+    </AnnoncesFilterBar>
 
     <div class="annonces-main">
       <div class="annonces-toolbar">
@@ -64,7 +92,8 @@
       </div>
 
       <AnnoncesSaveCta
-        v-if="hasActiveSearchCriteria && !hasAlertForCurrentSearch"
+        v-if="hasActiveSearchCriteria"
+        class="annonces-save--desktop"
         @create-alert="onCreateSearchAlert"
       />
 
@@ -328,21 +357,22 @@ function normalizeSearchQuery(query: typeof route.query): Record<string, string>
 }
 
 const hasActiveSearchCriteria = computed(() => {
-  const query = normalizeSearchQuery(route.query)
-  const hasProjet = query.projet === 'acheter' || query.projet === 'louer'
-  const hasAnotherCriteria = Object.keys(query).some((key) => key !== 'projet')
+  const p = parsed.value
+  const hasProjet = p.projet === 'acheter' || p.projet === 'louer'
+  const hasAnotherCriteria =
+    Boolean(p.ville.trim())
+    || p.types.length > 0
+    || p.budgetMin !== undefined
+    || p.budgetMax !== undefined
+    || p.surfaceMin !== undefined
+    || p.surfaceMax !== undefined
+    || p.piecesMin !== undefined
+    || p.piecesMax !== undefined
+    || p.chambresMin !== undefined
+    || p.chambresMax !== undefined
+    || p.dpeMin !== undefined
+    || p.features.length > 0
   return hasProjet && hasAnotherCriteria
-})
-
-const hasAlertForCurrentSearch = computed(() => {
-  const query = normalizeSearchQuery(route.query)
-  if (!Object.keys(query).length) {
-    return false
-  }
-  const currentSignature = JSON.stringify({ path: '/annonces', query })
-  return siteStore.savedSearches.some(
-    (search) => JSON.stringify(search.to) === currentSignature,
-  )
 })
 
 function saveCurrentSearchForUser() {

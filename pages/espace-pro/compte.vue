@@ -83,6 +83,7 @@ const siteStore = useSiteStore()
 const router = useRouter()
 const desktopPush = useDesktopPush()
 const auth = useSupabaseAuth()
+const supabase = useSupabaseClient()
 
 const pro = computed(() => siteStore.currentProUser)
 const proPushDiagnostics = computed(() => desktopPush.diagnostics())
@@ -108,18 +109,88 @@ watch(
 )
 
 
-function onSaveProSettings() {
+async function onSaveProSettings() {
   if (!pro.value) {
     return
   }
-  siteStore.updateProProfile(
-    pro.value.companyName,
-    settingsName.value,
-    settingsEmail.value,
-    settingsPassword.value,
-  )
-  settingsPassword.value = ''
-  settingsFeedback.value = 'Paramètres professionnels mis à jour.'
+  const nextName = settingsName.value.trim()
+  const nextEmail = settingsEmail.value.trim().toLowerCase()
+  const nextPassword = settingsPassword.value.trim()
+  if (!nextName || !nextEmail) {
+    settingsFeedback.value = 'Nom et e-mail sont requis.'
+    return
+  }
+  try {
+    if (supabase) {
+      const memberUpdate: {
+        display_name?: string
+        updated_at: string
+      } = {
+        updated_at: new Date().toISOString(),
+      }
+      if (nextName !== pro.value.name.trim()) {
+        memberUpdate.display_name = nextName
+      }
+      const { error: memberErr } = await supabase
+        .from('agency_members')
+        .update(memberUpdate)
+        .eq('user_id', pro.value.id)
+      if (memberErr) {
+        throw memberErr
+      }
+
+      const profileUpdate: {
+        display_name?: string
+        updated_at: string
+      } = {
+        updated_at: new Date().toISOString(),
+      }
+      if (nextName !== pro.value.name.trim()) {
+        profileUpdate.display_name = nextName
+      }
+      const { error: profileErr } = await supabase
+        .from('profiles')
+        .update(profileUpdate)
+        .eq('id', pro.value.id)
+      if (profileErr) {
+        throw profileErr
+      }
+
+      if (nextEmail !== pro.value.email || nextPassword) {
+        const payload: {
+          email?: string
+          password?: string
+          data?: Record<string, string>
+        } = {
+          data: { display_name: nextName },
+        }
+        if (nextEmail !== pro.value.email) {
+          payload.email = nextEmail
+        }
+        if (nextPassword) {
+          payload.password = nextPassword
+        }
+        const { error: authErr } = await supabase.auth.updateUser(payload)
+        if (authErr) {
+          throw authErr
+        }
+      }
+    }
+
+    siteStore.updateProProfile(
+      pro.value.companyName,
+      nextName,
+      nextEmail,
+      nextPassword,
+    )
+    settingsPassword.value = ''
+    settingsFeedback.value = nextEmail !== pro.value.email
+      ? 'Profil mis à jour. Vérifiez votre nouvelle adresse e-mail pour confirmer le changement.'
+      : 'Paramètres professionnels mis à jour.'
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Mise à jour impossible.'
+    settingsFeedback.value = `Mise à jour impossible : ${message}`
+  }
 }
 
 function onLogoutPro() {

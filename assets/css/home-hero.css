@@ -160,3 +160,32 @@
     padding-bottom: 3rem;
   }
 }
+
+@media (max-width: 640px) {
+  .hero--home .hero__inner {
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-top: 1.6rem;
+    padding-bottom: 2.25rem;
+  }
+
+  .hero--home .hero__content {
+    max-width: 100%;
+  }
+
+  .hero--home .hero__search-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hero--home .hero__location {
+    flex: 0 0 auto;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .hero--home .hero__location-list {
+    max-height: 10rem;
+  }
+}

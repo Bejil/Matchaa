@@ -707,6 +707,7 @@
             @input="autoResizeProspectChatComposer"
             @keydown="onProspectChatComposerKeydown"
           />
+          <p class="conversation-panel__hint conversation-panel__hint--inline">Entrée pour envoyer · Shift + Entrée pour un saut de ligne</p>
           <div class="conversation-panel__composer-actions">
             <div class="conversation-panel__listing-pick">
               <button
@@ -746,7 +747,6 @@
                 </ul>
               </div>
             </div>
-            <p class="conversation-panel__hint conversation-panel__hint--inline">Entrée pour envoyer · Shift + Entrée pour un saut de ligne</p>
             <button type="submit" class="profil-account__btn profil-account__btn--primary conversation-panel__send-btn" :disabled="!prospectChatDraft.trim()">
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M22 2 11 13" />

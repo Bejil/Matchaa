@@ -343,6 +343,19 @@
 }
 
 @media (max-width: 768px) {
+  .home-section {
+    padding: 2.1rem 1rem 1.6rem;
+  }
+
+  .home-section--testimonials {
+    padding: 1.6rem 1rem 2.3rem;
+  }
+
+  .home-cta {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
   .home-section__head {
     flex-direction: column;
     align-items: flex-start;
@@ -354,7 +367,17 @@
 }
 
 @media (max-width: 520px) {
+  .home-testimonials-marquee__cell {
+    flex-basis: min(80vw, 260px);
+    width: min(80vw, 260px);
+  }
+
   .home-cta__inner {
     padding: 1.5rem 1.25rem;
+  }
+
+  .home-cta__actions,
+  .home-cta__btn {
+    width: 100%;
   }
 }
