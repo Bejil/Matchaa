@@ -78,8 +78,9 @@ async function onEnableDesktopPushClick() {
   await desktopPush.confirmPermissionFromPrompt()
 }
 
-onMounted(() => {
+onMounted(async () => {
   siteStore.hydrateSession()
+  await useFavoritesStore().ensureRemoteHydration()
   window.addEventListener('matchaa:incoming-message', onIncomingMessage as EventListener)
   window.addEventListener('storage', onIncomingMessageStorage)
 })

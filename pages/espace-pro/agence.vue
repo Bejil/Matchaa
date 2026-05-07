@@ -16,7 +16,108 @@
         </header>
       </div>
 
-      <div class="compte-layout">
+      <div v-if="!agency" class="agency-onboarding">
+        <header class="agency-onboarding__head">
+          <h2 class="compte-panel__title">Choisissez votre mode de publication</h2>
+          <p class="compte-panel__lead">
+            Votre compte pro est actif mais n est rattaché à aucune agence.
+          </p>
+        </header>
+        <div class="agency-onboarding__grid">
+          <article class="pro-credits-pricing-card agency-onboarding__card agency-onboarding__card--primary">
+            <div class="agency-onboarding__icon" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 21h18" />
+                <path d="M5 21V7l8-4v18" />
+                <path d="M19 21V11l-6-4" />
+                <path d="M9 9v.01" />
+                <path d="M9 12v.01" />
+                <path d="M9 15v.01" />
+                <path d="M9 18v.01" />
+              </svg>
+            </div>
+            <p class="pro-credits-pricing-card__plan">Agence classique</p>
+            <p class="pro-credits-pricing-card__subtitle">Créer une structure collaborative</p>
+            <p class="pro-credits-pricing-card__price">
+              <strong>1 crédit</strong>
+              <span>offert à la création</span>
+            </p>
+            <p class="pro-credits-pricing-card__meta">
+              Invitez ensuite des membres et gérez leurs rôles.
+            </p>
+            <button
+              type="button"
+              class="profil-account__btn pro-credits-pricing-card__cta"
+              @click="showCreateAgencyModal = true"
+            >
+              Créer mon agence
+            </button>
+            <ul class="pro-credits-pricing-card__features">
+              <li>Mode multi-membres (agents + gestionnaires)</li>
+              <li>Paramétrage complet de la vitrine agence</li>
+              <li>Gestion partagée des annonces et crédits</li>
+            </ul>
+          </article>
+
+          <article class="pro-credits-pricing-card agency-onboarding__card agency-onboarding__card--primary">
+            <div class="agency-onboarding__icon" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            </div>
+            <p class="pro-credits-pricing-card__plan">Vendeur particulier</p>
+            <p class="pro-credits-pricing-card__subtitle">Publier en votre nom propre</p>
+            <p class="pro-credits-pricing-card__price">
+              <strong>1 crédit</strong>
+              <span>offert à l’activation</span>
+            </p>
+            <p class="pro-credits-pricing-card__meta">
+              Une agence personnelle est créée automatiquement.
+            </p>
+            <button
+              type="button"
+              class="profil-account__btn pro-credits-pricing-card__cta"
+              :disabled="creatingIndividualAgency"
+              @click="onDeclareIndividualSeller"
+            >
+              {{ creatingIndividualAgency ? 'Création en cours...' : 'Je suis un particulier' }}
+            </button>
+            <ul class="pro-credits-pricing-card__features">
+              <li>Publication rapide sans configuration complexe</li>
+              <li>Compte limité à un seul membre</li>
+              <li>Évolutif ensuite vers une agence classique</li>
+            </ul>
+          </article>
+
+          <article class="pro-credits-pricing-card agency-onboarding__card agency-onboarding__card--secondary">
+            <div class="agency-onboarding__icon agency-onboarding__icon--muted" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+            </div>
+            <p class="pro-credits-pricing-card__plan">Être invité par une agence</p>
+            <p class="pro-credits-pricing-card__subtitle">Rejoindre une agence déjà créée</p>
+            <p class="pro-credits-pricing-card__price">
+              <strong>0 crédit</strong>
+              <span>à l’activation</span>
+            </p>
+            <p class="pro-credits-pricing-card__meta">
+              Un gestionnaire peut vous inviter par email. Votre rattachement se fait automatiquement à la connexion.
+            </p>
+            <ul class="pro-credits-pricing-card__features">
+              <li>Aucune configuration agence à faire</li>
+              <li>Accès immédiat après acceptation de l’invitation</li>
+              <li>Rôle défini par le gestionnaire</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+
+      <div v-else-if="isAgencyManager" class="compte-layout">
         <aside class="compte-menu" aria-label="Navigation agence">
           <p class="compte-menu__title">Agence</p>
           <nav class="compte-menu__nav">
@@ -32,8 +133,8 @@
             <button
               type="button"
               class="compte-menu__item"
-              :class="{ 'is-active': activeTab === 'membres', 'is-disabled': !isAgencyManager }"
-              :disabled="!isAgencyManager"
+              :class="{ 'is-active': activeTab === 'membres', 'is-disabled': !isAgencyManager || isIndividualAgency }"
+              :disabled="!isAgencyManager || isIndividualAgency"
               @click="activeTab = 'membres'"
             >
               <span class="compte-menu__ic" aria-hidden="true">👥</span>
@@ -147,7 +248,10 @@
 
           <article v-else-if="activeTab === 'membres'" class="espace-pro-dashboard__card">
             <h2 class="compte-panel__title">Membres de l'agence</h2>
-            <p class="compte-panel__lead">Ajoutez des membres et gérez leur rôle.</p>
+            <p v-if="isIndividualAgency" class="compte-panel__lead">
+              Cette agence est en mode vendeur particulier : la gestion des membres est désactivée.
+            </p>
+            <p v-else class="compte-panel__lead">Ajoutez des membres et gérez leur rôle.</p>
             <aside class="annonces-save compte-panel__save" aria-labelledby="agency-members-cta-title">
               <div class="annonces-save__icon" aria-hidden="true">
                 <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
@@ -166,6 +270,7 @@
               <button
                 type="button"
                 class="annonces-save__btn"
+                :disabled="isIndividualAgency"
                 @click="showCreateMemberModal = true"
               >
                 Ajouter un membre
@@ -207,6 +312,35 @@
                 </div>
               </li>
             </ul>
+
+            <h3 class="compte-panel__title" style="margin-top: 1.25rem;">Invitations en attente</h3>
+            <ul v-if="pendingInvites.length" class="pro-members-list">
+              <li v-for="invite in pendingInvites" :key="invite.id" class="pro-members-list__item">
+                <div>
+                  <p class="pro-members-list__name">{{ invite.invited_email }}</p>
+                  <p class="pro-members-list__meta">
+                    {{ invite.role === 'manager' ? 'Gestionnaire' : 'Agent' }} · {{ new Date(invite.created_at).toLocaleString('fr-FR') }}
+                  </p>
+                </div>
+                <div class="pro-members-list__actions">
+                  <button
+                    type="button"
+                    class="compte-panel__search-remove compte-panel__search-remove--icon"
+                    aria-label="Annuler l'invitation"
+                    @click="cancelInvite(invite.id)"
+                  >
+                    <svg class="compte-panel__search-remove-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                      <path d="M3 6h18" />
+                      <path d="M8 6V4h8v2" />
+                      <rect x="6" y="6" width="12" height="14" rx="1" />
+                      <path d="M10 10v7" />
+                      <path d="M14 10v7" />
+                    </svg>
+                  </button>
+                </div>
+              </li>
+            </ul>
+            <p v-else class="compte-settings__hint">Aucune invitation en attente.</p>
           </article>
           <article v-else class="espace-pro-dashboard__card">
             <section class="pro-credits-page">
@@ -326,26 +460,156 @@
           </article>
         </main>
       </div>
+      <article v-else class="espace-pro-dashboard__card pro-agency-member-view">
+        <header class="pro-agency-member-view__head">
+          <div>
+            <p class="pro-agency-member-view__eyebrow">Accès membre</p>
+            <h2 class="pro-agency-member-view__title">{{ agency?.name || 'Agence' }}</h2>
+            <p class="pro-agency-member-view__lead">
+              Vous consultez les informations de votre agence en lecture seule.
+            </p>
+          </div>
+          <img
+            v-if="agency?.logo"
+            :src="agency.logo"
+            alt="Logo de l agence"
+            class="pro-agency-member-view__logo"
+          >
+        </header>
+
+        <section class="pro-agency-member-view__grid" aria-label="Détails agence">
+          <article class="pro-agency-member-view__item">
+            <p class="pro-agency-member-view__label">Nom</p>
+            <p class="pro-agency-member-view__value">{{ agency?.name || 'Non renseigné' }}</p>
+          </article>
+          <article class="pro-agency-member-view__item">
+            <p class="pro-agency-member-view__label">Ville</p>
+            <p class="pro-agency-member-view__value">{{ agency?.city || 'Non renseigné' }}</p>
+          </article>
+          <article class="pro-agency-member-view__item">
+            <p class="pro-agency-member-view__label">Adresse</p>
+            <p class="pro-agency-member-view__value">{{ agency?.address || 'Non renseignée' }}</p>
+          </article>
+          <article class="pro-agency-member-view__item">
+            <p class="pro-agency-member-view__label">Email de contact</p>
+            <p class="pro-agency-member-view__value">{{ agency?.contactEmail || 'Non renseigné' }}</p>
+          </article>
+          <article class="pro-agency-member-view__item">
+            <p class="pro-agency-member-view__label">Téléphone</p>
+            <p class="pro-agency-member-view__value">{{ agency?.contactPhone || 'Non renseigné' }}</p>
+          </article>
+          <article class="pro-agency-member-view__item pro-agency-member-view__item--wide">
+            <p class="pro-agency-member-view__label">Description</p>
+            <p class="pro-agency-member-view__value">{{ agency?.description || 'Aucune description.' }}</p>
+          </article>
+        </section>
+      </article>
+
+      <AppCenterModal
+        v-model="showCreateAgencyModal"
+        title="Creer mon agence"
+      >
+        <form class="compte-settings__form" @submit.prevent="onCreateAgency">
+          <label class="compte-settings__label" for="create-agency-name">Nom de l'agence</label>
+          <input id="create-agency-name" v-model.trim="createAgencyName" class="compte-settings__input" type="text" required>
+
+          <label class="compte-settings__label" for="create-agency-logo-file">Logo de l'agence</label>
+          <input
+            id="create-agency-logo-file"
+            class="compte-settings__input"
+            type="file"
+            accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+            @change="onCreateAgencyLogoSelected"
+          >
+          <p class="pro-agency-logo-help">
+            Formats acceptés : JPG, JPEG, PNG · Taille max : 2 Mo.
+          </p>
+          <p
+            v-if="createAgencyLogoError"
+            class="pro-agency-logo-error"
+            role="alert"
+            aria-live="assertive"
+          >
+            {{ createAgencyLogoError }}
+          </p>
+          <p v-if="createAgencyLogoName" class="pro-agency-logo-name">
+            Fichier sélectionné : {{ createAgencyLogoName }}
+          </p>
+          <img
+            v-if="createAgencyLogo"
+            :src="createAgencyLogo"
+            alt="Aperçu du logo de la nouvelle agence"
+            class="pro-agency-logo-preview"
+          >
+
+          <label class="compte-settings__label" for="create-agency-city">Ville</label>
+          <div class="pro-location-input">
+            <input
+              id="create-agency-city"
+              v-model.trim="createAgencyCity"
+              class="compte-settings__input"
+              type="text"
+              autocomplete="off"
+              @input="onCreateAgencyCityInput"
+              @focus="onCreateAgencyCityFocus"
+              @blur="onCreateAgencyCityBlur"
+            >
+            <ul v-if="createAgencyCityOpen && createAgencyCitySuggestionList.length" class="pro-location-input__suggestions" role="listbox">
+              <li v-for="c in createAgencyCitySuggestionList" :key="`create-${c.code}-${c.nom}`">
+                <button type="button" class="pro-location-input__suggestion" @mousedown.prevent="pickCreateAgencyCity(c)">
+                  {{ communeLabel(c) }}
+                </button>
+              </li>
+            </ul>
+          </div>
+
+          <label class="compte-settings__label" for="create-agency-address">Adresse</label>
+          <input id="create-agency-address" v-model.trim="createAgencyAddress" class="compte-settings__input" type="text">
+
+          <label class="compte-settings__label" for="create-agency-phone">Telephone</label>
+          <input id="create-agency-phone" v-model.trim="createAgencyPhone" class="compte-settings__input" type="text">
+
+          <label class="compte-settings__label" for="create-agency-desc">Description</label>
+          <textarea
+            id="create-agency-desc"
+            v-model.trim="createAgencyDescription"
+            class="compte-settings__input compte-settings__input--textarea"
+            rows="4"
+          />
+
+          <p v-if="createAgencyFeedback" class="compte-settings__feedback" role="status">{{ createAgencyFeedback }}</p>
+
+          <div class="compte-settings__confirm-actions">
+            <button
+              type="button"
+              class="profil-account__btn profil-account__btn--ghost"
+              @click="showCreateAgencyModal = false"
+            >
+              Annuler
+            </button>
+            <button type="submit" class="profil-account__btn profil-account__btn--primary" :disabled="isCreatingAgency">
+              {{ isCreatingAgency ? 'Creation...' : "Creer l'agence" }}
+            </button>
+          </div>
+        </form>
+      </AppCenterModal>
 
       <AppCenterModal
         v-model="showCreateMemberModal"
-        title="Ajouter un membre"
+        title="Inviter un membre"
       >
         <form class="compte-settings__form" @submit.prevent="onAddAgent">
-          <label class="compte-settings__label" for="member-name-modal">Nom</label>
-          <input id="member-name-modal" v-model.trim="newMemberName" class="compte-settings__input" type="text" required>
-
           <label class="compte-settings__label" for="member-email-modal">Email</label>
           <input id="member-email-modal" v-model.trim="newMemberEmail" class="compte-settings__input" type="email" required>
-
-          <label class="compte-settings__label" for="member-password-modal">Mot de passe initial</label>
-          <input id="member-password-modal" v-model="newMemberPassword" class="compte-settings__input" type="password" required>
 
           <label class="compte-settings__label" for="member-role-modal">Rôle</label>
           <select id="member-role-modal" v-model="newMemberRole" class="compte-settings__input">
             <option value="agent">Agent</option>
             <option value="manager">Gestionnaire</option>
           </select>
+          <p class="compte-settings__hint">
+            Un rattachement sera appliqué automatiquement à la prochaine connexion de cet email.
+          </p>
 
           <div class="compte-settings__confirm-actions">
             <button
@@ -355,7 +619,7 @@
             >
               Annuler
             </button>
-            <button type="submit" class="profil-account__btn profil-account__btn--primary">Créer le membre</button>
+            <button type="submit" class="profil-account__btn profil-account__btn--primary">Envoyer l'invitation</button>
           </div>
         </form>
       </AppCenterModal>
@@ -535,11 +799,18 @@ const {
   debouncedFetch: debouncedFetchAgencyCity,
   clearSuggestions: clearAgencyCitySuggestions,
 } = useCommuneSearch()
+const {
+  suggestions: createAgencyCitySuggestions,
+  debouncedFetch: debouncedFetchCreateAgencyCity,
+  clearSuggestions: clearCreateAgencyCitySuggestions,
+} = useCommuneSearch()
+const supabase = useSupabaseClient()
 
 const pro = computed(() => siteStore.currentProUser)
 const agency = computed(() => siteStore.currentProAgency)
 const agencyMembers = computed(() => siteStore.currentProAgencyMembers)
 const isAgencyManager = computed(() => pro.value?.role === 'manager')
+const isIndividualAgency = computed(() => agency.value?.agencyKind === 'individual')
 const activeTab = ref<'infos' | 'membres' | 'credits'>('infos')
 const creditPacks = computed(() => siteStore.creditPacks)
 const annualOffer = computed(() => siteStore.annualSubscriptionOffer)
@@ -591,11 +862,23 @@ const agencyDescription = ref('')
 const agencyCityOpen = ref(false)
 const agencyLogoError = ref('')
 
-const newMemberName = ref('')
 const newMemberEmail = ref('')
-const newMemberPassword = ref('')
 const newMemberRole = ref<'agent' | 'manager'>('agent')
 const membersFeedback = ref('')
+const pendingInvites = ref<Array<{ id: string; invited_email: string; role: 'agent' | 'manager'; created_at: string }>>([])
+const showCreateAgencyModal = ref(false)
+const createAgencyName = ref('')
+const createAgencyCity = ref('')
+const createAgencyAddress = ref('')
+const createAgencyPhone = ref('')
+const createAgencyDescription = ref('')
+const createAgencyLogo = ref('')
+const createAgencyLogoName = ref('')
+const createAgencyLogoError = ref('')
+const createAgencyCityOpen = ref(false)
+const createAgencyFeedback = ref('')
+const isCreatingAgency = ref(false)
+const creatingIndividualAgency = ref(false)
 const showCreateMemberModal = ref(false)
 const showDeleteMemberModal = ref(false)
 const showResetCreditsModal = ref(false)
@@ -773,8 +1056,17 @@ watch(
   { immediate: true },
 )
 
+watch(isIndividualAgency, (value) => {
+  if (value && activeTab.value === 'membres') {
+    activeTab.value = 'infos'
+  }
+}, { immediate: true })
+
 const agencyCitySuggestionList = computed(() =>
   agencyCityOpen.value ? agencyCitySuggestions.value : [],
+)
+const createAgencyCitySuggestionList = computed(() =>
+  createAgencyCityOpen.value ? createAgencyCitySuggestions.value : [],
 )
 
 function communeLabel(c: CommuneResult) {
@@ -811,11 +1103,34 @@ function pickAgencyCity(c: CommuneResult) {
   clearAgencyCitySuggestions()
 }
 
-function onSaveAgency() {
+function onCreateAgencyCityInput() {
+  debouncedFetchCreateAgencyCity(createAgencyCity.value)
+  createAgencyCityOpen.value = createAgencyCity.value.trim().length >= 2
+}
+
+function onCreateAgencyCityFocus() {
+  if (createAgencyCity.value.trim().length >= 2 && createAgencyCitySuggestions.value.length) {
+    createAgencyCityOpen.value = true
+  }
+}
+
+function onCreateAgencyCityBlur() {
+  window.setTimeout(() => {
+    createAgencyCityOpen.value = false
+  }, 180)
+}
+
+function pickCreateAgencyCity(c: CommuneResult) {
+  createAgencyCity.value = c.nom
+  createAgencyCityOpen.value = false
+  clearCreateAgencyCitySuggestions()
+}
+
+async function onSaveAgency() {
   if (!isAgencyManager.value) {
     return
   }
-  siteStore.updateCurrentAgencyInfo({
+  const result = await siteStore.updateCurrentAgencyInfo({
     name: agencyName.value,
     logo: agencyLogo.value,
     contactEmail: agencyEmail.value,
@@ -824,10 +1139,91 @@ function onSaveAgency() {
     address: agencyAddress.value,
     description: agencyDescription.value,
   })
+  if (!result.ok) {
+    showToast({
+      title: 'Mise a jour impossible',
+      message: result.message || 'La mise a jour de l agence a echoue.',
+      variant: 'error',
+    })
+    return
+  }
   showToast({
     title: 'Agence mise à jour',
     message: 'Informations agence mises à jour.',
   })
+}
+
+async function onCreateAgency() {
+  if (isCreatingAgency.value) {
+    return
+  }
+  isCreatingAgency.value = true
+  createAgencyFeedback.value = ''
+  try {
+    const result = await siteStore.createAgencyForCurrentPro({
+      name: createAgencyName.value,
+      city: createAgencyCity.value,
+      address: createAgencyAddress.value,
+      contactPhone: createAgencyPhone.value,
+      description: createAgencyDescription.value,
+      logo: createAgencyLogo.value,
+      agencyKind: 'standard',
+    })
+    if (!result.ok) {
+      createAgencyFeedback.value = result.message || 'Creation impossible. Verifiez le formulaire.'
+      return
+    }
+    createAgencyFeedback.value = ''
+    showCreateAgencyModal.value = false
+    createAgencyName.value = ''
+    createAgencyCity.value = ''
+    createAgencyAddress.value = ''
+    createAgencyPhone.value = ''
+    createAgencyDescription.value = ''
+    createAgencyLogo.value = ''
+    createAgencyLogoName.value = ''
+    createAgencyLogoError.value = ''
+    createAgencyCityOpen.value = false
+    clearCreateAgencyCitySuggestions()
+    showToast({
+      title: 'Agence creee',
+      message: 'Votre compte est maintenant rattache a votre agence en tant que gestionnaire.',
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Erreur inconnue.'
+    createAgencyFeedback.value = `Creation impossible: ${message}`
+  } finally {
+    isCreatingAgency.value = false
+  }
+}
+
+async function onDeclareIndividualSeller() {
+  if (creatingIndividualAgency.value) {
+    return
+  }
+  creatingIndividualAgency.value = true
+  try {
+    const displayName = pro.value?.name?.trim() || 'Vendeur particulier'
+    const result = await siteStore.createAgencyForCurrentPro({
+      name: `Agence personnelle de ${displayName}`,
+      description: 'Agence personnelle creee pour publication en nom propre.',
+      agencyKind: 'individual',
+    })
+    if (!result.ok) {
+      showToast({
+        title: 'Creation impossible',
+        message: result.message || 'Impossible de creer votre agence personnelle.',
+        variant: 'error',
+      })
+      return
+    }
+    showToast({
+      title: 'Particulier activé',
+      message: 'Votre espace vendeur particulier est prêt, avec 1 crédit offert.',
+    })
+  } finally {
+    creatingIndividualAgency.value = false
+  }
 }
 
 function onAgencyLogoSelected(event: Event) {
@@ -863,27 +1259,124 @@ function onAgencyLogoSelected(event: Event) {
   reader.readAsDataURL(file)
 }
 
-function onAddAgent() {
-  const ok = siteStore.addCurrentAgencyMember({
-    name: newMemberName.value,
-    email: newMemberEmail.value,
-    password: newMemberPassword.value,
-    role: newMemberRole.value,
-  })
-  if (!ok) {
-    membersFeedback.value = 'Impossible d’ajouter cet agent (email déjà utilisé ou données invalides).'
+function onCreateAgencyLogoSelected(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) {
     return
   }
-  newMemberName.value = ''
+  createAgencyLogoError.value = ''
+  const allowedTypes = ['image/jpeg', 'image/png']
+  const maxBytes = 2 * 1024 * 1024
+  if (!allowedTypes.includes(file.type)) {
+    createAgencyLogoError.value = 'Logo invalide : utilisez uniquement JPG, JPEG ou PNG.'
+    input.value = ''
+    return
+  }
+  if (file.size > maxBytes) {
+    createAgencyLogoError.value = 'Logo trop volumineux : maximum 2 Mo.'
+    input.value = ''
+    return
+  }
+  const reader = new FileReader()
+  reader.onload = () => {
+    if (typeof reader.result !== 'string') {
+      return
+    }
+    createAgencyLogo.value = reader.result
+    createAgencyLogoName.value = file.name
+  }
+  reader.onerror = () => {
+    createAgencyLogoError.value = 'Impossible de lire ce fichier.'
+  }
+  reader.readAsDataURL(file)
+}
+
+async function loadPendingInvites() {
+  if (!supabase || !pro.value?.agencyId || !isAgencyManager.value) {
+    pendingInvites.value = []
+    return
+  }
+  const { data, error } = await supabase
+    .from('agency_member_invites')
+    .select('id, invited_email, role, created_at')
+    .eq('agency_id', pro.value.agencyId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+  if (error) {
+    console.warn('[Matchaa] invites load', error.message)
+    pendingInvites.value = []
+    return
+  }
+  pendingInvites.value = (data ?? []) as Array<{ id: string; invited_email: string; role: 'agent' | 'manager'; created_at: string }>
+}
+
+async function syncAgencyMembers() {
+  const result = await siteStore.syncCurrentAgencyMembersFromCloud()
+  if (!result.ok) {
+    console.warn('[Matchaa] sync agency members', result.message || 'unknown error')
+  }
+}
+
+async function syncAgencyInfo() {
+  const result = await siteStore.syncCurrentAgencyFromCloud()
+  if (!result.ok) {
+    console.warn('[Matchaa] sync agency info', result.message || 'unknown error')
+  }
+}
+
+async function onAddAgent() {
+  if (isIndividualAgency.value) {
+    membersFeedback.value = 'Une agence personnelle ne peut pas avoir de membres.'
+    return
+  }
+  const email = newMemberEmail.value.trim().toLowerCase()
+  if (!email) {
+    membersFeedback.value = 'Renseignez un email valide.'
+    return
+  }
+  if (!supabase || !pro.value?.agencyId || !isAgencyManager.value) {
+    membersFeedback.value = 'Action réservée au gestionnaire avec agence rattachée.'
+    return
+  }
+  const { error } = await supabase.from('agency_member_invites').insert({
+    agency_id: pro.value.agencyId,
+    invited_email: email,
+    role: newMemberRole.value,
+    invited_by_user_id: pro.value.id,
+    status: 'pending',
+  })
+  if (error) {
+    membersFeedback.value = `Invitation impossible : ${error.message}`
+    return
+  }
   newMemberEmail.value = ''
-  newMemberPassword.value = ''
   newMemberRole.value = 'agent'
   showCreateMemberModal.value = false
-  membersFeedback.value = 'Agent ajouté.'
+  membersFeedback.value = 'Invitation envoyée.'
+  await syncAgencyMembers()
+  await loadPendingInvites()
   showToast({
-    title: 'Membre créé',
-    message: 'Membre créé avec succès.',
+    title: 'Invitation envoyee',
+    message: 'Le rattachement sera applique a la prochaine connexion de cet email.',
   })
+}
+
+async function cancelInvite(inviteId: string) {
+  if (!supabase || !isAgencyManager.value) {
+    return
+  }
+  const { error } = await supabase
+    .from('agency_member_invites')
+    .update({ status: 'cancelled' })
+    .eq('id', inviteId)
+  if (error) {
+    membersFeedback.value = `Annulation impossible : ${error.message}`
+    return
+  }
+  await loadPendingInvites()
+  await syncAgencyMembers()
+  membersFeedback.value = 'Invitation annulée.'
 }
 
 function requestRemoveMember(memberId: string) {
@@ -891,19 +1384,30 @@ function requestRemoveMember(memberId: string) {
   showDeleteMemberModal.value = true
 }
 
-function onConfirmRemoveMember() {
+async function onConfirmRemoveMember() {
   if (!memberIdToDelete.value) {
     showDeleteMemberModal.value = false
     return
   }
-  siteStore.removeCurrentAgencyMember(memberIdToDelete.value)
+  const result = await siteStore.removeCurrentAgencyMember(memberIdToDelete.value)
+  if (!result.ok) {
+    membersFeedback.value = `Suppression impossible : ${result.message || 'Erreur inconnue.'}`
+    showDeleteMemberModal.value = false
+    return
+  }
   memberIdToDelete.value = null
   showDeleteMemberModal.value = false
+  await syncAgencyMembers()
   membersFeedback.value = 'Agent supprimé.'
 }
 
-function onChangeRole(memberId: string, role: 'agent' | 'manager') {
-  siteStore.setCurrentAgencyMemberRole(memberId, role)
+async function onChangeRole(memberId: string, role: 'agent' | 'manager') {
+  const result = await siteStore.setCurrentAgencyMemberRole(memberId, role)
+  if (!result.ok) {
+    membersFeedback.value = `Mise a jour impossible : ${result.message || 'Erreur inconnue.'}`
+    return
+  }
+  await syncAgencyMembers()
   membersFeedback.value = 'Rôle mis à jour.'
 }
 
@@ -1084,4 +1588,10 @@ function formatCreditLedgerNote(entry: { type: string; note: string }): string {
 useHead({
   title: 'Agence — Espace Pro Matchaa',
 })
+
+watch([() => pro.value?.agencyId, isAgencyManager], () => {
+  void syncAgencyInfo()
+  void syncAgencyMembers()
+  void loadPendingInvites()
+}, { immediate: true })
 </script>

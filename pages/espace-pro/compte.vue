@@ -62,8 +62,8 @@
           <button type="button" class="profil-account__btn profil-account__btn--ghost" @click="showDeleteConfirm = false">
             Annuler
           </button>
-          <button type="button" class="profil-account__btn profil-account__btn--danger" @click="onDeleteProAccount">
-            Confirmer la suppression
+          <button type="button" class="profil-account__btn profil-account__btn--danger" :disabled="deletingAccount" @click="onDeleteProAccount">
+            {{ deletingAccount ? 'Suppression...' : 'Confirmer la suppression' }}
           </button>
         </div>
       </AppCenterModal>
@@ -82,6 +82,7 @@ import DesktopPushSettingsCard from '~/components/notifications/DesktopPushSetti
 const siteStore = useSiteStore()
 const router = useRouter()
 const desktopPush = useDesktopPush()
+const auth = useSupabaseAuth()
 
 const pro = computed(() => siteStore.currentProUser)
 const proPushDiagnostics = computed(() => desktopPush.diagnostics())
@@ -92,6 +93,7 @@ const settingsFeedback = ref('')
 const proPushFeedback = ref('')
 const proPushFeedbackIsError = ref(false)
 const showDeleteConfirm = ref(false)
+const deletingAccount = ref(false)
 
 watch(
   pro,
@@ -125,10 +127,22 @@ function onLogoutPro() {
   router.push('/espace-pro')
 }
 
-function onDeleteProAccount() {
+async function onDeleteProAccount() {
+  if (deletingAccount.value) {
+    return
+  }
+  deletingAccount.value = true
   showDeleteConfirm.value = false
-  siteStore.deleteProAccount()
-  router.push('/espace-pro')
+  try {
+    await auth.deleteMyAccount()
+    siteStore.deleteProAccount()
+    await router.push('/espace-pro')
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Suppression impossible.'
+    settingsFeedback.value = `Suppression impossible: ${message}`
+  } finally {
+    deletingAccount.value = false
+  }
 }
 
 function onEnableProDesktopPush() {

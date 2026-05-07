@@ -4105,6 +4105,39 @@ button.prospect-kpi-card {
   margin: 2rem 0;
 }
 
+.agency-onboarding {
+  display: grid;
+  gap: 1rem;
+}
+
+.agency-onboarding__head .compte-panel__lead {
+  margin: 0.4rem 0 0;
+}
+
+.agency-onboarding__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.22fr) minmax(0, 1.22fr) minmax(0, 0.72fr);
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.agency-onboarding__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.85rem;
+  color: var(--color-accent, #2d7a4a);
+  background: color-mix(in srgb, var(--color-accent, #2d7a4a) 12%, var(--color-surface, #fff));
+  border: 1px solid color-mix(in srgb, var(--color-accent, #2d7a4a) 22%, var(--color-border));
+  margin-bottom: 0.15rem;
+}
+
+.agency-onboarding__icon svg {
+  flex-shrink: 0;
+}
+
 .pro-credits-pricing-card {
   position: relative;
   border: 1px solid var(--color-border);
@@ -4242,6 +4275,78 @@ button.prospect-kpi-card {
 
 .pro-credits-pricing-card.is-featured .pro-credits-pricing-card__features li::before {
   background: #fff;
+}
+
+/* Onboarding agence : 2 cartes mises en avant + survol */
+.agency-onboarding__card {
+  min-height: 100%;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.agency-onboarding__card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px rgb(19 31 53 / 6%);
+}
+
+.agency-onboarding__card--primary {
+  border: 2px solid color-mix(in srgb, var(--color-accent, #2d7a4a) 48%, var(--color-border));
+  padding: 1.2rem 1.15rem;
+  background: linear-gradient(
+    168deg,
+    color-mix(in srgb, var(--color-accent, #2d7a4a) 11%, var(--color-surface, #fff)) 0%,
+    var(--color-surface, #fff) 52%
+  );
+  box-shadow:
+    0 14px 34px color-mix(in srgb, var(--color-accent, #2d7a4a) 14%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--color-accent, #2d7a4a) 8%, transparent);
+}
+
+.agency-onboarding__card--primary:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--color-accent, #2d7a4a) 54%, var(--color-border));
+  box-shadow:
+    0 14px 28px color-mix(in srgb, var(--color-accent, #2d7a4a) 9%, rgb(19 31 53 / 5%));
+}
+
+.agency-onboarding__card--primary .agency-onboarding__icon {
+  width: 3.75rem;
+  height: 3.75rem;
+}
+
+.agency-onboarding__card--secondary {
+  border: 1px dashed color-mix(in srgb, var(--color-border) 70%, var(--color-text-muted));
+  background: color-mix(in srgb, var(--color-surface-muted, #fafafa) 92%, var(--color-surface, #fff));
+  box-shadow: 0 8px 20px rgb(19 31 53 / 5%);
+  padding: 1rem;
+}
+
+.agency-onboarding__card--secondary:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--color-border) 62%, var(--color-text-muted));
+  box-shadow: 0 10px 22px rgb(19 31 53 / 6%);
+}
+
+.agency-onboarding__icon--muted {
+  color: var(--color-text-muted);
+  background: color-mix(in srgb, var(--color-text-muted) 9%, var(--color-surface, #fff));
+  border-color: var(--color-border);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agency-onboarding__card,
+  .agency-onboarding__card--primary,
+  .agency-onboarding__card--secondary {
+    transition: none;
+  }
+
+  .agency-onboarding__card:hover,
+  .agency-onboarding__card--primary:hover,
+  .agency-onboarding__card--secondary:hover {
+    transform: none;
+  }
 }
 
 .pro-credits-page__section-title {
@@ -4580,6 +4685,7 @@ button.prospect-kpi-card {
   .pro-credits-page__hero,
   .pro-credits-page__stats,
   .pro-credits-page__offers,
+  .agency-onboarding__grid,
   .pro-credits-payment__row {
     grid-template-columns: 1fr;
   }
@@ -4648,4 +4754,77 @@ button.prospect-kpi-card {
   font-size: 0.75rem;
   font-weight: 700;
   vertical-align: middle;
+}
+
+.pro-agency-member-view {
+  padding: 1.1rem;
+}
+
+.pro-agency-member-view__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.pro-agency-member-view__eyebrow {
+  margin: 0 0 0.2rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+.pro-agency-member-view__title {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.pro-agency-member-view__lead {
+  margin: 0.3rem 0 0;
+  color: var(--color-text-muted);
+}
+
+.pro-agency-member-view__logo {
+  width: 3.6rem;
+  height: 3.6rem;
+  object-fit: cover;
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-border);
+  background: #fff;
+  flex-shrink: 0;
+}
+
+.pro-agency-member-view__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.pro-agency-member-view__item {
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  padding: 0.72rem 0.8rem;
+  background: linear-gradient(160deg, #ffffff 0%, #f7fbf9 100%);
+}
+
+.pro-agency-member-view__item--wide {
+  grid-column: 1 / -1;
+}
+
+.pro-agency-member-view__label {
+  margin: 0 0 0.2rem;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+}
+
+.pro-agency-member-view__value {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--color-text);
+  line-height: 1.45;
 }

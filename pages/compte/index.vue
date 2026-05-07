@@ -371,8 +371,8 @@
           <button type="button" class="profil-account__btn profil-account__btn--ghost" @click="showDeleteConfirm = false">
             Annuler
           </button>
-          <button type="button" class="profil-account__btn profil-account__btn--danger" @click="onDeleteAccount">
-            Confirmer la suppression
+          <button type="button" class="profil-account__btn profil-account__btn--danger" :disabled="deletingAccount" @click="onDeleteAccount">
+            {{ deletingAccount ? 'Suppression...' : 'Confirmer la suppression' }}
           </button>
         </div>
       </AppCenterModal>
@@ -474,6 +474,7 @@ const siteStore = useSiteStore()
 const favoritesStore = useFavoritesStore()
 const router = useRouter()
 const route = useRoute()
+const auth = useSupabaseAuth()
 
 const currentUser = computed(() => siteStore.currentUser)
 const desktopPush = useDesktopPush()
@@ -497,6 +498,7 @@ const ITEMS_PER_PAGE = 32
 const searchesPage = ref(1)
 const favoritesPage = ref(1)
 const showDeleteConfirm = ref(false)
+const deletingAccount = ref(false)
 const showDeleteSearchesConfirm = ref(false)
 const searchToDeleteId = ref<string | null>(null)
 const settingsToastVisible = ref(false)
@@ -805,10 +807,26 @@ function onSaveSettings() {
   }, 3200)
 }
 
-function onDeleteAccount() {
+async function onDeleteAccount() {
+  if (deletingAccount.value) {
+    return
+  }
+  deletingAccount.value = true
   showDeleteConfirm.value = false
-  siteStore.deleteAccount()
-  router.push('/profil')
+  try {
+    await auth.deleteMyAccount()
+    siteStore.deleteAccount()
+    await router.push('/profil')
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Suppression impossible.'
+    showToast({
+      title: 'Suppression impossible',
+      message,
+      variant: 'error',
+    })
+  } finally {
+    deletingAccount.value = false
+  }
 }
 
 function openDeleteSearchConfirm(id: string) {

@@ -56,8 +56,9 @@ const desktopPushPromptSource = desktopPush.promptSource
 const incomingToastVisible = ref(false)
 let incomingToastTimer: ReturnType<typeof setTimeout> | null = null
 
-onMounted(() => {
+onMounted(async () => {
   siteStore.hydrateProSession()
+  await useFavoritesStore().ensureRemoteHydration()
   desktopPush.openPermissionPromptIfNeeded('pro')
   window.addEventListener('matchaa:incoming-message', onIncomingMessage as EventListener)
   window.addEventListener('storage', onIncomingMessageStorage)

@@ -99,31 +99,6 @@
           <article class="profil-auth__card" aria-labelledby="pro-register-title">
             <h2 id="pro-register-title" class="profil-auth__card-title">Créer un compte professionnel</h2>
             <form class="profil-auth__form" @submit.prevent="onProRegisterSubmit">
-              <span class="profil-auth__label">Je suis</span>
-              <div class="pro-register-role">
-                <label class="pro-register-role__option">
-                  <input v-model="registerRole" type="radio" value="agent">
-                  Agent d'agence
-                </label>
-                <label class="pro-register-role__option">
-                  <input v-model="registerRole" type="radio" value="manager">
-                  Gestionnaire d'agence
-                </label>
-              </div>
-
-              <template v-if="registerRole === 'manager'">
-                <label class="profil-auth__label" for="pro-register-company">Raison sociale</label>
-                <input id="pro-register-company" v-model.trim="registerCompany" class="profil-auth__input" type="text" autocomplete="organization" required>
-              </template>
-              <template v-else>
-                <label class="profil-auth__label" for="pro-register-agency">Agence de rattachement</label>
-                <select id="pro-register-agency" v-model="registerAgencyId" class="profil-auth__input" required>
-                  <option v-for="agency in agencies" :key="agency.id" :value="agency.id">
-                    {{ agency.name }}
-                  </option>
-                </select>
-              </template>
-
               <label class="profil-auth__label" for="pro-register-name">Nom du contact</label>
               <input id="pro-register-name" v-model.trim="registerName" class="profil-auth__input" type="text" autocomplete="name" required>
 
@@ -173,67 +148,181 @@ definePageMeta({ layout: 'pro' })
 
 const siteStore = useSiteStore()
 const router = useRouter()
+const auth = useSupabaseAuth()
+const supabase = useSupabaseClient()
 
 const loginEmail = ref('')
 const loginPassword = ref('')
 
-const registerCompany = ref('')
 const registerName = ref('')
 const registerEmail = ref('')
 const registerPassword = ref('')
-const registerRole = ref<'agent' | 'manager'>('agent')
-const registerAgencyId = ref('')
 
 const feedback = ref('')
-const agencies = computed(() => siteStore.proAgencies)
 
-function onProLoginSubmit() {
-  const ok = siteStore.loginPro(loginEmail.value, loginPassword.value)
-  if (!ok) {
-    if (siteStore.matchesPublicDemoCredentials(loginEmail.value, loginPassword.value)) {
-      feedback.value = 'Ce compte est un compte particulier. Utilisez la page Identification ou des identifiants professionnels.'
-      return
-    }
-    feedback.value = 'Identifiants invalides pour l’Espace Pro. Vérifiez votre e-mail et mot de passe.'
-    return
+async function resolveProMembershipWithInvite(uid: string, email: string) {
+  if (!supabase) {
+    return null
   }
-  feedback.value = `Bienvenue, ${siteStore.currentProUser?.companyName}. Redirection…`
-  router.push('/espace-pro/dashboard')
+  const normalizedEmail = email.trim().toLowerCase()
+  let { data: membership } = await supabase
+    .from('agency_members')
+    .select('id, agency_id, role, display_name')
+    .eq('user_id', uid)
+    .limit(1)
+    .maybeSingle()
+  if (membership?.agency_id) {
+    return membership
+  }
+  const { data: invite } = await supabase
+    .from('agency_member_invites')
+    .select('id, agency_id, role')
+    .ilike('invited_email', normalizedEmail)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (!invite?.agency_id) {
+    return null
+  }
+  const role = invite.role === 'manager' ? 'manager' : 'agent'
+  const { error: joinErr } = await supabase.from('agency_members').insert({
+    user_id: uid,
+    agency_id: invite.agency_id,
+    role,
+    display_name: normalizedEmail.split('@')[0] || normalizedEmail,
+  })
+  if (joinErr) {
+    console.warn('[Matchaa] invitation attach', joinErr.message)
+    return null
+  }
+  await supabase
+    .from('agency_member_invites')
+    .update({ status: 'accepted', accepted_at: new Date().toISOString() })
+    .eq('id', invite.id)
+  const { data: attached } = await supabase
+    .from('agency_members')
+    .select('id, agency_id, role, display_name')
+    .eq('user_id', uid)
+    .limit(1)
+    .maybeSingle()
+  return attached
 }
 
-function onProRegisterSubmit() {
+async function onProLoginSubmit() {
+  try {
+    const { session } = await auth.signInWithEmail(loginEmail.value, loginPassword.value)
+    const uid = session?.user?.id
+    const email = session?.user?.email?.trim().toLowerCase() || ''
+    if (!uid || !email || !supabase) {
+      feedback.value = 'Session Supabase introuvable après connexion.'
+      return
+    }
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('account_kind')
+      .eq('id', uid)
+      .maybeSingle()
+    if (profile?.account_kind !== 'pro') {
+      await auth.signOut()
+      feedback.value = 'Ce compte est un compte particulier. Utilisez la page Identification.'
+      return
+    }
+    const membership = await resolveProMembershipWithInvite(uid, email)
+    const hasAgency = Boolean(membership?.agency_id)
+    const { data: agency } = hasAgency
+      ? await supabase
+          .from('agencies')
+          .select('name')
+          .eq('id', membership?.agency_id ?? '')
+          .maybeSingle()
+      : { data: null as { name?: string } | null }
+    siteStore.setCurrentProUserForSession({
+      id: uid,
+      agencyId: membership?.agency_id ?? '',
+      name: (membership?.display_name || email).trim(),
+      email,
+      role: membership?.role === 'manager' ? 'manager' : 'agent',
+      companyName: agency?.name || 'Agence non renseignée',
+    })
+    if (!hasAgency) {
+      feedback.value = 'Compte pro créé sans agence. Renseignez votre agence dans les réglages pour activer les fonctionnalités pro.'
+      await router.push('/espace-pro/compte')
+      return
+    }
+    feedback.value = `Bienvenue, ${siteStore.currentProUser?.companyName}. Redirection…`
+    await router.push('/espace-pro/dashboard')
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Connexion impossible.'
+    feedback.value = `Connexion échouée : ${message}`
+  }
+}
+
+async function onProRegisterSubmit() {
   if (registerPassword.value.length < 4) {
     feedback.value = 'Choisissez un mot de passe d’au moins 4 caractères (maquette).'
     return
   }
-  if (registerRole.value === 'agent' && !registerAgencyId.value) {
-    feedback.value = 'Sélectionnez une agence pour créer un compte agent.'
+  if (!supabase) {
+    feedback.value = 'Supabase n’est pas configuré.'
     return
   }
-  siteStore.createDemoProAccount({
-    role: registerRole.value,
-    agencyName: registerRole.value === 'manager' ? registerCompany.value : undefined,
-    agencyId: registerRole.value === 'agent' ? registerAgencyId.value : undefined,
-    contactName: registerName.value,
-    email: registerEmail.value,
-    password: registerPassword.value,
-  })
-  feedback.value = `Espace créé pour ${siteStore.currentProUser?.companyName}. Redirection…`
-  router.push('/espace-pro/dashboard')
+  try {
+    const { session, user } = await auth.signUpWithKind(
+      registerEmail.value,
+      registerPassword.value,
+      'pro',
+      registerName.value,
+    )
+    if (!session?.user?.id) {
+      feedback.value = `Compte créé pour ${user?.email ?? registerEmail.value}. Confirmez votre e-mail puis reconnectez-vous.`
+      return
+    }
+    const uid = session.user.id
+    const email = (session.user.email || registerEmail.value).trim().toLowerCase()
+    const membership = await resolveProMembershipWithInvite(uid, email)
+    const hasAgency = Boolean(membership?.agency_id)
+    const { data: agency } = hasAgency
+      ? await supabase
+          .from('agencies')
+          .select('name')
+          .eq('id', membership?.agency_id ?? '')
+          .maybeSingle()
+      : { data: null as { name?: string } | null }
+    siteStore.setCurrentProUserForSession({
+      id: uid,
+      agencyId: membership?.agency_id ?? '',
+      name: (membership?.display_name || registerName.value.trim() || email).trim(),
+      email,
+      role: membership?.role === 'manager' ? 'manager' : 'agent',
+      companyName: agency?.name || 'Agence non renseignée',
+    })
+    if (hasAgency) {
+      feedback.value = 'Compte pro créé et invitation acceptée. Redirection...'
+      await router.push('/espace-pro/dashboard')
+      return
+    }
+    feedback.value = 'Compte pro créé. Renseignez votre agence dans les réglages pour activer les fonctionnalités pro.'
+    await router.push('/espace-pro/compte')
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Inscription impossible.'
+    feedback.value = `Inscription échouée : ${message}`
+  }
 }
 
 useHead({
   title: 'Espace Pro — Matchaa',
 })
 
-onMounted(() => {
+onMounted(async () => {
   siteStore.hydrateSession()
   siteStore.hydrateProSession()
-  if (!registerAgencyId.value) {
-    registerAgencyId.value = agencies.value[0]?.id ?? ''
-  }
   if (siteStore.currentProUser) {
-    router.replace('/espace-pro/dashboard')
+    if ((siteStore.currentProUser.agencyId || '').trim()) {
+      await router.replace('/espace-pro/dashboard')
+    } else {
+      await router.replace('/espace-pro/compte')
+    }
   }
 })
 </script>

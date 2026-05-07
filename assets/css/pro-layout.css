@@ -18,7 +18,7 @@
   position: sticky;
   top: 0;
   z-index: 80;
-  background: linear-gradient(180deg, #2a1014 0%, #451820 100%);
+  background: linear-gradient(180deg, #1b4332 0%, #2d6a4f 100%);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
 }
@@ -71,7 +71,7 @@
   text-transform: uppercase;
   border-radius: 0.3rem;
   background: rgba(212, 232, 222, 0.22);
-  color: #f5c2c8;
+  color: #ffffff;
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
@@ -113,7 +113,7 @@
 
 .pro-header__link.is-active {
   color: #fff;
-  border-bottom-color: #fca5a5;
+  border-bottom-color: #ffffff;
 }
 
 .pro-header__link--prospects {
@@ -151,7 +151,6 @@
   font-size: 0.65rem;
   font-weight: 800;
   line-height: 1;
-  box-shadow: 0 0 0 2px rgba(42, 16, 20, 0.95);
 }
 
 .pro-header__prospect-badge__n {
