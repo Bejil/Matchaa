@@ -300,8 +300,8 @@
                     @input="autoResizeComposer"
                     @keydown="onComposerKeydown"
                   />
+                  <p class="conversation-panel__hint conversation-panel__hint--inline">Entrée pour envoyer · Shift + Entrée pour un saut de ligne</p>
                   <div class="conversation-panel__composer-actions conversation-panel__composer-actions--public">
-                    <p class="conversation-panel__hint conversation-panel__hint--inline">Entrée pour envoyer · Shift + Entrée pour un saut de ligne</p>
                     <button type="submit" class="profil-account__btn profil-account__btn--primary" :disabled="!publicThreadDraft.trim()">
                       Envoyer
                     </button>

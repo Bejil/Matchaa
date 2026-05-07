@@ -2,10 +2,32 @@
   grid-template-columns: 1fr;
 }
 
+.conversation-panel__contactbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0.3rem 0.1rem 1.4rem;
+  margin-bottom: 0.35rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.conversation-panel__contact-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.conversation-panel__contact-btn {
+  min-height: 2rem !important;
+  height: 2rem !important;
+  padding: 0 0.85rem !important;
+  white-space: nowrap;
+}
+
 .conversation-panel__composer-actions {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr auto auto;
   gap: 0.5rem;
   align-items: center;
 }
@@ -34,6 +56,34 @@
   gap: 0.35rem;
 }
 
+.conversation-bubble__listing-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.conversation-bubble__similar-btn {
+  min-height: 2rem;
+  height: 2rem;
+  width: 2rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.conversation-similar-modal {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.conversation-similar-modal__empty {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.84rem;
+}
+
 .conversation-panel__composer-actions .conversation-panel__hint--inline {
   margin: 0;
   grid-column: auto;
@@ -41,12 +91,14 @@
   font-size: 0.72rem;
   color: var(--color-text-muted);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   text-align: center;
 }
 
 @media (max-width: 900px) {
+  .conversation-panel__contact-btn {
+    justify-content: center;
+  }
+
   .conversation-panel__composer-actions {
     grid-template-columns: 1fr;
   }
@@ -58,6 +110,15 @@
 }
 
 @media (max-width: 640px) {
+  .conversation-bubble__listing-row {
+    grid-template-columns: 1fr;
+  }
+
+  .conversation-bubble__similar-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
   .conversation-panel__attach-btn,
   .conversation-panel__signature-btn,
   .conversation-panel__send-btn {

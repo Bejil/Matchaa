@@ -51,6 +51,34 @@
               </article>
             </aside>
             <section v-if="activeProThread" class="conversation-panel" aria-label="Fil de discussion prospect">
+              <header class="conversation-panel__contactbar" aria-label="Actions du prospect">
+                <div class="conversation-panel__contact-actions">
+                  <button
+                    type="button"
+                    class="prospect-hero-contact-btn prospect-hero-contact-btn--call conversation-panel__contact-btn"
+                    :disabled="!activeProspectPhone"
+                    @click="openProspectCallModal"
+                  >
+                    <svg class="prospect-hero-contact-btn__ic" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.08 4.18 2 2 0 0 1 4.06 2h3a2 2 0 0 1 2 1.72 12.8 12.8 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8 10a16 16 0 0 0 6 6l1.36-1.31a2 2 0 0 1 2.11-.45 12.8 12.8 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                    </svg>
+                    Appeler
+                  >
+                  </button>
+                  <button
+                    type="button"
+                    class="prospect-hero-contact-btn prospect-hero-contact-btn--mail conversation-panel__contact-btn"
+                    :disabled="!activeProspectEmail"
+                    @click="openProspectEmailModal"
+                  >
+                    <svg class="prospect-hero-contact-btn__ic" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <rect x="3" y="5" width="18" height="14" rx="2" />
+                      <path d="m3 7 9 6 9-6" />
+                    </svg>
+                    E-mail
+                  </button>
+                </div>
+              </header>
               <div ref="proThreadContainer" class="conversation-panel__thread" role="log" aria-live="polite">
                 <article
                   v-for="msg in activeProThread.messages"
@@ -59,28 +87,44 @@
                   :class="msg.author === 'pro' ? 'is-self' : 'is-other'"
                 >
                   <p class="conversation-bubble__text">{{ msg.text }}</p>
-                  <button
-                    v-if="listingForThreadMessage(msg)"
-                    type="button"
-                    class="prospects-listing-picker__result-btn conversation-bubble__listing-btn"
-                    :aria-label="`Annonce : ${listingForThreadMessage(msg)!.title}`"
-                    @click="openListingPreview(listingForThreadMessage(msg)!.id)"
-                  >
-                    <img
-                      v-if="listingForThreadMessage(msg)!.images[0]"
-                      :src="listingForThreadMessage(msg)!.images[0] || ''"
-                      alt=""
-                      class="prospects-listing-picker__result-thumb"
+                  <div v-if="listingForThreadMessage(msg)" class="conversation-bubble__listing-row">
+                    <button
+                      type="button"
+                      class="prospects-listing-picker__result-btn conversation-bubble__listing-btn"
+                      :aria-label="`Annonce : ${listingForThreadMessage(msg)!.title}`"
+                      @click="openListingPreview(listingForThreadMessage(msg)!.id)"
                     >
-                    <span class="prospects-listing-picker__result-content">
-                      <span class="prospects-listing-picker__result-title">{{ listingForThreadMessage(msg)!.title }}</span>
-                      <span class="prospects-listing-picker__result-meta">
-                        {{ listingForThreadMessage(msg)!.city }} ·
-                        {{ labelForPropertyType(listingForThreadMessage(msg)!.propertyType) }} ·
-                        {{ formatListingPrice(listingForThreadMessage(msg)!) }}
+                      <img
+                        v-if="listingForThreadMessage(msg)!.images[0]"
+                        :src="listingForThreadMessage(msg)!.images[0] || ''"
+                        alt=""
+                        class="prospects-listing-picker__result-thumb"
+                      >
+                      <span class="prospects-listing-picker__result-content">
+                        <span class="prospects-listing-picker__result-title">{{ listingForThreadMessage(msg)!.title }}</span>
+                        <span class="prospects-listing-picker__result-meta">
+                          {{ listingForThreadMessage(msg)!.city }} ·
+                          {{ labelForPropertyType(listingForThreadMessage(msg)!.propertyType) }} ·
+                          {{ formatListingPrice(listingForThreadMessage(msg)!) }}
+                        </span>
                       </span>
-                    </span>
-                  </button>
+                    </button>
+                    <button
+                      type="button"
+                      class="profil-account__btn profil-account__btn--ghost conversation-bubble__similar-btn"
+                      aria-label="Voir les annonces similaires"
+                      title="Voir les annonces similaires"
+                      @click="openSimilarListingsFromMessage(listingForThreadMessage(msg)!.id)"
+                    >
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M3 7h11" />
+                        <path d="M3 12h18" />
+                        <path d="M3 17h11" />
+                        <circle cx="18" cy="7" r="2" />
+                        <circle cx="6" cy="17" r="2" />
+                      </svg>
+                    </button>
+                  </div>
                   <div
                     v-else-if="msg.listingId || msg.listingTitle"
                     class="conversation-bubble__listing-fallback"
@@ -110,45 +154,20 @@
                   @input="autoResizeComposer"
                   @keydown="onComposerKeydown"
                 />
+                <p class="conversation-panel__hint conversation-panel__hint--inline">Entrée pour envoyer · Shift + Entrée pour un saut de ligne</p>
                 <div class="conversation-panel__composer-actions">
                   <div class="conversation-panel__listing-pick">
                     <button type="button" class="profil-account__btn profil-account__btn--ghost conversation-panel__attach-btn" @click="toggleListingPicker">
                       Joindre une annonce
                     </button>
-                    <button
-                      type="button"
-                      class="profil-account__btn profil-account__btn--ghost conversation-panel__signature-btn"
-                      @click="insertProSignature"
-                    >
-                      Insérer la signature
-                    </button>
-                    <div v-if="listingPickerOpen" class="prospects-listing-picker__popover conversation-panel__listing-popover" @click.stop>
-                      <input
-                        v-model.trim="listingPickerSearch"
-                        class="prospects-listing-picker__search-input"
-                        type="search"
-                        placeholder="Rechercher une annonce…"
-                      >
-                      <ul v-if="filteredListingPickerOptions.length" class="prospects-listing-picker__results">
-                        <li v-for="entry in filteredListingPickerOptions" :key="entry.id">
-                          <button
-                            type="button"
-                            class="prospects-listing-picker__result-btn"
-                            @click="selectListingToSend(entry)"
-                          >
-                            <img :src="entry.images[0] || ''" alt="" class="prospects-listing-picker__result-thumb">
-                            <span class="prospects-listing-picker__result-content">
-                              <span class="prospects-listing-picker__result-title">{{ entry.title }}</span>
-                              <span class="prospects-listing-picker__result-meta">
-                                {{ entry.city }} · {{ labelForPropertyType(entry.propertyType) }} · {{ formatListingPrice(entry) }}
-                              </span>
-                            </span>
-                          </button>
-                        </li>
-                      </ul>
-                    </div>
                   </div>
-                  <p class="conversation-panel__hint conversation-panel__hint--inline">Entrée pour envoyer · Shift + Entrée pour un saut de ligne</p>
+                  <button
+                    type="button"
+                    class="profil-account__btn profil-account__btn--ghost conversation-panel__signature-btn"
+                    @click="insertProSignature"
+                  >
+                    Insérer la signature
+                  </button>
                   <button type="submit" class="profil-account__btn profil-account__btn--primary conversation-panel__send-btn" :disabled="!proThreadDraft.trim()">
                     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                       <path d="M22 2 11 13" />
@@ -171,6 +190,40 @@
     </section>
   </div>
 
+  <AppCenterModal
+    v-model="listingPickerOpen"
+    title="Joindre une annonce"
+    size="sm"
+  >
+    <div class="conversation-similar-modal">
+      <input
+        v-model.trim="listingPickerSearch"
+        class="prospects-listing-picker__search-input"
+        type="search"
+        placeholder="Rechercher une annonce…"
+      >
+      <ul v-if="filteredListingPickerOptions.length" class="prospects-listing-picker__results">
+        <li v-for="entry in filteredListingPickerOptions" :key="`attach-${entry.id}`">
+          <button
+            type="button"
+            class="prospects-listing-picker__result-btn"
+            @click="selectListingToSend(entry)"
+          >
+            <img :src="entry.images[0] || ''" alt="" class="prospects-listing-picker__result-thumb">
+            <span class="prospects-listing-picker__result-content">
+              <span class="prospects-listing-picker__result-title">{{ entry.title }}</span>
+              <span class="prospects-listing-picker__result-meta">
+                {{ entry.city }} · {{ labelForPropertyType(entry.propertyType) }} · {{ formatListingPrice(entry) }}
+              </span>
+            </span>
+          </button>
+        </li>
+      </ul>
+      <p v-else class="conversation-similar-modal__empty">
+        Aucune annonce trouvée.
+      </p>
+    </div>
+  </AppCenterModal>
   <AppCenterModal
     v-model="deleteThreadConfirmOpen"
     title="Supprimer la conversation"
@@ -207,11 +260,102 @@
       />
     </div>
   </AppCenterModal>
+  <AppCenterModal
+    v-model="similarListingsModalOpen"
+    title="Annonces similaires"
+    size="sm"
+  >
+    <div class="conversation-similar-modal">
+      <input
+        v-model.trim="similarListingSearch"
+        class="prospects-listing-picker__search-input"
+        type="search"
+        placeholder="Rechercher une annonce similaire…"
+      >
+      <ul v-if="similarListingOptions.length" class="prospects-listing-picker__results">
+        <li v-for="entry in similarListingOptions" :key="`similar-${entry.id}`">
+          <button
+            type="button"
+            class="prospects-listing-picker__result-btn"
+            @click="selectSimilarListingToSend(entry)"
+          >
+            <img :src="entry.images[0] || ''" alt="" class="prospects-listing-picker__result-thumb">
+            <span class="prospects-listing-picker__result-content">
+              <span class="prospects-listing-picker__result-title">{{ entry.title }}</span>
+              <span class="prospects-listing-picker__result-meta">
+                {{ entry.city }} · {{ labelForPropertyType(entry.propertyType) }} · {{ formatListingPrice(entry) }}
+              </span>
+            </span>
+          </button>
+        </li>
+      </ul>
+      <p v-else class="conversation-similar-modal__empty">
+        Aucune annonce similaire trouvée.
+      </p>
+    </div>
+  </AppCenterModal>
+  <AppCenterModal
+    v-model="prospectCallModalOpen"
+    title="Numéro du prospect"
+    size="sm"
+  >
+    <div class="prospect-contact-modal">
+      <p class="prospect-contact-modal__lead">{{ activeProspectDisplayName }}</p>
+      <p class="prospect-contact-modal__dial">
+        <a :href="activeProspectPhoneHref" class="prospect-contact-modal__phone-link">
+          {{ activeProspectPhone || 'Numéro non renseigné' }}
+        </a>
+      </p>
+    </div>
+  </AppCenterModal>
+  <AppCenterModal
+    v-model="prospectEmailModalOpen"
+    title="Envoyer un e-mail"
+    size="sm"
+  >
+    <form class="prospect-email-modal" @submit.prevent="sendProspectEmail">
+      <p class="prospect-email-modal__to">
+        Destinataire : <strong>{{ activeProspectEmail }}</strong>
+      </p>
+      <div class="prospect-email-modal__field">
+        <label for="messages-prospect-email-subject">Objet</label>
+        <input
+          id="messages-prospect-email-subject"
+          v-model.trim="prospectEmailSubject"
+          class="prospect-email-modal__input"
+          type="text"
+          required
+        >
+      </div>
+      <div class="prospect-email-modal__field">
+        <label for="messages-prospect-email-message">Message</label>
+        <textarea
+          id="messages-prospect-email-message"
+          v-model="prospectEmailMessage"
+          class="prospect-email-modal__textarea"
+          rows="8"
+          required
+        />
+      </div>
+      <div class="prospect-email-modal__actions">
+        <button type="submit" class="profil-account__btn profil-account__btn--primary">
+          Envoyer
+        </button>
+      </div>
+    </form>
+  </AppCenterModal>
+  <AppToast
+    :visible="emailSentToastVisible"
+    title="E-mail envoyé"
+    message="Le message a bien été préparé pour ce prospect."
+    variant="info"
+  />
 </template>
 
 <script setup lang="ts">
 import AccountEmptyState from '~/components/account/AccountEmptyState.vue'
 import AppCenterModal from '~/components/ui/AppCenterModal.vue'
+import AppToast from '~/components/ui/AppToast.vue'
 import type { SearchListing } from '~/data/mock-listings'
 import { labelForPropertyType } from '~/data/property-types'
 import { formatListingPrice } from '~/composables/useAnnoncesSearch'
@@ -231,6 +375,15 @@ const deleteThreadConfirmOpen = ref(false)
 const threadToDeleteId = ref<string | null>(null)
 const previewModalOpen = ref(false)
 const previewListingId = ref<string | null>(null)
+const similarListingsModalOpen = ref(false)
+const similarSourceListingId = ref<string | null>(null)
+const similarListingSearch = ref('')
+const prospectCallModalOpen = ref(false)
+const prospectEmailModalOpen = ref(false)
+const prospectEmailSubject = ref('')
+const prospectEmailMessage = ref('')
+const emailSentToastVisible = ref(false)
+let emailSentToastTimer: ReturnType<typeof setTimeout> | null = null
 const activeProThread = computed(() => {
   const id = selectedProThreadId.value
   if (!id) {
@@ -238,6 +391,110 @@ const activeProThread = computed(() => {
   }
   return proMessageThreads.value.find((t) => t.id === id) ?? null
 })
+const prospectSnapshots = computed(() => siteStore.listProspectActivitySnapshots())
+const activeProspectSnapshot = computed(() => {
+  const email = activeProThread.value?.publicEmail?.trim().toLowerCase()
+  if (!email) {
+    return null
+  }
+  return prospectSnapshots.value.find((s) => s.email.trim().toLowerCase() === email) ?? null
+})
+
+function splitProspectName(fullName: string): { firstName: string; lastName: string } {
+  const normalized = fullName.trim().replace(/\s+/g, ' ')
+  if (!normalized) {
+    return { firstName: '—', lastName: '—' }
+  }
+  const parts = normalized.split(' ')
+  if (parts.length === 1) {
+    return { firstName: parts[0], lastName: '—' }
+  }
+  return {
+    firstName: parts[0],
+    lastName: parts.slice(1).join(' '),
+  }
+}
+
+const activeProspectNameParts = computed(() =>
+  splitProspectName(activeProspectSnapshot.value?.name || activeProThread.value?.publicName || ''),
+)
+const activeProspectFirstName = computed(() => activeProspectNameParts.value.firstName)
+const activeProspectLastName = computed(() => activeProspectNameParts.value.lastName)
+const activeProspectDisplayName = computed(() => {
+  const first = activeProspectFirstName.value === '—' ? '' : activeProspectFirstName.value
+  const last = activeProspectLastName.value === '—' ? '' : activeProspectLastName.value
+  return `${first} ${last}`.trim() || 'Prospect'
+})
+const activeProspectPhone = computed(() => (activeProspectSnapshot.value?.contactPhone || '').trim())
+const activeProspectPhoneHref = computed(() => {
+  const raw = activeProspectPhone.value
+  if (!raw) {
+    return ''
+  }
+  const normalized = raw.replace(/[^\d+]/g, '')
+  return normalized ? `tel:${normalized}` : ''
+})
+const activeProspectEmail = computed(() =>
+  (activeProThread.value?.publicEmail || '').trim().toLowerCase(),
+)
+
+function buildProspectEmailPrefill() {
+  const first = activeProspectFirstName.value === '—' ? '' : activeProspectFirstName.value
+  const agency = siteStore.currentProAgency
+  const agencyDetails = [
+    agency?.name,
+    agency?.contactEmail,
+    agency?.contactPhone,
+    agency?.address,
+  ].filter((line): line is string => typeof line === 'string' && line.trim().length > 0)
+  return {
+    subject: 'Suite à votre recherche immobilière',
+    message: [
+      first ? `Bonjour ${first},` : 'Bonjour,',
+      '',
+      'Je vous contacte suite à vos interactions sur Matchaa.',
+      '',
+      'N’hésitez pas à me préciser vos critères pour que je vous envoie une sélection ciblée.',
+      '',
+      'Bien cordialement,',
+      siteStore.currentProUser?.name ?? 'Votre conseiller',
+      '',
+      ...agencyDetails,
+    ].join('\n'),
+  }
+}
+
+function openProspectCallModal() {
+  if (!activeProspectPhone.value) {
+    return
+  }
+  prospectCallModalOpen.value = true
+}
+
+function openProspectEmailModal() {
+  if (!activeProspectEmail.value) {
+    return
+  }
+  const prefill = buildProspectEmailPrefill()
+  prospectEmailSubject.value = prefill.subject
+  prospectEmailMessage.value = prefill.message
+  prospectEmailModalOpen.value = true
+}
+
+function sendProspectEmail() {
+  if (!prospectEmailSubject.value.trim() || !prospectEmailMessage.value.trim()) {
+    return
+  }
+  prospectEmailModalOpen.value = false
+  emailSentToastVisible.value = true
+  if (emailSentToastTimer) {
+    clearTimeout(emailSentToastTimer)
+  }
+  emailSentToastTimer = setTimeout(() => {
+    emailSentToastVisible.value = false
+    emailSentToastTimer = null
+  }, 2800)
+}
 
 function threadIdFromRouteQuery(): string | null {
   const raw = route.query.thread
@@ -311,12 +568,52 @@ function openListingPreview(listingId: string) {
   previewModalOpen.value = true
 }
 
+function openSimilarListingsFromMessage(sourceListingId: string) {
+  similarSourceListingId.value = sourceListingId
+  similarListingSearch.value = ''
+  similarListingsModalOpen.value = true
+}
+
 const filteredListingPickerOptions = computed<SearchListing[]>(() => {
   const q = listingPickerSearch.value.trim().toLowerCase()
   const options = [...siteStore.currentProAgencyListings]
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .map((l) => siteStore.publicActiveSearchListings.find((p) => p.id === l.id))
     .filter((l): l is SearchListing => Boolean(l))
+  if (!q) {
+    return options.slice(0, 24)
+  }
+  return options.filter((item) => {
+    const hay = `${item.title} ${item.city} ${item.propertyType}`.toLowerCase()
+    return hay.includes(q)
+  }).slice(0, 24)
+})
+
+const similarListingOptions = computed<SearchListing[]>(() => {
+  const sourceId = similarSourceListingId.value
+  if (!sourceId) {
+    return []
+  }
+  const source = listingById.value.get(sourceId)
+  if (!source) {
+    return []
+  }
+  const q = similarListingSearch.value.trim().toLowerCase()
+  const sourcePrice = Number(source.price) || 0
+  const minPrice = sourcePrice > 0 ? sourcePrice * 0.8 : 0
+  const maxPrice = sourcePrice > 0 ? sourcePrice * 1.2 : Number.POSITIVE_INFINITY
+  const options = [...siteStore.currentProAgencyListings]
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .map((l) => siteStore.publicActiveSearchListings.find((p) => p.id === l.id))
+    .filter((l): l is SearchListing => Boolean(l))
+    .filter((l) => l.id !== source.id)
+    .filter((l) => {
+      const sameCity = l.city.trim().toLowerCase() === source.city.trim().toLowerCase()
+      const sameType = l.propertyType === source.propertyType
+      const price = Number(l.price) || 0
+      const inBudgetRange = price >= minPrice && price <= maxPrice
+      return sameCity && sameType && inBudgetRange
+    })
   if (!q) {
     return options.slice(0, 24)
   }
@@ -482,6 +779,10 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('click', closeThreadMenuOnOutsideClick)
+  if (emailSentToastTimer) {
+    clearTimeout(emailSentToastTimer)
+    emailSentToastTimer = null
+  }
 })
 
 function toggleListingPicker() {
@@ -496,12 +797,31 @@ function selectListingToSend(item: SearchListing) {
   listingPickerOpen.value = false
 }
 
+function selectSimilarListingToSend(item: SearchListing) {
+  selectedListingToSend.value = item
+  similarListingsModalOpen.value = false
+  listingPickerOpen.value = false
+  nextTick(() => {
+    proComposerInput.value?.focus()
+  })
+}
+
 watch(
   () => [proMessageThreads.value, route.query.thread] as const,
   () => {
     syncSelectedThreadFromRouteAndList()
   },
   { immediate: true, deep: true },
+)
+
+watch(
+  () => similarListingsModalOpen.value,
+  (open) => {
+    if (!open) {
+      similarSourceListingId.value = null
+      similarListingSearch.value = ''
+    }
+  },
 )
 
 watch(

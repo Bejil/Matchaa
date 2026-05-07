@@ -969,6 +969,26 @@
       </div>
     </AppCenterModal>
 
+    <AppCenterModal
+      v-model="creditsBlockedPublishModalOpen"
+      title="Publication indisponible"
+    >
+      <p class="compte-settings__confirm-text">
+        Vous ne pouvez pas publier cette annonce pour le moment.
+      </p>
+      <p class="compte-settings__hint">
+        Votre solde de crédits est insuffisant pour publier une annonce. Rechargez vos crédits (ou activez un abonnement) pour reprendre la publication immédiatement.
+      </p>
+      <div class="compte-settings__confirm-actions">
+        <button type="button" class="profil-account__btn profil-account__btn--ghost" @click="creditsBlockedPublishModalOpen = false">
+          Plus tard
+        </button>
+        <button type="button" class="profil-account__btn profil-account__btn--primary" @click="goToAgencyCredits">
+          Voir mes crédits
+        </button>
+      </div>
+    </AppCenterModal>
+
     <AppToast
       :visible="toastVisible"
       :title="toastTitle"
@@ -1114,6 +1134,7 @@ const previewModalOpen = ref(false)
 const deleteModalOpen = ref(false)
 const bulkDeleteModalOpen = ref(false)
 const bulkPublishWarningModalOpen = ref(false)
+const creditsBlockedPublishModalOpen = ref(false)
 const selectedListingId = ref<string | null>(null)
 const previewListingId = ref<string | null>(null)
 const editLocationOpen = ref(false)
@@ -2576,6 +2597,10 @@ function onListingStatusChange(listingId: string, status: 'active' | 'draft' | '
   const ok = siteStore.setCurrentAgencyListingStatus(listingId, status)
   if (!ok) {
     const eligibility = status === 'active' ? siteStore.getListingPublishEligibility(listingId) : null
+    if (status === 'active' && eligibility?.reasons.some((reason) => reason.toLowerCase().includes('crédit'))) {
+      creditsBlockedPublishModalOpen.value = true
+      return
+    }
     const details = eligibility?.reasons?.join(' ') || 'Le statut n’a pas pu être mis à jour.'
     showToast('Action impossible', details, 'error')
     return
@@ -2589,6 +2614,11 @@ function onListingStatusChange(listingId: string, status: 'active' | 'draft' | '
   else {
     showToast('Annonce archivée', 'L’annonce figure désormais dans les archives.')
   }
+}
+
+function goToAgencyCredits() {
+  creditsBlockedPublishModalOpen.value = false
+  void navigateTo('/espace-pro/agence?tab=credits')
 }
 
 function openDeleteModal(listingId: string) {

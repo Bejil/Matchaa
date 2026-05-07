@@ -805,6 +805,7 @@ const {
   clearSuggestions: clearCreateAgencyCitySuggestions,
 } = useCommuneSearch()
 const supabase = useSupabaseClient()
+const route = useRoute()
 
 const pro = computed(() => siteStore.currentProUser)
 const agency = computed(() => siteStore.currentProAgency)
@@ -1061,6 +1062,25 @@ watch(isIndividualAgency, (value) => {
     activeTab.value = 'infos'
   }
 }, { immediate: true })
+
+watch(
+  () => route.query.tab,
+  (tab) => {
+    const value = typeof tab === 'string' ? tab : Array.isArray(tab) ? tab[0] : ''
+    if (value === 'credits' && isAgencyManager.value) {
+      activeTab.value = 'credits'
+      return
+    }
+    if (value === 'membres' && isAgencyManager.value && !isIndividualAgency.value) {
+      activeTab.value = 'membres'
+      return
+    }
+    if (value === 'infos') {
+      activeTab.value = 'infos'
+    }
+  },
+  { immediate: true },
+)
 
 const agencyCitySuggestionList = computed(() =>
   agencyCityOpen.value ? agencyCitySuggestions.value : [],
