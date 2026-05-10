@@ -1,5 +1,4 @@
 import type { EnergyLetter, SearchListing } from '~/data/mock-listings'
-import { buildDemoProCatalogListings } from '~/data/demo-pro-catalog-listings'
 import { getAgencyById, type Agency } from '~/data/agencies'
 import { ALL_PROPERTY_TYPE_SLUGS, PROPERTY_TYPE_GROUPS, type PropertyTypeSlug } from '~/data/property-types'
 import { proAgencyIdToPublicNumeric, proListingToSearchListing } from '~/utils/pro-listing-to-search'
@@ -1755,68 +1754,13 @@ export const useSiteStore = defineStore('site', () => {
         mergedMembers.push(member)
       }
     }
-    // Agence « principale » pour l’hydratation session ; le catalogue démo est fusionné pour
-    // toutes les agences connues (les interactions prospect peuvent citer d’autres agences).
-    let targetSeedAgencyId: string | null = currentProUser.value?.agencyId ?? null
-    if (!targetSeedAgencyId && import.meta.client) {
-      try {
-        const rawSession = localStorage.getItem(PRO_SESSION_KEY)
-        if (rawSession) {
-          const parsedSession = JSON.parse(rawSession) as Partial<CurrentProUser>
-          if (typeof parsedSession.agencyId === 'string' && parsedSession.agencyId.trim()) {
-            targetSeedAgencyId = parsedSession.agencyId.trim()
-          } else if (typeof parsedSession.id === 'string' && parsedSession.id.trim()) {
-            const foundById = mergedMembers.find((m) => m.id === parsedSession.id)
-            targetSeedAgencyId = foundById?.agencyId ?? null
-          } else if (typeof parsedSession.email === 'string' && parsedSession.email.trim()) {
-            const foundByEmail = mergedMembers.find((m) => m.email.toLowerCase() === parsedSession.email?.toLowerCase())
-            targetSeedAgencyId = foundByEmail?.agencyId ?? null
-          }
-        }
-      } catch {
-        /* ignore */
-      }
-    }
-    if (!targetSeedAgencyId) {
-      targetSeedAgencyId = 'agency-demo-test'
-    }
-
     const fromStorage = storedListings === null ? [] : [...storedListings]
     let mergedListings = fromStorage.filter(
-      (l) => !LEGACY_SEEDED_PRO_LISTING_IDS.has(l.id),
+      (l) =>
+        !LEGACY_SEEDED_PRO_LISTING_IDS.has(l.id)
+        && !String(l.id || '').startsWith('demo-catalog-'),
     )
-    const removedLegacySeed = fromStorage.length !== mergedListings.length
-    const agencyIdsForDemoSeed = new Set<string>()
-    agencyIdsForDemoSeed.add(targetSeedAgencyId)
-    for (const a of mergedAgencies) {
-      const aid = typeof a.id === 'string' ? a.id.trim() : ''
-      if (aid) {
-        agencyIdsForDemoSeed.add(aid)
-      }
-    }
-    const byIdIndex = new Map(mergedListings.map((l, i) => [l.id, i]))
-    let addedDemoCatalog = 0
-    let refreshedDemoCatalog = 0
-    for (const seedAgencyId of agencyIdsForDemoSeed) {
-      for (const row of buildDemoProCatalogListings(seedAgencyId)) {
-        const existingIdx = byIdIndex.get(row.id)
-        if (existingIdx === undefined) {
-          mergedListings.push(row as ProListing)
-          byIdIndex.set(row.id, mergedListings.length - 1)
-          addedDemoCatalog++
-        } else {
-          const existing = mergedListings[existingIdx]
-          mergedListings[existingIdx] = {
-            ...(row as ProListing),
-            viewCount: existing.viewCount ?? 0,
-            favoriteCount: existing.favoriteCount ?? 0,
-            leadCount: existing.leadCount ?? 0,
-            phoneRevealCount: existing.phoneRevealCount ?? 0,
-          }
-          refreshedDemoCatalog++
-        }
-      }
-    }
+    const listingsStorageChanged = fromStorage.length !== mergedListings.length
 
     proAgencies.value = mergedAgencies
     proMembers.value = mergedMembers
@@ -1848,7 +1792,7 @@ export const useSiteStore = defineStore('site', () => {
       refreshMemberCreditConsumptionCounters(agency.id)
     }
     enforceListingExpiry()
-    if (import.meta.client && (removedLegacySeed || addedDemoCatalog > 0 || refreshedDemoCatalog > 0)) {
+    if (import.meta.client && listingsStorageChanged) {
       persistProData()
     }
   }
