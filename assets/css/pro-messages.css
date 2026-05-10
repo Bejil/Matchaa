@@ -56,6 +56,11 @@
   gap: 0.35rem;
 }
 
+.conversation-panel__input {
+  max-height: 13.75rem;
+  overflow-y: auto;
+}
+
 .conversation-bubble__listing-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

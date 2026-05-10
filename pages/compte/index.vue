@@ -429,6 +429,7 @@
           hide-title
           @request-close-container="contactModalOpen = false"
           :listing-id="contactListing.id"
+          :listing-agency-numeric="contactListing.agencyId"
           :agency-name="getAgencyById(contactListing.agencyId)?.name ?? 'Agence'"
           :agency-phone-display="getAgencyById(contactListing.agencyId)?.phoneDisplay"
           :agency-phone-tel="getAgencyById(contactListing.agencyId)?.phoneTel"

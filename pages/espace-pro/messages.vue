@@ -384,6 +384,7 @@ const prospectEmailSubject = ref('')
 const prospectEmailMessage = ref('')
 const emailSentToastVisible = ref(false)
 let emailSentToastTimer: ReturnType<typeof setTimeout> | null = null
+const MAX_COMPOSER_HEIGHT_PX = 220
 const activeProThread = computed(() => {
   const id = selectedProThreadId.value
   if (!id) {
@@ -687,8 +688,7 @@ function insertProSignature() {
       return
     }
     el.focus()
-    el.style.height = 'auto'
-    el.style.height = `${Math.max(el.scrollHeight, 42)}px`
+    resizeComposerElement(el)
   })
 }
 
@@ -705,8 +705,7 @@ function autoResizeComposer(event: Event) {
   if (!el) {
     return
   }
-  el.style.height = 'auto'
-  el.style.height = `${Math.max(el.scrollHeight, 42)}px`
+  resizeComposerElement(el)
 }
 
 function resetComposerHeight() {
@@ -716,7 +715,16 @@ function resetComposerHeight() {
       return
     }
     el.style.height = ''
+    el.style.overflowY = ''
   })
+}
+
+function resizeComposerElement(el: HTMLTextAreaElement) {
+  el.style.height = 'auto'
+  const targetHeight = Math.max(el.scrollHeight, 42)
+  const nextHeight = Math.min(targetHeight, MAX_COMPOSER_HEIGHT_PX)
+  el.style.height = `${nextHeight}px`
+  el.style.overflowY = targetHeight > MAX_COMPOSER_HEIGHT_PX ? 'auto' : 'hidden'
 }
 
 function scrollProThreadToBottom() {

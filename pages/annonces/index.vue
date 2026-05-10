@@ -254,6 +254,7 @@
         hide-title
         @request-close-container="contactModalOpen = false"
         :listing-id="contactListing.id"
+        :listing-agency-numeric="contactListing.agencyId"
         :agency-name="siteStore.getPublicAgencyByListingAgencyId(contactListing.agencyId)?.name ?? 'Agence'"
         :agency-phone-display="siteStore.getPublicAgencyByListingAgencyId(contactListing.agencyId)?.phoneDisplay"
         :agency-phone-tel="siteStore.getPublicAgencyByListingAgencyId(contactListing.agencyId)?.phoneTel"

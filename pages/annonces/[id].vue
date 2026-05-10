@@ -166,6 +166,7 @@
               form-id="contact-annonceur"
               field-id-prefix="lc-main"
               :listing-id="listing.id"
+              :listing-agency-numeric="listing.agencyId"
               :agency-name="agency?.name ?? 'Agence'"
               :agency-phone-display="agency?.phoneDisplay"
               :agency-phone-tel="agency?.phoneTel"
@@ -206,6 +207,7 @@
               form-id="contact-annonceur-aside"
               field-id-prefix="lc-aside"
               :listing-id="listing.id"
+              :listing-agency-numeric="listing.agencyId"
               :agency-name="agency?.name ?? 'Agence'"
               :agency-phone-display="agency?.phoneDisplay"
               :agency-phone-tel="agency?.phoneTel"
@@ -389,6 +391,7 @@
         hide-title
         @request-close-container="contactSimilarModalOpen = false"
         :listing-id="contactSimilarListing.id"
+        :listing-agency-numeric="contactSimilarListing.agencyId"
         :agency-name="siteStore.getPublicAgencyByListingAgencyId(contactSimilarListing.agencyId)?.name ?? 'Agence'"
         :agency-phone-display="siteStore.getPublicAgencyByListingAgencyId(contactSimilarListing.agencyId)?.phoneDisplay"
         :agency-phone-tel="siteStore.getPublicAgencyByListingAgencyId(contactSimilarListing.agencyId)?.phoneTel"
@@ -409,6 +412,18 @@ import { pickRelatedEditoArticles, pickSimilarListings } from '~/utils/annonce-d
 const route = useRoute()
 const siteStore = useSiteStore()
 const routeListingId = computed(() => String(route.params.id ?? ''))
+const previewFromPro = computed(() => {
+  const raw = route.query.preview
+  const value = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : ''
+  return value === 'pro'
+})
+
+const listingPool = computed<SearchListing[]>(() => {
+  if (!previewFromPro.value) {
+    return siteStore.publicActiveSearchListings
+  }
+  return siteStore.currentProAgencyListings as SearchListing[]
+})
 
 const listing = computed(() => {
   const id = routeListingId.value
@@ -416,7 +431,7 @@ const listing = computed(() => {
     return undefined
   }
   siteStore.ensureProListingsLoadedForPublic()
-  return siteStore.publicActiveSearchListings.find((l) => l.id === id)
+  return listingPool.value.find((l) => l.id === id)
 })
 
 const agency = computed(() =>
@@ -428,7 +443,7 @@ function getListingAgency(item: SearchListing) {
 }
 
 const similarListings = computed(() =>
-  listing.value ? pickSimilarListings(listing.value, siteStore.publicActiveSearchListings, 4) : [],
+  listing.value ? pickSimilarListings(listing.value, listingPool.value, 4) : [],
 )
 
 const relatedArticles = computed(() =>

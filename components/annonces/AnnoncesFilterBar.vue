@@ -122,6 +122,9 @@
             </svg>
           </button>
         </div>
+        <div v-if="$slots.pillsEnd" class="annonces-filters__pills-end">
+          <slot name="pillsEnd" />
+        </div>
       </div>
     </div>
   </div>

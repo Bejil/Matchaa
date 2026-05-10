@@ -99,7 +99,28 @@
               :parsed="listingFiltersParsed"
               :merge-query="mergeListingFilters"
               :show-result-count="false"
-            />
+            >
+              <template #pillsEnd>
+                <button
+                  type="button"
+                  class="profil-account__btn profil-account__btn--ghost prospects-filters-reset"
+                  aria-label="Réinitialiser tous les critères de recherche"
+                  @click="clearMainListingSearch"
+                >
+                  Réinitialiser
+                </button>
+              </template>
+              <template #actions>
+                <button
+                  type="button"
+                  class="profil-account__btn profil-account__btn--ghost prospects-filters-reset prospects-filters-reset--mobile-toolbar"
+                  aria-label="Réinitialiser tous les critères de recherche"
+                  @click="clearMainListingSearch"
+                >
+                  Réinitialiser
+                </button>
+              </template>
+            </AnnoncesFilterBar>
           </div>
 
           <div v-if="agencyListings.length" class="prospects-list-toolbar pro-listing-list-toolbar">
@@ -2011,7 +2032,7 @@ function onEditProjectTypeChange() {
 }
 
 function previewListingUrl(listingId: string): string {
-  return `/annonces/${encodeURIComponent(listingId)}?embed=1`
+  return `/annonces/${encodeURIComponent(listingId)}?embed=1&preview=pro`
 }
 
 const previewModalSrc = computed(() =>
