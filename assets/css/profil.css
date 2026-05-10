@@ -74,12 +74,16 @@
 }
 
 .espace-pro-dashboard__grid.prospect-kpi-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 @media (max-width: 1100px) {
   .espace-pro-dashboard__grid.prospect-kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .prospect-kpi-card--treated {
+    margin-left: 0;
   }
 }
 
@@ -177,6 +181,10 @@ button.prospect-kpi-card {
   background: linear-gradient(180deg, #fb7185, #be123c);
 }
 
+.prospect-kpi-card--treated::before {
+  background: linear-gradient(180deg, #22c55e, #15803d);
+}
+
 .prospect-kpi-card:hover {
   border-color: color-mix(in srgb, var(--color-border) 70%, var(--color-text-muted) 30%);
   box-shadow: 0 6px 22px rgba(26, 26, 26, 0.07);
@@ -228,6 +236,10 @@ button.prospect-kpi-card {
 
 .prospect-kpi-card__ic--hot {
   color: #db3846;
+}
+
+.prospect-kpi-card__ic--treated {
+  color: #15803d;
 }
 
 .prospect-kpi-card__title {
@@ -298,6 +310,17 @@ button.prospect-kpi-card {
 .espace-pro-dashboard__card--prospects-filters > *:not(.annonces-filters) {
   margin-left: 1.15rem;
   margin-right: 1.15rem;
+}
+
+.espace-pro-dashboard__card--prospects-filters .prospects-filters-reset {
+  white-space: nowrap;
+  font-size: 0.8125rem;
+}
+
+@media (min-width: 821px) {
+  .espace-pro-dashboard__card--prospects-filters .prospects-filters-reset--mobile-toolbar {
+    display: none;
+  }
 }
 
 .espace-pro-dashboard__card--prospects-filters .prospects-list-toolbar {
@@ -1820,6 +1843,66 @@ button.prospect-kpi-card {
   background: #fff;
 }
 
+.pro-listing-preview-stub {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-height: min(78vh, 58rem);
+  overflow: auto;
+  padding: 0.25rem 0.15rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.7rem;
+  background: var(--color-surface, #fff);
+}
+
+.pro-listing-preview-stub__media {
+  border-radius: 0.55rem;
+  overflow: hidden;
+  background: var(--color-muted-bg, #f4f4f5);
+}
+
+.pro-listing-preview-stub__img {
+  display: block;
+  width: 100%;
+  max-height: 14rem;
+  object-fit: cover;
+}
+
+.pro-listing-preview-stub__img--empty {
+  min-height: 8rem;
+}
+
+.pro-listing-preview-stub__body {
+  padding: 0 0.35rem 0.25rem;
+}
+
+.pro-listing-preview-stub__price {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--color-text, #111);
+}
+
+.pro-listing-preview-stub__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.pro-listing-preview-stub__loc {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  color: var(--color-text-muted, #555);
+}
+
+.pro-listing-preview-stub__note {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--color-text-muted, #666);
+}
+
 .pro-listing-tab-empty {
   margin-top: 0.65rem;
 }
@@ -1836,6 +1919,17 @@ button.prospect-kpi-card {
 .espace-pro-dashboard__card--annonces-list {
   margin-top: 0;
   padding-top: 0;
+}
+
+.espace-pro-dashboard__card--annonces-list .prospects-filters-reset {
+  white-space: nowrap;
+  font-size: 0.8125rem;
+}
+
+@media (min-width: 821px) {
+  .espace-pro-dashboard__card--annonces-list .prospects-filters-reset--mobile-toolbar {
+    display: none;
+  }
 }
 
 .pro-listing-tabs {
@@ -2022,6 +2116,15 @@ button.prospect-kpi-card {
   color: #991b1b;
 }
 
+/* Détail prospect : pillule température plus lisible qu’en liste. */
+.prospect-detail-hero .prospect-heat-pill {
+  padding: 0.4rem 1.1rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
 .prospect-date-pill {
   display: inline-flex;
   align-items: center;
@@ -2059,6 +2162,15 @@ button.prospect-kpi-card {
   color: #475569;
   padding: 0.15rem 0.5rem;
   font-size: 0.74rem;
+}
+
+.prospect-criteria-list--single-line {
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.prospect-criteria-list--single-line li {
+  white-space: nowrap;
 }
 
 .prospect-activity__stats {
@@ -2132,6 +2244,14 @@ button.prospect-kpi-card {
 .prospect-list-card.is-active {
   background: color-mix(in srgb, var(--color-accent, #db3846) 10%, white);
   box-shadow: none;
+}
+
+.prospects-layout.is-selection-mode .prospect-list-card {
+  cursor: default;
+}
+
+.prospect-list-card.is-selected:not(.is-active) {
+  background: color-mix(in srgb, var(--color-accent, #db3846) 8%, #fff);
 }
 
 .prospect-list-card.is-crm-favorite:not(.is-active) {
@@ -2337,6 +2457,30 @@ button.prospect-kpi-card {
 .prospect-favorite-btn.is-active .prospect-favorite-btn__ic path {
   fill: currentColor;
   stroke: none;
+}
+
+.prospect-treated-btn.is-inactive {
+  border-color: #cbd5e1;
+  color: #475569;
+  background: #f8fafc;
+}
+
+.prospect-treated-btn.is-inactive:hover {
+  border-color: #94a3b8;
+  color: #1e293b;
+  background: #f1f5f9;
+}
+
+.prospect-treated-btn.is-active {
+  border-color: #86efac;
+  color: #14532d;
+  background: linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+}
+
+.prospect-treated-btn.is-active .prospect-favorite-btn__ic path {
+  fill: none;
+  stroke: currentColor;
 }
 
 .prospect-unseen-btn {
@@ -2789,6 +2933,78 @@ button.prospect-kpi-card {
   color: var(--color-text-muted);
 }
 
+.prospect-chat-modal__bulk-hint {
+  margin: 0.45rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+.prospect-chat-modal__bulk-recipients {
+  margin: 0.5rem 0 0;
+  padding: 0.5rem 0.65rem;
+  list-style: none;
+  border-radius: 0.5rem;
+  background: var(--color-surface-muted, #f8fafc);
+  border: 1px solid var(--color-border);
+  max-height: 9rem;
+  overflow: auto;
+}
+
+.prospect-chat-modal__bulk-recipients li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+  padding: 0.2rem 0;
+  font-size: 0.8rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.prospect-chat-modal__bulk-recipients li:last-child {
+  border-bottom: 0;
+}
+
+.prospect-chat-modal__bulk-name {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.prospect-chat-modal__bulk-email {
+  font-size: 0.76rem;
+  color: var(--color-text-muted);
+  word-break: break-all;
+}
+
+.prospect-chat-modal__bulk-more {
+  font-style: italic;
+  color: var(--color-text-muted);
+}
+
+.prospect-email-modal__bulk {
+  margin-bottom: 0.75rem;
+}
+
+.prospect-email-modal__to--lead {
+  margin-bottom: 0.35rem;
+}
+
+.pro-listing-bulkbar__btn-wrap {
+  display: inline-flex;
+}
+
+.pro-listing-bulkbar__btn--crm-message {
+  border-color: #c7d5e7;
+  background: #f0f5fb;
+  color: #1e3a5f;
+}
+
+.pro-listing-bulkbar__btn--crm-mail {
+  border-color: #ddd6fe;
+  background: #f5f3ff;
+  color: #5b21b6;
+}
+
 .prospect-chat-modal__thread {
   display: grid;
   gap: 0.45rem;
@@ -2966,20 +3182,25 @@ button.prospect-kpi-card {
 .pro-listing-bulkbar__btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.34rem;
+  justify-content: center;
+  gap: 0.4rem;
   border: 1px solid var(--color-border);
   background: #fff;
   color: var(--color-text);
   border-radius: 0.45rem;
-  padding: 0.38rem 0.64rem;
+  min-height: 2.5rem;
+  padding: 0.55rem 0.85rem;
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 0.8125rem;
   font-weight: 600;
+  line-height: 1.2;
   cursor: pointer;
 }
 
 .pro-listing-bulkbar__btn-ic {
   flex-shrink: 0;
+  width: 15px;
+  height: 15px;
 }
 
 .pro-listing-bulkbar__btn:hover:not(:disabled) {
@@ -3014,6 +3235,30 @@ button.prospect-kpi-card {
   border-color: #f0d8ad;
   background: #fff6e8;
   color: #8a5c18;
+}
+
+.pro-listing-bulkbar__btn--crm-favorite {
+  border-color: #fcd34d;
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.pro-listing-bulkbar__btn--crm-treated {
+  border-color: #b7e2ca;
+  background: #e8f7ee;
+  color: #1d6b45;
+}
+
+.pro-listing-bulkbar__btn--crm-favorite.is-bulk-remove {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.pro-listing-bulkbar__btn--crm-treated.is-bulk-remove {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
 }
 
 .pro-listing-bulkbar__btn--archive {

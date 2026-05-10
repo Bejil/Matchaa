@@ -55,7 +55,28 @@
             </div>
             <h2 class="prospect-kpi-card__title">Nouveaux prospects</h2>
             <p class="prospect-kpi-card__desc">
-              Non encore ouverts dans le CRM, proximité &gt; 75&nbsp;% (alignée sur le pourcentage affiché dans la liste).
+              Non lus et non traités, proximité &gt; 75&nbsp;% (alignée sur le pourcentage affiché dans la liste).
+            </p>
+          </button>
+          <button
+            type="button"
+            class="espace-pro-dashboard__card prospect-kpi-card prospect-kpi-card--hot"
+            :class="{ 'prospect-kpi-card--active': prospectKpiFilter === 'potential' }"
+            :aria-pressed="prospectKpiFilter === 'potential'"
+            @click="prospectKpiFilter = 'potential'"
+          >
+            <div class="prospect-kpi-card__value-row">
+              <p class="prospect-kpi-card__value">{{ potentialProspectsCount }}</p>
+              <span class="prospect-kpi-card__ic prospect-kpi-card__ic--hot" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                  <polyline points="17 6 23 6 23 12" />
+                </svg>
+              </span>
+            </div>
+            <h2 class="prospect-kpi-card__title">Prospects potentiels</h2>
+            <p class="prospect-kpi-card__desc">
+              Non lus et non traités, score &gt; 70&nbsp;/&nbsp;100.
             </p>
           </button>
           <button
@@ -80,23 +101,22 @@
           </button>
           <button
             type="button"
-            class="espace-pro-dashboard__card prospect-kpi-card prospect-kpi-card--hot"
-            :class="{ 'prospect-kpi-card--active': prospectKpiFilter === 'potential' }"
-            :aria-pressed="prospectKpiFilter === 'potential'"
-            @click="prospectKpiFilter = 'potential'"
+            class="espace-pro-dashboard__card prospect-kpi-card prospect-kpi-card--treated"
+            :class="{ 'prospect-kpi-card--active': prospectKpiFilter === 'treated' }"
+            :aria-pressed="prospectKpiFilter === 'treated'"
+            @click="prospectKpiFilter = 'treated'"
           >
             <div class="prospect-kpi-card__value-row">
-              <p class="prospect-kpi-card__value">{{ potentialProspectsCount }}</p>
-              <span class="prospect-kpi-card__ic prospect-kpi-card__ic--hot" aria-hidden="true">
+              <p class="prospect-kpi-card__value">{{ treatedProspectsCount }}</p>
+              <span class="prospect-kpi-card__ic prospect-kpi-card__ic--treated" aria-hidden="true">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
-                  <polyline points="17 6 23 6 23 12" />
+                  <path d="m20 6-11 11-5-5" />
                 </svg>
               </span>
             </div>
-            <h2 class="prospect-kpi-card__title">Prospects potentiels</h2>
+            <h2 class="prospect-kpi-card__title">Prospects traités</h2>
             <p class="prospect-kpi-card__desc">
-              Non encore ouverts dans le CRM, score &gt; 70&nbsp;/&nbsp;100.
+              Marqués comme traités depuis le détail prospect.
             </p>
           </button>
         </div>
@@ -182,7 +202,28 @@
         </div>
 
         <article class="espace-pro-dashboard__card espace-pro-dashboard__card--prospects-filters">
-          <AnnoncesFilterBar :parsed="parsed" :merge-query="mergeQuery" :show-result-count="false" />
+          <AnnoncesFilterBar :parsed="parsed" :merge-query="mergeQuery" :show-result-count="false">
+            <template #pillsEnd>
+              <button
+                type="button"
+                class="profil-account__btn profil-account__btn--ghost prospects-filters-reset"
+                aria-label="Réinitialiser tous les critères de recherche"
+                @click="resetProspectSearchCriteria"
+              >
+                Réinitialiser
+              </button>
+            </template>
+            <template #actions>
+              <button
+                type="button"
+                class="profil-account__btn profil-account__btn--ghost prospects-filters-reset prospects-filters-reset--mobile-toolbar"
+                aria-label="Réinitialiser tous les critères de recherche"
+                @click="resetProspectSearchCriteria"
+              >
+                Réinitialiser
+              </button>
+            </template>
+          </AnnoncesFilterBar>
 
           <div class="prospects-list-toolbar">
             <p class="prospects-list-toolbar__lead">
@@ -213,7 +254,7 @@
             </button>
           </div>
 
-          <div v-if="filteredProspects.length" class="prospects-layout">
+          <div v-if="filteredProspects.length" class="prospects-layout" :class="{ 'is-selection-mode': selectedProspectsCount > 0 }">
             <aside class="prospects-layout__list">
               <ul class="pro-members-list">
                 <li
@@ -224,6 +265,7 @@
                     'is-active': selectedProspect?.email === p.email,
                     'is-seen': isProspectSeen(p),
                     'is-crm-favorite': isProspectCrmFavorite(p),
+                    'is-selected': isProspectSelected(p.email),
                   }"
                   role="button"
                   tabindex="0"
@@ -231,6 +273,15 @@
                   @keydown.enter.prevent="selectedProspectEmail = p.email"
                   @keydown.space.prevent="selectedProspectEmail = p.email"
                 >
+                  <label class="pro-listing__select" @click.stop>
+                    <input
+                      class="pro-listing__select-input"
+                      type="checkbox"
+                      :checked="isProspectSelected(p.email)"
+                      :aria-label="`Sélectionner le prospect ${displayProspectName(p)}`"
+                      @click="onProspectCheckboxClick(p.email, $event)"
+                    >
+                  </label>
                   <div class="pro-listing__content">
                     <p class="pro-members-list__headline">
                       <span class="pro-members-list__name" :class="{ 'prospect-anon': shouldBlurProspectName(p) }">
@@ -245,17 +296,17 @@
                       </span>
                     </p>
                     <div class="prospect-activity">
-                      <ul v-if="p.topCriteria.length" class="prospect-criteria-list">
-                        <li v-for="criterion in p.topCriteria" :key="`${p.email}-left-${criterion}`">{{ criterion }}</li>
+                      <ul v-if="listCardCriteria(p).length" class="prospect-criteria-list prospect-criteria-list--single-line">
+                        <li v-for="criterion in listCardCriteria(p)" :key="`${p.email}-left-${criterion}`">{{ criterion }}</li>
                       </ul>
                       <p v-else class="pro-members-list__meta">Aucun critère principal détecté.</p>
                       <ul class="prospect-activity__stats" aria-label="Statistiques d'activité">
-                        <li class="prospect-activity__stats-date" :title="`Dernière activité: ${formatActivityDate(p.lastActivityAt)}`">
+                        <li class="prospect-activity__stats-date" :title="formatLastActivitySummary(p.lastActivityAt)">
                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                             <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8" />
                             <path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
                           </svg>
-                          <span>{{ formatActivityDate(p.lastActivityAt) }}</span>
+                          <span>{{ formatLastActivitySummary(p.lastActivityAt) }}</span>
                         </li>
                         <li :title="`${p.activity.views} vues`">
                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -297,20 +348,20 @@
                       <div class="prospect-detail-hero__crm-toolbar-left">
                         <span
                           class="prospect-btn-tooltip"
-                          :data-tooltip="isProspectSeen(selectedProspect) ? 'Ce prospect reapparaitra comme non ouvert dans le CRM (liste et indicateurs)' : 'Disponible uniquement pour un prospect deja marque comme ouvert'"
+                          :data-tooltip="isProspectSeen(selectedProspect) ? 'Basculer ce prospect en non lu' : 'Basculer ce prospect en lu'"
                         >
                           <button
                             type="button"
                             class="prospect-unseen-btn"
-                            :disabled="!isProspectSeen(selectedProspect)"
-                            @click.stop="unmarkProspectSeen(selectedProspect.email)"
+                            :aria-pressed="isProspectSeen(selectedProspect)"
+                            @click.stop="toggleProspectSeen(selectedProspect)"
                           >
                             <svg class="prospect-unseen-btn__ic" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                               <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" />
                               <circle cx="12" cy="12" r="2.8" />
-                              <path d="M4 4l16 16" />
+                              <path v-if="isProspectSeen(selectedProspect)" d="M4 4l16 16" />
                             </svg>
-                            <span>Marquer comme non vu</span>
+                            <span>{{ isProspectSeen(selectedProspect) ? 'Non lu' : 'Lu' }}</span>
                           </button>
                         </span>
                         <span
@@ -322,7 +373,7 @@
                             class="prospect-favorite-btn"
                             :class="{ 'is-active': isProspectCrmFavorite(selectedProspect) }"
                             :aria-pressed="isProspectCrmFavorite(selectedProspect)"
-                            @click.stop="toggleProspectFavorite(selectedProspect.email)"
+                            @click.stop="toggleProspectFavorite(selectedProspect)"
                           >
                             <svg class="prospect-favorite-btn__ic" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                               <path d="M12 21s-6.7-4.1-9-8.5C.5 9.4 2 6 6 6c2.5 0 4.5 2 6 3.5C13.5 8 15.5 6 18 6c4 0 5.5 3.4 3 6.5C18.7 16.9 12 21 12 21z" />
@@ -330,22 +381,26 @@
                             <span>Favoris</span>
                           </button>
                         </span>
-                      </div>
-                      <div class="prospect-detail-hero__crm-toolbar-right">
-                        <span class="prospect-btn-tooltip" data-tooltip="Supprimer ce prospect du CRM local">
+                        <span
+                          class="prospect-btn-tooltip"
+                          :data-tooltip="isProspectTreated(selectedProspect) ? 'Basculer ce prospect en non traité' : 'Basculer ce prospect en traité'"
+                        >
                           <button
                             type="button"
-                            class="prospect-delete-btn"
-                            @click.stop="openDeleteProspectConfirm(selectedProspect)"
+                            class="prospect-favorite-btn prospect-treated-btn"
+                            :class="{
+                              'is-active': isProspectTreated(selectedProspect),
+                              'is-inactive': !isProspectTreated(selectedProspect),
+                            }"
+                            :aria-pressed="isProspectTreated(selectedProspect)"
+                            @click.stop="toggleProspectTreated(selectedProspect)"
                           >
-                            <svg class="prospect-delete-btn__ic" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                              <path d="M3 6h18" />
-                              <path d="M8 6V4h8v2" />
-                              <path d="M6 6l1 14h10l1-14" />
-                              <path d="M10 11v6" />
-                              <path d="M14 11v6" />
+                            <svg class="prospect-favorite-btn__ic" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                              <path v-if="isProspectTreated(selectedProspect)" d="M18 6 6 18" />
+                              <path v-if="isProspectTreated(selectedProspect)" d="m6 6 12 12" />
+                              <path v-else d="m20 6-11 11-5-5" />
                             </svg>
-                            <span>Supprimer</span>
+                            <span>{{ isProspectTreated(selectedProspect) ? 'Non traité' : 'Traité' }}</span>
                           </button>
                         </span>
                       </div>
@@ -354,19 +409,15 @@
                       <span class="pro-members-list__name" :class="{ 'prospect-anon': shouldBlurProspectName(selectedProspect) }">
                         {{ displayProspectName(selectedProspect) }}
                       </span>
-                      <span class="prospect-heat-pill" :class="`prospect-heat-pill--${heatLevelForProspect(selectedProspect)}`">
-                        {{ selectedProspect.heatLabel }}
+                      <span
+                        class="prospect-heat-pill"
+                        :class="`prospect-heat-pill--${heatLevelForProspect(selectedProspect)}`"
+                        :title="temperatureTitleForProspect(selectedProspect)"
+                      >
+                        {{ heatLabelForProspect(selectedProspect) }} · {{ formatTemperatureScore(selectedProspect.score) }}
                       </span>
                     </p>
-                    <p class="prospect-detail-hero__score">Score {{ selectedProspect.score.toFixed(1) }}/100</p>
-                    <p class="prospect-detail-hero__hint">La température prime : le score complète l’interprétation.</p>
                     <div class="prospect-detail-hero__legend">
-                      <p class="prospect-detail-hero__legend-line">
-                        <strong>Température :</strong> niveau de priorité commerciale immédiate (Froid / Tiède / Chaud).
-                      </p>
-                      <p class="prospect-detail-hero__legend-line">
-                        <strong>Score :</strong> note détaillée basée sur similarité, activité et intention (utile pour départager deux prospects de même température).
-                      </p>
                       <p class="prospect-detail-hero__legend-line prospect-detail-hero__legend-line--accent">
                         {{ temperatureMeaningForProspect(selectedProspect) }}
                       </p>
@@ -510,7 +561,7 @@
                           type="button"
                           class="listing-card__hit"
                           :aria-label="`Aperçu de l’annonce : ${entry.listing.title}`"
-                          @click="openInteractionListingPreview(entry.listing.id)"
+                          @click="openInteractionListingPreview(entry.listing)"
                         />
                         <div class="listing-card__media-col">
                           <ListingCardMedia
@@ -545,6 +596,151 @@
                 </div>
               </div>
             </section>
+          </div>
+
+          <div v-if="selectedProspectsCount > 0" class="pro-listing-bulkbar" role="region" aria-label="Sélection de prospects">
+            <div class="pro-listing-bulkbar__left">
+              <p class="pro-listing-bulkbar__count">
+                {{ selectedProspectsCount }} prospect(s) sélectionné(s)
+              </p>
+              <div class="pro-listing-bulkbar__actions pro-listing-bulkbar__actions--selection">
+                <button type="button" class="pro-listing-bulkbar__btn pro-listing-bulkbar__btn--selection" @click="selectAllFilteredProspects">
+                  <svg class="pro-listing-bulkbar__btn-ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="m9 11 3 3L22 4" />
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                  </svg>
+                  Tous
+                </button>
+                <button type="button" class="pro-listing-bulkbar__btn pro-listing-bulkbar__btn--selection" @click="clearSelectedProspects">
+                  <svg class="pro-listing-bulkbar__btn-ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M18 6 6 18" />
+                    <path d="m6 6 12 12" />
+                  </svg>
+                  Aucun
+                </button>
+              </div>
+            </div>
+            <div class="pro-listing-bulkbar__actions pro-listing-bulkbar__actions--crm">
+              <button
+                type="button"
+                class="pro-listing-bulkbar__btn pro-listing-bulkbar__btn--crm-favorite"
+                :class="{ 'is-bulk-remove': !bulkToggleFavoriteTarget }"
+                :aria-label="bulkFavoriteAriaLabel"
+                @click="bulkMarkProspectsFavorite"
+              >
+                <svg
+                  v-if="bulkToggleFavoriteTarget"
+                  class="pro-listing-bulkbar__btn-ic"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12 21s-6.7-4.1-9-8.5C.5 9.4 2 6 6 6c2.5 0 4.5 2 6 3.5C13.5 8 15.5 6 18 6c4 0 5.5 3.4 3 6.5C18.7 16.9 12 21 12 21z" />
+                </svg>
+                <svg
+                  v-else
+                  class="pro-listing-bulkbar__btn-ic"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12 21s-6.7-4.1-9-8.5C.5 9.4 2 6 6 6c2.5 0 4.5 2 6 3.5C13.5 8 15.5 6 18 6c4 0 5.5 3.4 3 6.5C18.7 16.9 12 21 12 21z" />
+                  <path d="M2 2l20 20" />
+                </svg>
+                {{ bulkFavoriteLabel }}
+              </button>
+              <button
+                type="button"
+                class="pro-listing-bulkbar__btn pro-listing-bulkbar__btn--crm-treated"
+                :class="{ 'is-bulk-remove': !bulkToggleTreatedTarget }"
+                :aria-label="bulkTreatedAriaLabel"
+                @click="bulkMarkProspectsTreated"
+              >
+                <svg
+                  v-if="bulkToggleTreatedTarget"
+                  class="pro-listing-bulkbar__btn-ic"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="m20 6-11 11-5-5" />
+                </svg>
+                <svg
+                  v-else
+                  class="pro-listing-bulkbar__btn-ic"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+                {{ bulkTreatedLabel }}
+              </button>
+              <span
+                class="pro-listing-bulkbar__btn-wrap"
+                :class="{ 'prospect-btn-tooltip': !canBulkSendMessage }"
+                :data-tooltip="!canBulkSendMessage ? 'Aucun prospect sélectionné n’a de compte Matchaa : la messagerie est indisponible.' : undefined"
+              >
+                <button
+                  type="button"
+                  class="pro-listing-bulkbar__btn pro-listing-bulkbar__btn--crm-message"
+                  :disabled="!canBulkSendMessage"
+                  aria-label="Ouvrir la messagerie pour les prospects sélectionnés ayant un compte"
+                  @click="openBulkProspectChat"
+                >
+                  <svg class="pro-listing-bulkbar__btn-ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M4 4h16v10H8l-4 4V4z" />
+                    <path d="M8 12h8" />
+                    <path d="M8 8h8" />
+                  </svg>
+                  Message
+                </button>
+              </span>
+              <span
+                class="pro-listing-bulkbar__btn-wrap"
+                :class="{ 'prospect-btn-tooltip': !canBulkSendEmail }"
+                :data-tooltip="!canBulkSendEmail ? 'Aucun prospect sélectionné n’a consenti à recevoir un e-mail.' : undefined"
+              >
+                <button
+                  type="button"
+                  class="pro-listing-bulkbar__btn pro-listing-bulkbar__btn--crm-mail"
+                  :disabled="!canBulkSendEmail"
+                  aria-label="Composer un e-mail pour les prospects sélectionnés ayant consenti"
+                  @click="openBulkProspectEmailModal"
+                >
+                  <svg class="pro-listing-bulkbar__btn-ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="3" y="5" width="18" height="14" rx="2" />
+                    <path d="m3 7 9 6 9-6" />
+                  </svg>
+                  E-mail
+                </button>
+              </span>
+            </div>
           </div>
 
           <div v-if="filteredProspects.length && totalPages > 1" class="pro-pagination">
@@ -591,6 +787,7 @@
         hide-title
         @request-close-container="contactModalOpen = false"
         :listing-id="contactListing.id"
+        :listing-agency-numeric="contactListing.agencyId"
         :agency-name="getAgencyById(contactListing.agencyId)?.name ?? 'Agence'"
         :agency-phone-display="getAgencyById(contactListing.agencyId)?.phoneDisplay"
         :agency-phone-tel="getAgencyById(contactListing.agencyId)?.phoneTel"
@@ -604,12 +801,36 @@
     >
       <div class="pro-listing-preview">
         <iframe
-          v-if="previewModalSrc"
-          :src="previewModalSrc"
+          v-if="previewModalIframeSrc"
+          :src="previewModalIframeSrc"
           class="pro-listing-preview__frame"
           loading="lazy"
           referrerpolicy="strict-origin-when-cross-origin"
         />
+        <div
+          v-else-if="previewListingStub"
+          class="pro-listing-preview-stub"
+        >
+          <div class="pro-listing-preview-stub__media">
+            <img
+              v-if="previewListingStub.images[0]"
+              :src="previewListingStub.images[0]"
+              alt=""
+              class="pro-listing-preview-stub__img"
+            >
+            <div v-else class="pro-listing-preview-stub__img pro-listing-preview-stub__img--empty" aria-hidden="true" />
+          </div>
+          <div class="pro-listing-preview-stub__body">
+            <p class="pro-listing-preview-stub__price">{{ formatListingPrice(previewListingStub) }}</p>
+            <h3 class="pro-listing-preview-stub__title">{{ previewListingStub.title }}</h3>
+            <p class="pro-listing-preview-stub__loc">
+              {{ previewListingStub.city }} · {{ labelForPropertyType(previewListingStub.propertyType) }}
+            </p>
+            <p class="pro-listing-preview-stub__note">
+              Cette fiche n’est pas chargée en pleine page (brouillon, catalogue hors ligne ou donnée issue de l’activité). Les informations ci-dessus reprennent le résumé disponible.
+            </p>
+          </div>
+        </div>
       </div>
     </AppCenterModal>
 
@@ -630,17 +851,37 @@
 
     <AppCenterModal
       v-model="prospectChatModalOpen"
-      title="Messagerie prospect"
+      :title="prospectChatModalTitle"
       size="form"
     >
       <div class="prospect-chat-modal">
         <div class="prospect-chat-modal__head">
           <p class="prospect-chat-modal__title">
-            Conversation avec
-            <strong>{{ activeChatProspect ? displayProspectName(activeChatProspect) : 'ce prospect' }}</strong>
+            <template v-if="prospectChatIsBulk">
+              Message groupé à
+              <strong>{{ prospectChatBulkRecipients.length }} prospect(s)</strong>
+              avec compte Matchaa
+            </template>
+            <template v-else>
+              Conversation avec
+              <strong>{{ activeChatProspect ? displayProspectName(activeChatProspect) : 'ce prospect' }}</strong>
+            </template>
           </p>
+          <p v-if="prospectChatIsBulk" class="prospect-chat-modal__bulk-hint">
+            Le même texte (et l’annonce jointe le cas échéant) sera envoyé à chaque destinataire. Pas d’historique fusionné en mode groupé.
+          </p>
+          <ul v-if="prospectChatIsBulk" class="prospect-chat-modal__bulk-recipients" aria-label="Destinataires">
+            <li v-for="p in prospectChatBulkRecipientsVisible" :key="`bulk-chat-${p.email}`">
+              <span class="prospect-chat-modal__bulk-name">{{ displayProspectName(p) }}</span>
+              <span class="prospect-chat-modal__bulk-email">{{ p.email }}</span>
+            </li>
+            <li v-if="prospectChatBulkRecipientsMore > 0" class="prospect-chat-modal__bulk-more">
+              … et {{ prospectChatBulkRecipientsMore }} autre(s)
+            </li>
+          </ul>
         </div>
         <div
+          v-if="!prospectChatIsBulk"
           ref="prospectChatThreadContainer"
           class="prospect-chat-modal__thread"
           role="log"
@@ -659,7 +900,7 @@
               type="button"
               class="prospects-listing-picker__result-btn"
               :aria-label="`Annonce : ${listingForThreadMessage(msg)!.title}`"
-              @click="openInteractionListingPreview(listingForThreadMessage(msg)!.id)"
+              @click="openInteractionListingPreview(listingForThreadMessage(msg)!)"
             >
               <img
                 v-if="listingForThreadMessage(msg)!.images[0]"
@@ -703,7 +944,7 @@
             v-model="prospectChatDraft"
             class="conversation-panel__input"
             rows="1"
-            placeholder="Écrire un message au prospect…"
+            :placeholder="prospectChatIsBulk ? 'Écrire le message envoyé à chaque destinataire…' : 'Écrire un message au prospect…'"
             @input="autoResizeProspectChatComposer"
             @keydown="onProspectChatComposerKeydown"
           />
@@ -761,13 +1002,30 @@
 
     <AppCenterModal
       v-model="prospectEmailModalOpen"
-      title="Envoyer un e-mail"
+      :title="prospectEmailModalTitle"
       size="form"
     >
       <form class="prospect-email-modal" @submit.prevent="sendProspectEmail">
-        <p v-if="selectedProspect" class="prospect-email-modal__to">
+        <p v-if="!prospectEmailIsBulk && selectedProspect" class="prospect-email-modal__to">
           Destinataire : <strong>{{ selectedProspect.email }}</strong>
         </p>
+        <div v-if="prospectEmailIsBulk" class="prospect-email-modal__bulk">
+          <p class="prospect-email-modal__to prospect-email-modal__to--lead">
+            <strong>{{ prospectEmailBulkRecipients.length }} destinataire(s)</strong> avec consentement e-mail
+          </p>
+          <ul class="prospect-chat-modal__bulk-recipients" aria-label="Destinataires">
+            <li v-for="p in prospectEmailBulkRecipientsVisible" :key="`bulk-mail-${p.email}`">
+              <span class="prospect-chat-modal__bulk-name">{{ displayProspectName(p) }}</span>
+              <span class="prospect-chat-modal__bulk-email">{{ p.email }}</span>
+            </li>
+            <li v-if="prospectEmailBulkRecipientsMore > 0" class="prospect-chat-modal__bulk-more">
+              … et {{ prospectEmailBulkRecipientsMore }} autre(s)
+            </li>
+          </ul>
+          <p class="prospect-chat-modal__bulk-hint">
+            Le même objet et le même corps seront enregistrés pour chaque envoi.
+          </p>
+        </div>
         <div class="prospect-email-modal__field">
           <label for="prospect-email-subject">Objet</label>
           <input
@@ -802,23 +1060,10 @@
     <AppToast
       :visible="emailSentToastVisible"
       title="E-mail envoyé"
-      message="Votre e-mail a bien été enregistré."
+      :message="emailSentToastMessage"
       variant="success"
     />
 
-    <AppCenterModal v-model="deleteProspectConfirmOpen" title="Supprimer le prospect" size="sm">
-      <p class="compte-settings__confirm-text">
-        Voulez-vous vraiment supprimer ce prospect du CRM local ?
-      </p>
-      <div class="compte-settings__confirm-actions">
-        <button type="button" class="profil-account__btn profil-account__btn--ghost" @click="deleteProspectConfirmOpen = false">
-          Annuler
-        </button>
-        <button type="button" class="profil-account__btn profil-account__btn--danger" @click="confirmDeleteProspect">
-          Supprimer
-        </button>
-      </div>
-    </AppCenterModal>
   </div>
 </template>
 
@@ -828,10 +1073,9 @@ import AppToast from '~/components/ui/AppToast.vue'
 import AccountEmptyState from '~/components/account/AccountEmptyState.vue'
 import AnnoncesFilterBar from '~/components/annonces/AnnoncesFilterBar.vue'
 import ListingContactAnnouncerForm from '~/components/listing/ListingContactAnnouncerForm.vue'
-import { PROSPECT_SEEN_STORAGE_CHANGED } from '~/utils/prospect-seen-events'
 import { getAgencyById } from '~/data/agencies'
 import type { SearchListing } from '~/data/mock-listings'
-import { labelForPropertyType, PROPERTY_TYPE_LABEL_LOWER_SET } from '~/data/property-types'
+import { labelForPropertyType } from '~/data/property-types'
 import type { ProspectHeatLevel } from '~/utils/prospect-temperature'
 import {
   buildProspectRows,
@@ -840,8 +1084,10 @@ import {
   type ProspectListSortKey,
   type ProspectMatchRow,
 } from '~/utils/build-prospect-rows'
+import { normalizeProspectIdentityId } from '~/utils/prospect-identity-id'
+import { replaceProNewProspectsBadgeCrmMapsFromSnapshots, syncProNewProspectsBadgeCrmMaps } from '~/composables/useProNewProspectsBadgeCount'
 
-type ProspectKpiFilter = 'all' | 'new' | 'favorite' | 'potential'
+type ProspectKpiFilter = 'all' | 'new' | 'potential' | 'favorite' | 'treated'
 
 definePageMeta({ layout: 'pro' })
 
@@ -861,12 +1107,13 @@ const { parsed, mergeQuery, formatListingPrice } = useAnnoncesSearch()
 const contactModalOpen = ref(false)
 const contactListing = ref<SearchListing | null>(null)
 const previewModalOpen = ref(false)
-const previewListingId = ref<string | null>(null)
+/** URL iframe `/annonces/...` si la fiche est résolvable côté app, sinon vide (aperçu stub). */
+const previewModalIframeSrc = ref<string | null>(null)
+/** Données affichées si l’iframe ne peut pas charger la page détail. */
+const previewListingStub = ref<SearchListing | null>(null)
 const prospectCallModalOpen = ref(false)
 const prospectChatModalOpen = ref(false)
 const prospectEmailModalOpen = ref(false)
-const deleteProspectConfirmOpen = ref(false)
-const prospectEmailPendingDeletion = ref<string | null>(null)
 const prospectEmailSubject = ref('')
 const prospectEmailMessage = ref('')
 const prospectChatDraft = ref('')
@@ -876,8 +1123,30 @@ const prospectChatListingPickerOpen = ref(false)
 const prospectChatListingPickerSearch = ref('')
 const prospectChatSelectedListing = ref<SearchListing | null>(null)
 const activeChatProspectEmail = ref<string | null>(null)
+const prospectChatIsBulk = ref(false)
+const prospectChatBulkRecipients = ref<ProspectMatchRow[]>([])
+const prospectEmailIsBulk = ref(false)
+const prospectEmailBulkRecipients = ref<ProspectMatchRow[]>([])
 const emailSentToastVisible = ref(false)
+const emailSentToastMessage = ref('Votre e-mail a bien été enregistré.')
 let emailSentToastTimer: ReturnType<typeof setTimeout> | null = null
+
+const prospectChatModalTitle = computed(() =>
+  prospectChatIsBulk.value ? 'Messagerie groupée' : 'Messagerie prospect',
+)
+const prospectEmailModalTitle = computed(() =>
+  prospectEmailIsBulk.value
+    ? `E-mail groupé (${prospectEmailBulkRecipients.value.length})`
+    : 'Envoyer un e-mail',
+)
+const prospectChatBulkRecipientsVisible = computed(() => prospectChatBulkRecipients.value.slice(0, 5))
+const prospectChatBulkRecipientsMore = computed(() =>
+  Math.max(0, prospectChatBulkRecipients.value.length - 5),
+)
+const prospectEmailBulkRecipientsVisible = computed(() => prospectEmailBulkRecipients.value.slice(0, 5))
+const prospectEmailBulkRecipientsMore = computed(() =>
+  Math.max(0, prospectEmailBulkRecipients.value.length - 5),
+)
 let prospectChatScrollTimer: ReturnType<typeof setTimeout> | null = null
 const listingCriteriaPickerRef = ref<HTMLElement | null>(null)
 const listingCriteriaPickerOpen = ref(false)
@@ -895,36 +1164,86 @@ function listingForThreadMessage(msg: { listingId?: string | null }): SearchList
   }
   return listingById.value.get(id) ?? null
 }
-/** Ancienne clé globale ; migrée vers {@link prospectSeenStorageKey} si besoin. */
-const PROSPECTS_SEEN_LEGACY_STORAGE_KEY = 'matchaa-pro-prospects-seen'
-const seenProspectEmails = ref<Set<string>>(new Set())
+type ProspectCrmState = { isRead: boolean; isFavorite: boolean; isTreated: boolean }
+const crmStateByIdentity = ref<Map<string, ProspectCrmState>>(new Map())
 
-const prospectSeenStorageKey = computed(() => {
-  const id = siteStore.currentProUser?.id
-  return id ? `matchaa-pro-prospects-seen:${id}` : 'matchaa-pro-prospects-seen:guest'
-})
-const favoriteProspectEmails = ref<Set<string>>(new Set())
+function authBearerHeader(): Record<string, string> {
+  const token = useSupabaseSession().value?.access_token || ''
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
 
-const prospectFavoritesStorageKey = computed(() => {
-  const id = siteStore.currentProUser?.id
-  return id ? `matchaa-pro-prospect-favorites:${id}` : 'matchaa-pro-prospect-favorites:guest'
-})
+async function resolveAuthBearerHeader(): Promise<Record<string, string>> {
+  const fromState = useSupabaseSession().value?.access_token || ''
+  if (fromState) {
+    return { Authorization: `Bearer ${fromState}` }
+  }
+  const supabase = useSupabaseClient()
+  if (!supabase) {
+    return {}
+  }
+  const { data } = await supabase.auth.getSession()
+  if (data.session) {
+    useSupabaseSession().value = data.session
+  }
+  const token = data.session?.access_token || ''
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+async function refreshProspectCrmState() {
+  try {
+    const headers = await resolveAuthBearerHeader()
+    if (!headers.Authorization) {
+      return
+    }
+    const agencyId = (siteStore.currentProUser?.agencyId || '').trim()
+    const res = await $fetch<{ snapshots: Array<{ email: string; crm: ProspectCrmState; identityId: string }> }>('/api/prospects/list', {
+      query: agencyId ? { agencyId } : undefined,
+      headers,
+    })
+    const nextByIdentity = new Map<string, ProspectCrmState>()
+    for (const item of res.snapshots || []) {
+      const identityId = normalizeProspectIdentityId(item.identityId)
+      if (!identityId) {
+        continue
+      }
+      nextByIdentity.set(identityId, {
+        isRead: item.crm?.isRead === true,
+        isFavorite: item.crm?.isFavorite === true,
+        isTreated: item.crm?.isTreated === true,
+      })
+    }
+    crmStateByIdentity.value = nextByIdentity
+    replaceProNewProspectsBadgeCrmMapsFromSnapshots(res.snapshots || [])
+  } catch {
+    /* ignore */
+  }
+}
 
 function openContactModal(item: SearchListing) {
   contactListing.value = item
   contactModalOpen.value = true
 }
 
-function previewListingUrl(listingId: string): string {
-  return `/annonces/${encodeURIComponent(listingId)}?embed=1`
+function resolveProspectListingIframeSrc(listing: SearchListing): string | null {
+  const id = (listing.id || '').trim()
+  if (!id) {
+    return null
+  }
+  siteStore.ensureProListingsLoadedForPublic()
+  const inAgency = siteStore.currentProAgencyListings.some((l) => l.id === id)
+  if (inAgency) {
+    return `/annonces/${encodeURIComponent(id)}?embed=1&preview=pro`
+  }
+  const inPublic = siteStore.publicActiveSearchListings.some((l) => l.id === id)
+  if (inPublic) {
+    return `/annonces/${encodeURIComponent(id)}?embed=1`
+  }
+  return null
 }
 
-const previewModalSrc = computed(() =>
-  previewListingId.value ? previewListingUrl(previewListingId.value) : '',
-)
-
-function openInteractionListingPreview(listingId: string) {
-  previewListingId.value = listingId
+function openInteractionListingPreview(listing: SearchListing) {
+  previewListingStub.value = listing
+  previewModalIframeSrc.value = resolveProspectListingIframeSrc(listing)
   previewModalOpen.value = true
 }
 
@@ -1002,6 +1321,8 @@ function openProspectChat() {
   if (!selectedProspect.value?.hasAccount) {
     return
   }
+  prospectChatIsBulk.value = false
+  prospectChatBulkRecipients.value = []
   activeChatProspectEmail.value = selectedProspect.value.email
   prospectChatDraft.value = ''
   prospectChatSelectedListing.value = null
@@ -1009,18 +1330,56 @@ function openProspectChat() {
   prospectChatModalOpen.value = true
 }
 
+function openBulkProspectChat() {
+  const rows = bulkSelectedProspectRows.value.filter((p) => p.hasAccount === true)
+  if (!rows.length) {
+    return
+  }
+  prospectChatIsBulk.value = true
+  prospectChatBulkRecipients.value = [...rows]
+  activeChatProspectEmail.value = null
+  prospectChatDraft.value = ''
+  prospectChatSelectedListing.value = null
+  prospectChatListingPickerOpen.value = false
+  prospectChatModalOpen.value = true
+}
+
 function sendProspectChatMessage() {
-  const prospect = activeChatProspect.value
   const text = prospectChatDraft.value.trim()
-  if (!prospect || !text) {
+  if (!text) {
+    return
+  }
+  const listing = prospectChatSelectedListing.value
+  if (prospectChatIsBulk.value) {
+    const recipients = prospectChatBulkRecipients.value
+    if (!recipients.length) {
+      return
+    }
+    for (const p of recipients) {
+      siteStore.sendProMessageToProspect({
+        prospectEmail: p.email,
+        prospectName: p.name,
+        text,
+        listingId: listing?.id ?? null,
+        listingTitle: listing?.title,
+      })
+    }
+    prospectChatDraft.value = ''
+    resetProspectChatComposerHeight()
+    prospectChatSelectedListing.value = null
+    prospectChatListingPickerOpen.value = false
+    return
+  }
+  const prospect = activeChatProspect.value
+  if (!prospect) {
     return
   }
   siteStore.sendProMessageToProspect({
     prospectEmail: prospect.email,
     prospectName: prospect.name,
     text,
-    listingId: prospectChatSelectedListing.value?.id ?? null,
-    listingTitle: prospectChatSelectedListing.value?.title,
+    listingId: listing?.id ?? null,
+    listingTitle: listing?.title,
   })
   prospectChatDraft.value = ''
   resetProspectChatComposerHeight()
@@ -1099,28 +1458,25 @@ function openProspectEmailModal() {
   if (!selectedProspect.value?.hasEmailConsent) {
     return
   }
+  prospectEmailIsBulk.value = false
+  prospectEmailBulkRecipients.value = []
   const prefill = buildProspectEmailPrefill(selectedProspect.value)
   prospectEmailSubject.value = prefill.subject
   prospectEmailMessage.value = prefill.message
   prospectEmailModalOpen.value = true
 }
 
-function openDeleteProspectConfirm(prospect: ProspectMatchRow) {
-  prospectEmailPendingDeletion.value = prospect.email
-  deleteProspectConfirmOpen.value = true
-}
-
-function confirmDeleteProspect() {
-  const email = prospectEmailPendingDeletion.value
-  if (!email) {
-    deleteProspectConfirmOpen.value = false
+function openBulkProspectEmailModal() {
+  const rows = bulkSelectedProspectRows.value.filter((p) => p.hasEmailConsent === true)
+  if (!rows.length) {
     return
   }
-  siteStore.deleteProspectData(email)
-  deleteProspectConfirmOpen.value = false
-  prospectEmailPendingDeletion.value = null
-  const first = filteredProspects.value[0]
-  selectedProspectEmail.value = first ? first.email : null
+  prospectEmailIsBulk.value = true
+  prospectEmailBulkRecipients.value = [...rows]
+  const prefill = buildProspectEmailPrefill(rows[0])
+  prospectEmailSubject.value = prefill.subject
+  prospectEmailMessage.value = prefill.message
+  prospectEmailModalOpen.value = true
 }
 
 function sendProspectEmail() {
@@ -1129,7 +1485,15 @@ function sendProspectEmail() {
   if (!subject || !body) {
     return
   }
+  const wasBulk = prospectEmailIsBulk.value
+  const bulkCount = prospectEmailBulkRecipients.value.length
   prospectEmailModalOpen.value = false
+  prospectEmailIsBulk.value = false
+  prospectEmailBulkRecipients.value = []
+  emailSentToastMessage.value =
+    wasBulk && bulkCount > 1
+      ? `Vos e-mails ont bien été enregistrés pour ${bulkCount} destinataires.`
+      : 'Votre e-mail a bien été enregistré.'
   emailSentToastVisible.value = true
   if (emailSentToastTimer) {
     clearTimeout(emailSentToastTimer)
@@ -1146,6 +1510,19 @@ watch(
     if (open) {
       siteStore.markCurrentProMessagesRead()
       scrollProspectChatToBottom()
+    } else {
+      prospectChatIsBulk.value = false
+      prospectChatBulkRecipients.value = []
+    }
+  },
+)
+
+watch(
+  () => prospectEmailModalOpen.value,
+  (open) => {
+    if (!open) {
+      prospectEmailIsBulk.value = false
+      prospectEmailBulkRecipients.value = []
     }
   },
 )
@@ -1252,6 +1629,10 @@ function clearSelectedListingCriteria() {
   })
 }
 
+function resetProspectSearchCriteria() {
+  clearSelectedListingCriteria()
+}
+
 function onDocumentClickCloseListingCriteriaPicker(e: MouseEvent) {
   if (!listingCriteriaPickerOpen.value) {
     return
@@ -1263,142 +1644,103 @@ function onDocumentClickCloseListingCriteriaPicker(e: MouseEvent) {
   listingCriteriaPickerOpen.value = false
 }
 
+function crmStateForProspect(prospect: ProspectMatchRow): ProspectCrmState {
+  const identityId = normalizeProspectIdentityId(prospect.prospectIdentityId)
+  if (!identityId) {
+    return { isRead: false, isFavorite: false, isTreated: false }
+  }
+  return crmStateByIdentity.value.get(identityId) ?? { isRead: false, isFavorite: false, isTreated: false }
+}
+
 function isProspectSeen(prospect: ProspectMatchRow): boolean {
-  return seenProspectEmails.value.has(prospect.email.toLowerCase())
+  return crmStateForProspect(prospect).isRead === true
 }
 
-function hydrateSeenProspects() {
-  if (!import.meta.client) {
+async function updateProspectCrmState(prospect: ProspectMatchRow, patch: Partial<ProspectCrmState>) {
+  const agencyId = siteStore.currentProUser?.agencyId
+  const prospectIdentityId = normalizeProspectIdentityId(prospect.prospectIdentityId)
+  if (!prospectIdentityId) {
     return
   }
-  const key = prospectSeenStorageKey.value
+  const current = crmStateForProspect(prospect)
+  const next = { ...current, ...patch }
+  crmStateByIdentity.value.set(prospectIdentityId, next)
+  syncProNewProspectsBadgeCrmMaps(prospectIdentityId, { isRead: next.isRead, isTreated: next.isTreated })
   try {
-    let raw = localStorage.getItem(key)
-    if (!raw && key !== PROSPECTS_SEEN_LEGACY_STORAGE_KEY) {
-      const legacy = localStorage.getItem(PROSPECTS_SEEN_LEGACY_STORAGE_KEY)
-      const guestScoped = localStorage.getItem('matchaa-pro-prospects-seen:guest')
-      const transfer = legacy ?? (key.endsWith(':guest') ? null : guestScoped)
-      if (transfer) {
-        raw = transfer
-        try {
-          localStorage.setItem(key, transfer)
-        } catch {
-          /* ignore */
-        }
-      }
-    }
-    if (!raw) {
-      seenProspectEmails.value = new Set()
+    const headers = await resolveAuthBearerHeader()
+    if (!headers.Authorization) {
       return
     }
-    const parsed = JSON.parse(raw) as unknown
-    if (!Array.isArray(parsed)) {
-      seenProspectEmails.value = new Set()
-      return
+    const body: Record<string, unknown> = {
+      prospectIdentityId,
+      prospectEmail: null,
+      anonymousId: null,
     }
-    seenProspectEmails.value = new Set(
-      parsed.filter((x): x is string => typeof x === 'string' && x.trim() !== '').map((x) => x.toLowerCase()),
-    )
+    if (agencyId) {
+      body.agencyId = agencyId
+    }
+    if (typeof patch.isRead === 'boolean') {
+      body.isRead = patch.isRead
+    }
+    if (typeof patch.isFavorite === 'boolean') {
+      body.isFavorite = patch.isFavorite
+    }
+    if (typeof patch.isTreated === 'boolean') {
+      body.isTreated = patch.isTreated
+    }
+    await $fetch('/api/prospects/crm-state', {
+      method: 'POST',
+      headers,
+      body,
+    })
   } catch {
-    seenProspectEmails.value = new Set()
+    crmStateByIdentity.value.set(prospectIdentityId, current)
+    syncProNewProspectsBadgeCrmMaps(prospectIdentityId, { isRead: current.isRead, isTreated: current.isTreated })
   }
 }
 
-function markProspectSeen(email: string | null) {
-  if (!import.meta.client || !email) {
+async function markProspectSeen(prospect: ProspectMatchRow | null) {
+  if (!prospect) {
     return
   }
-  const normalized = email.trim().toLowerCase()
-  if (!normalized || seenProspectEmails.value.has(normalized)) {
+  if (isProspectSeen(prospect)) {
     return
   }
-  const next = new Set(seenProspectEmails.value)
-  next.add(normalized)
-  seenProspectEmails.value = next
-  try {
-    localStorage.setItem(prospectSeenStorageKey.value, JSON.stringify([...next]))
-  } catch {
-    /* ignore */
-  }
-  if (import.meta.client) {
-    window.dispatchEvent(new CustomEvent(PROSPECT_SEEN_STORAGE_CHANGED))
-  }
+  await updateProspectCrmState(prospect, { isRead: true })
 }
 
-function unmarkProspectSeen(email: string | null) {
-  if (!import.meta.client || !email) {
+async function toggleProspectSeen(prospect: ProspectMatchRow | null) {
+  if (!prospect) {
     return
   }
-  const normalized = email.trim().toLowerCase()
-  if (!normalized || !seenProspectEmails.value.has(normalized)) {
-    return
-  }
-  const next = new Set(seenProspectEmails.value)
-  next.delete(normalized)
-  seenProspectEmails.value = next
-  try {
-    localStorage.setItem(prospectSeenStorageKey.value, JSON.stringify([...next]))
-  } catch {
-    /* ignore */
-  }
-  window.dispatchEvent(new CustomEvent(PROSPECT_SEEN_STORAGE_CHANGED))
+  const isRead = isProspectSeen(prospect)
+  await updateProspectCrmState(prospect, { isRead: !isRead })
 }
 
 function isProspectCrmFavorite(prospect: ProspectMatchRow): boolean {
-  return favoriteProspectEmails.value.has(prospect.email.toLowerCase())
+  return crmStateForProspect(prospect).isFavorite === true
 }
 
-function hydrateFavoriteProspects() {
-  if (!import.meta.client) {
-    return
-  }
-  try {
-    const raw = localStorage.getItem(prospectFavoritesStorageKey.value)
-    if (!raw) {
-      favoriteProspectEmails.value = new Set()
-      return
-    }
-    const parsed = JSON.parse(raw) as unknown
-    if (!Array.isArray(parsed)) {
-      favoriteProspectEmails.value = new Set()
-      return
-    }
-    favoriteProspectEmails.value = new Set(
-      parsed.filter((x): x is string => typeof x === 'string' && x.trim() !== '').map((x) => x.toLowerCase()),
-    )
-  } catch {
-    favoriteProspectEmails.value = new Set()
-  }
+async function toggleProspectFavorite(prospect: ProspectMatchRow) {
+  const isFavorite = isProspectCrmFavorite(prospect)
+  await updateProspectCrmState(prospect, { isFavorite: !isFavorite })
 }
 
-function toggleProspectFavorite(email: string) {
-  if (!import.meta.client) {
-    return
-  }
-  const normalized = email.trim().toLowerCase()
-  if (!normalized) {
-    return
-  }
-  const next = new Set(favoriteProspectEmails.value)
-  if (next.has(normalized)) {
-    next.delete(normalized)
-  } else {
-    next.add(normalized)
-  }
-  favoriteProspectEmails.value = next
-  try {
-    localStorage.setItem(prospectFavoritesStorageKey.value, JSON.stringify([...next]))
-  } catch {
-    /* ignore */
-  }
+function isProspectTreated(prospect: ProspectMatchRow): boolean {
+  return crmStateForProspect(prospect).isTreated === true
+}
+
+async function toggleProspectTreated(prospect: ProspectMatchRow) {
+  const isTreated = isProspectTreated(prospect)
+  await updateProspectCrmState(prospect, { isTreated: !isTreated })
 }
 
 function prospectMatchesNewSegment(p: ProspectMatchRow): boolean {
-  return !isProspectSeen(p) && p.maxProximity > 0.75
+  return !isProspectSeen(p) && !isProspectTreated(p) && p.maxProximity > 0.75
 }
 
 function prospectMatchesPotentialSegment(p: ProspectMatchRow): boolean {
-  return !isProspectSeen(p) && p.score > 70
+  return !isProspectSeen(p) && !isProspectTreated(p) && p.score > 70
 }
 
 const prospectRowsBase = computed<ProspectMatchRow[]>(() => {
@@ -1429,8 +1771,9 @@ const prospectMembershipKey = computed(() =>
 const KPI_FILTER_SUFFIXES: Record<ProspectKpiFilter, string> = {
   all: '',
   new: ' dans « Nouveaux »',
-  favorite: ' dans « Favoris »',
   potential: ' dans « Potentiels »',
+  favorite: ' dans « Favoris »',
+  treated: ' dans « Traités »',
 }
 
 const totalProspectsCount = computed(() => prospects.value.length)
@@ -1440,10 +1783,12 @@ const filteredProspects = computed(() => {
   switch (prospectKpiFilter.value) {
     case 'new':
       return list.filter(prospectMatchesNewSegment)
-    case 'favorite':
-      return list.filter((p) => isProspectCrmFavorite(p))
     case 'potential':
       return list.filter(prospectMatchesPotentialSegment)
+    case 'favorite':
+      return list.filter((p) => isProspectCrmFavorite(p))
+    case 'treated':
+      return list.filter((p) => isProspectTreated(p))
     default:
       return list
   }
@@ -1456,6 +1801,9 @@ const newProspectsCount = computed(() => prospects.value.filter(prospectMatchesN
 const favoriteProspectsCount = computed(
   () => prospects.value.filter((p) => isProspectCrmFavorite(p)).length,
 )
+const treatedProspectsCount = computed(
+  () => prospects.value.filter((p) => isProspectTreated(p)).length,
+)
 /** Non vus dans le CRM + score &gt; 70. */
 const potentialProspectsCount = computed(() =>
   prospects.value.filter(prospectMatchesPotentialSegment).length,
@@ -1466,6 +1814,132 @@ const paginatedProspects = computed(() => {
   const start = (currentPage.value - 1) * PAGE_SIZE
   return filteredProspects.value.slice(start, start + PAGE_SIZE)
 })
+const selectedProspectEmails = ref<string[]>([])
+const lastSelectedProspectEmail = ref<string | null>(null)
+const selectedProspectsCount = computed(() => selectedProspectEmails.value.length)
+
+const bulkSelectedProspectRows = computed(() => {
+  const emails = new Set(selectedProspectEmails.value)
+  return prospects.value.filter(
+    (p) => emails.has(p.email) && Boolean(normalizeProspectIdentityId(p.prospectIdentityId)),
+  )
+})
+
+/** Si au moins un non favori → true (tout passer en favori). Si tous favoris → false (tout retirer). */
+const bulkToggleFavoriteTarget = computed(() => {
+  const rows = bulkSelectedProspectRows.value
+  if (!rows.length) {
+    return true
+  }
+  return !rows.every((p) => isProspectCrmFavorite(p))
+})
+
+/** Si au moins un non traité → true (tout traiter). Si tous traités → false (tout non traité). */
+const bulkToggleTreatedTarget = computed(() => {
+  const rows = bulkSelectedProspectRows.value
+  if (!rows.length) {
+    return true
+  }
+  return !rows.every((p) => isProspectTreated(p))
+})
+
+const bulkFavoriteLabel = computed(() =>
+  bulkToggleFavoriteTarget.value ? 'Ajouter aux favoris' : 'Retirer des favoris',
+)
+
+const bulkTreatedLabel = computed(() =>
+  bulkToggleTreatedTarget.value ? 'Marquer comme traités' : 'Marquer non traités',
+)
+
+const bulkFavoriteAriaLabel = computed(() =>
+  bulkToggleFavoriteTarget.value
+    ? 'Ajouter aux favoris les prospects sélectionnés'
+    : 'Retirer des favoris les prospects sélectionnés',
+)
+
+const bulkTreatedAriaLabel = computed(() =>
+  bulkToggleTreatedTarget.value
+    ? 'Marquer comme traités les prospects sélectionnés'
+    : 'Marquer comme non traités les prospects sélectionnés',
+)
+
+async function bulkMarkProspectsFavorite() {
+  const target = bulkToggleFavoriteTarget.value
+  for (const p of bulkSelectedProspectRows.value) {
+    await updateProspectCrmState(p, { isFavorite: target })
+  }
+}
+
+async function bulkMarkProspectsTreated() {
+  const target = bulkToggleTreatedTarget.value
+  for (const p of bulkSelectedProspectRows.value) {
+    await updateProspectCrmState(p, { isTreated: target })
+  }
+}
+
+const canBulkSendMessage = computed(() =>
+  bulkSelectedProspectRows.value.some((p) => p.hasAccount === true),
+)
+const canBulkSendEmail = computed(() =>
+  bulkSelectedProspectRows.value.some((p) => p.hasEmailConsent === true),
+)
+
+function isProspectSelected(email: string): boolean {
+  return selectedProspectEmails.value.includes(email)
+}
+
+function onToggleProspectSelection(email: string, checked: boolean) {
+  const next = new Set(selectedProspectEmails.value)
+  if (checked) {
+    next.add(email)
+  } else {
+    next.delete(email)
+  }
+  selectedProspectEmails.value = [...next]
+}
+
+function onProspectCheckboxClick(email: string, event: MouseEvent) {
+  const target = event.target as HTMLInputElement | null
+  if (!target) {
+    return
+  }
+  const checked = target.checked
+  if (!event.shiftKey || !lastSelectedProspectEmail.value) {
+    onToggleProspectSelection(email, checked)
+    lastSelectedProspectEmail.value = email
+    return
+  }
+  const orderedEmails = paginatedProspects.value.map((item) => item.email)
+  const start = orderedEmails.indexOf(lastSelectedProspectEmail.value)
+  const end = orderedEmails.indexOf(email)
+  if (start < 0 || end < 0) {
+    onToggleProspectSelection(email, checked)
+    lastSelectedProspectEmail.value = email
+    return
+  }
+  const [from, to] = start < end ? [start, end] : [end, start]
+  const next = new Set(selectedProspectEmails.value)
+  for (let i = from; i <= to; i += 1) {
+    const currentEmail = orderedEmails[i]
+    if (checked) {
+      next.add(currentEmail)
+    } else {
+      next.delete(currentEmail)
+    }
+  }
+  selectedProspectEmails.value = [...next]
+  lastSelectedProspectEmail.value = email
+}
+
+function selectAllFilteredProspects() {
+  selectedProspectEmails.value = filteredProspects.value.map((item) => item.email)
+}
+
+function clearSelectedProspects() {
+  selectedProspectEmails.value = []
+  lastSelectedProspectEmail.value = null
+}
+
 const selectedProspectEmail = ref<string | null>(null)
 const selectedProspect = computed(() => {
   const list = paginatedProspects.value
@@ -1474,14 +1948,6 @@ const selectedProspect = computed(() => {
   }
   return list.find((p) => p.email === selectedProspectEmail.value) ?? list[0]
 })
-
-watch(
-  prospectSeenStorageKey,
-  () => {
-    hydrateSeenProspects()
-  },
-  { immediate: true },
-)
 
 watch(prospectMembershipKey, () => {
   prospectKpiFilter.value = 'all'
@@ -1522,10 +1988,18 @@ watch(totalPages, (next) => {
   }
 })
 
+watch(filteredProspects, (list) => {
+  const visibleEmails = new Set(list.map((item) => item.email))
+  selectedProspectEmails.value = selectedProspectEmails.value.filter((email) => visibleEmails.has(email))
+  if (lastSelectedProspectEmail.value && !visibleEmails.has(lastSelectedProspectEmail.value)) {
+    lastSelectedProspectEmail.value = null
+  }
+})
+
 watch(
   selectedProspect,
   (p) => {
-    markProspectSeen(p?.email ?? null)
+    void markProspectSeen(p ?? null)
   },
   { immediate: true },
 )
@@ -1541,6 +2015,35 @@ function formatActivityDate(iso: string | null): string {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function formatLastActivitySummary(iso: string | null): string {
+  if (!iso) {
+    return 'Dernière activité : aucune'
+  }
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24))
+  if (days <= 30) {
+    return `Dernière activité : ${formatRelativeDays(iso)}`
+  }
+  return `Dernière activité : ${formatActivityDate(iso)}`
+}
+
+function listCardCriteria(prospect: ProspectMatchRow): string[] {
+  const out: string[] = []
+  let totalChars = 0
+  for (const criterion of prospect.topCriteria) {
+    const next = criterion.trim()
+    if (!next) {
+      continue
+    }
+    const projected = totalChars + next.length
+    if (out.length >= 3 || (out.length > 0 && projected > 34)) {
+      break
+    }
+    out.push(next)
+    totalChars = projected
+  }
+  return out
 }
 
 function heatLevelForProspect(prospect: ProspectMatchRow): ProspectHeatLevel {
@@ -1649,30 +2152,7 @@ function inferredPreferences(prospect: ProspectMatchRow): {
   surface: string
   rooms: string
 } {
-  const summaries = prospect.searchCriteriaSummaries
-  const budgetToken = summaries.join(' ').match(/Budget\s+([^\u00b7]+)/i)?.[1]?.trim() ?? 'Non estimé'
-  const surfaceToken = summaries.join(' ').match(/Surface min\s+(\d+\s*m²)/i)?.[1]?.trim() ?? 'Non estimée'
-  const roomsToken = summaries.join(' ').match(/Pièces min\s+(\d+)/i)?.[1]?.trim()
-  const typeToken = prospect.topCriteria.find((c) => !/Achat|Location|T\d+/i.test(c)) ?? 'Non déterminé'
-  const zoneCandidates = summaries
-    .map((s) => s.split(' · '))
-    .flat()
-    .map((s) => s.trim())
-    .filter(
-      (s) =>
-        /^[A-Za-zÀ-ÿ' -]{3,}$/.test(s) &&
-        !/Achat|Location|Budget|Surface|Pièces|Chambres/i.test(s) &&
-        !PROPERTY_TYPE_LABEL_LOWER_SET.has(s.toLowerCase()),
-    )
-  const zones = [...new Set(zoneCandidates)].slice(0, 2).join(', ') || 'Zone non déterminée'
-
-  return {
-    preferredType: typeToken,
-    zones,
-    budget: budgetToken,
-    surface: surfaceToken,
-    rooms: roomsToken ? `${roomsToken}+ pièces` : 'Non déterminé',
-  }
+  return prospect.inferredPreferences
 }
 
 function nextActionRecommendation(prospect: ProspectMatchRow): string {
@@ -1689,50 +2169,44 @@ function mergedInteractionListings(prospect: ProspectMatchRow): Array<{
   listing: SearchListing
   heatRank: number
 }> {
-  const byId = new Map<string, { listing: SearchListing; heatRank: number }>()
-  const upsert = (listing: SearchListing, heatRank: number) => {
-    const cur = byId.get(listing.id)
-    if (!cur || heatRank > cur.heatRank) {
-      byId.set(listing.id, { listing, heatRank })
-    }
-  }
-  for (const item of prospect.interactionListings.phone) {
-    upsert(item, 4)
-  }
-  for (const item of prospect.interactionListings.messages) {
-    upsert(item, 3)
-  }
-  for (const item of prospect.interactionListings.favorites) {
-    upsert(item, 2)
-  }
-  for (const item of prospect.interactionListings.views) {
-    upsert(item, 1)
-  }
-  return [...byId.values()].sort((a, b) =>
-    b.heatRank - a.heatRank
-      || (b.listing.relevanceScore ?? 0) - (a.listing.relevanceScore ?? 0),
-  ).slice(0, 7)
+  return prospect.interactionListingsRecent.map((listing, index) => ({
+    listing,
+    heatRank: Math.max(1, 10 - index),
+  }))
 }
 
 function formatTemperatureScore(value: number): string {
   return `${Math.round(Math.max(0, Math.min(100, value)))}%`
 }
 
+onMounted(() => {
+  siteStore.hydrateSession()
+  siteStore.hydrateProSession()
+  // Rechargements côté API déclenchés via watch (évite les courses hydrateProSession -> session JWT).
+  if (import.meta.client) {
+    document.addEventListener('click', onDocumentClickCloseListingCriteriaPicker)
+  }
+})
+
+const proAgencyId = computed(() => siteStore.currentProUser?.agencyId || '')
+const supabaseToken = computed(() => useSupabaseSession().value?.access_token || '')
+
 watch(
-  prospectFavoritesStorageKey,
-  () => {
-    hydrateFavoriteProspects()
+  [proAgencyId, supabaseToken],
+  ([, nextToken]) => {
+    if (!nextToken) {
+      return
+    }
+    void siteStore.refreshProspectSnapshotsFromApi()
+    void refreshProspectCrmState()
   },
   { immediate: true },
 )
 
-onMounted(() => {
-  siteStore.hydrateSession()
-  siteStore.hydrateProSession()
-  hydrateSeenProspects()
-  hydrateFavoriteProspects()
-  if (import.meta.client) {
-    document.addEventListener('click', onDocumentClickCloseListingCriteriaPicker)
+watch(previewModalOpen, (open) => {
+  if (!open) {
+    previewModalIframeSrc.value = null
+    previewListingStub.value = null
   }
 })
 

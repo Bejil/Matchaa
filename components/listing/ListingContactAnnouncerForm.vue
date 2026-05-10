@@ -242,6 +242,8 @@ const props = withDefaults(
   defineProps<{
     listingId: string
     agencyName: string
+    /** Aligné sur `SearchListing.agencyId` (résolution agence pro même si l’id n’est pas dans le store). */
+    listingAgencyNumeric?: number | null
     /** id du <form> (unique si plusieurs formulaires sur la page) */
     formId?: string
     /** Préfixe pour ids des champs (unicité accessibilité) */
@@ -255,6 +257,7 @@ const props = withDefaults(
     formId: 'contact-annonceur',
     fieldIdPrefix: 'lc-main',
     hideTitle: false,
+    listingAgencyNumeric: null,
   },
 )
 
@@ -386,7 +389,8 @@ function onSubmit() {
   siteStore.addSentMessage({
     agency: props.agencyName,
     listingTitle: currentListing.value?.title ?? 'Annonce immobiliere',
-    listingId: currentListing.value?.id ?? null,
+    listingId: currentListing.value?.id ?? props.listingId,
+    listingAgencyNumeric: props.listingAgencyNumeric ?? currentListing.value?.agencyId ?? null,
     messageBody: message.value || `Bonjour, je souhaite des informations sur cette annonce…`,
     contactName: name.value,
     contactEmail: email.value,
@@ -467,6 +471,7 @@ function contactSelectedSuggestion() {
       agency: getAgencyById(listing.agencyId)?.name ?? 'Agence',
       listingTitle: listing.title,
       listingId: listing.id,
+      listingAgencyNumeric: listing.agencyId,
       messageBody: `Bonjour, je souhaite des informations sur cette annonce…`,
       contactName: name.value,
       contactEmail: email.value,

@@ -18,6 +18,7 @@ import {
   upsertThreadMessage as upsertMessageThread,
 } from '~/stores/modules/messages'
 import { useFavoritesStore } from '~/stores/favorites'
+import { normalizeProspectIdentityId } from '~/utils/prospect-identity-id'
 
 function normalizeProListingPropertyType(raw: string | undefined | null): PropertyTypeSlug {
   const input = (raw ?? '').trim()
@@ -137,6 +138,8 @@ export const useSiteStore = defineStore('site', () => {
     updatedAt: string
   }
   type ProspectActivitySnapshot = {
+    /** Identifiant canonique côté Supabase (`prospect_identities`) — requis pour masquer un prospect au CRM. */
+    identityId: string
     email: string
     name: string
     hasAccount: boolean
@@ -159,6 +162,15 @@ export const useSiteStore = defineStore('site', () => {
       leads: string[]
       phoneReveals: string[]
     }
+    recentActivityListingHints: Record<string, {
+      title?: string
+      city?: string
+      propertyType?: string
+      projectType?: 'acheter' | 'louer'
+      price?: number
+      surface?: number
+      rooms?: number
+    }>
     lastActivityAt: string | null
   }
 
@@ -314,6 +326,7 @@ export const useSiteStore = defineStore('site', () => {
   const MESSAGES_KEY_PREFIX = 'matchaa-sent-messages'
   const MESSAGE_THREADS_KEY = 'matchaa-message-threads-v1'
   const PROSPECT_ACTIVITY_KEY_PREFIX = 'matchaa-prospect-activity'
+  let runtimeAnonymousProspectId: string | null = null
   const PUBLIC_PROFILE_KEY_PREFIX = 'matchaa-public-profile'
   const ANON_PROSPECT_ID_KEY = 'matchaa-anon-prospect-id'
   const PREAUTH_IDENTITIES_KEY = 'matchaa-preauth-identities-v1'
@@ -387,20 +400,29 @@ export const useSiteStore = defineStore('site', () => {
   }
 
   function ensureAnonymousProspectEmail(): string {
-    if (!import.meta.client) {
-      return 'anon-server@anonymous.matchaa'
-    }
-    try {
-      const existing = localStorage.getItem(ANON_PROSPECT_ID_KEY)
-      if (existing && existing.trim()) {
-        return `anon-${existing.trim()}@anonymous.matchaa`
+    if (!runtimeAnonymousProspectId) {
+      if (import.meta.client) {
+        try {
+          const stored = (localStorage.getItem(ANON_PROSPECT_ID_KEY) || '').trim()
+          if (stored) {
+            runtimeAnonymousProspectId = stored
+          }
+        } catch {
+          /* ignore */
+        }
       }
-      const created = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
-      localStorage.setItem(ANON_PROSPECT_ID_KEY, created)
-      return `anon-${created}@anonymous.matchaa`
-    } catch {
-      return `anon-${Date.now().toString(36)}@anonymous.matchaa`
+      if (!runtimeAnonymousProspectId) {
+        runtimeAnonymousProspectId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+        if (import.meta.client) {
+          try {
+            localStorage.setItem(ANON_PROSPECT_ID_KEY, runtimeAnonymousProspectId)
+          } catch {
+            /* ignore */
+          }
+        }
+      }
     }
+    return `anon-${runtimeAnonymousProspectId}@anonymous.matchaa`
   }
 
   function prospectActorEmail(): string {
@@ -411,22 +433,7 @@ export const useSiteStore = defineStore('site', () => {
   }
 
   function rememberPreAuthIdentity(emailInput: string) {
-    if (!import.meta.client || currentUser.value) {
-      return
-    }
-    const email = emailInput.trim().toLowerCase()
-    if (!email) {
-      return
-    }
-    try {
-      const raw = localStorage.getItem(PREAUTH_IDENTITIES_KEY)
-      const parsed = raw ? JSON.parse(raw) as unknown : []
-      const arr = Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : []
-      const next = [...new Set([email, ...arr])].slice(0, 50)
-      localStorage.setItem(PREAUTH_IDENTITIES_KEY, JSON.stringify(next))
-    } catch {
-      /* ignore */
-    }
+    void emailInput
   }
 
   function mergePublicProfileFromAnonymousSource(targetEmail: string, sourceEmail: string) {
@@ -531,190 +538,7 @@ export const useSiteStore = defineStore('site', () => {
   }
 
   function mergeAnonymousProspectDataIntoEmail(targetEmailInput: string) {
-    if (!import.meta.client) {
-      return
-    }
-    const targetEmail = targetEmailInput.trim().toLowerCase()
-    if (!targetEmail || isAnonymousProspectEmail(targetEmail)) {
-      return
-    }
-    const anonymousEmails = new Set<string>()
-    const currentAnonymous = ensureAnonymousProspectEmail()
-    if (isAnonymousProspectEmail(currentAnonymous) && currentAnonymous !== targetEmail) {
-      anonymousEmails.add(currentAnonymous)
-    }
-    try {
-      for (let i = 0; i < localStorage.length; i += 1) {
-        const key = localStorage.key(i)
-        if (!key) {
-          continue
-        }
-        const prefixes = [
-          `${SEARCHES_KEY_PREFIX}:`,
-          `${LATEST_SEARCH_KEY_PREFIX}:`,
-          `${MESSAGES_KEY_PREFIX}:`,
-          `${PROSPECT_ACTIVITY_KEY_PREFIX}:`,
-          `${PUBLIC_PROFILE_KEY_PREFIX}:`,
-        ]
-        const matchedPrefix = prefixes.find((prefix) => key.startsWith(prefix))
-        if (!matchedPrefix) {
-          continue
-        }
-        const maybeEmail = key.slice(matchedPrefix.length).trim().toLowerCase()
-        if (isAnonymousProspectEmail(maybeEmail) && maybeEmail !== targetEmail) {
-          anonymousEmails.add(maybeEmail)
-        }
-      }
-    } catch {
-      /* ignore */
-    }
-    try {
-      const raw = localStorage.getItem(PREAUTH_IDENTITIES_KEY)
-      const parsed = raw ? JSON.parse(raw) as unknown : []
-      const arr = Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : []
-      for (const identity of arr) {
-        const id = identity.trim().toLowerCase()
-        if (id && id !== targetEmail) {
-          anonymousEmails.add(id)
-        }
-      }
-    } catch {
-      /* ignore */
-    }
-    if (!anonymousEmails.size) {
-      return
-    }
-
-    const mergeArrayStorageByPrefix = (prefix: string, sourceEmail: string) => {
-      const sourceKey = `${prefix}:${sourceEmail}`
-      const targetKey = `${prefix}:${targetEmail}`
-      try {
-        const sourceRaw = localStorage.getItem(sourceKey)
-        if (!sourceRaw) {
-          return
-        }
-        const sourceParsed = JSON.parse(sourceRaw) as unknown
-        const targetRaw = localStorage.getItem(targetKey)
-        const targetParsed = targetRaw ? JSON.parse(targetRaw) as unknown : []
-        const sourceArray = Array.isArray(sourceParsed) ? sourceParsed : []
-        const targetArray = Array.isArray(targetParsed) ? targetParsed : []
-        const merged = [...targetArray, ...sourceArray].slice(0, 100)
-        localStorage.setItem(targetKey, JSON.stringify(merged))
-        localStorage.removeItem(sourceKey)
-      } catch {
-        /* ignore */
-      }
-    }
-
-    const mergeLatestSearch = (sourceEmail: string) => {
-      const sourceKey = latestSearchStorageKey(sourceEmail)
-      const targetKey = latestSearchStorageKey(targetEmail)
-      try {
-        const sourceRaw = localStorage.getItem(sourceKey)
-        if (!sourceRaw) {
-          return
-        }
-        if (!localStorage.getItem(targetKey)) {
-          localStorage.setItem(targetKey, sourceRaw)
-        }
-        localStorage.removeItem(sourceKey)
-      } catch {
-        /* ignore */
-      }
-    }
-
-    const mergeProspectActivity = (sourceEmail: string) => {
-      const sourceKey = prospectActivityStorageKey(sourceEmail)
-      const targetKey = prospectActivityStorageKey(targetEmail)
-      try {
-        const sourceRaw = localStorage.getItem(sourceKey)
-        if (!sourceRaw) {
-          return
-        }
-        const sourceParsed = JSON.parse(sourceRaw) as Record<string, unknown>
-        const targetRaw = localStorage.getItem(targetKey)
-        const targetParsed = targetRaw ? JSON.parse(targetRaw) as Record<string, unknown> : {}
-        const mergeIds = (a: unknown, b: unknown) => {
-          const arrA = Array.isArray(a) ? a.filter((v): v is string => typeof v === 'string') : []
-          const arrB = Array.isArray(b) ? b.filter((v): v is string => typeof v === 'string') : []
-          return [...new Set([...arrA, ...arrB])].slice(0, 80)
-        }
-        const merged = {
-          views: Math.max(0, Number(targetParsed.views ?? 0)) + Math.max(0, Number(sourceParsed.views ?? 0)),
-          favorites: Math.max(0, Number(targetParsed.favorites ?? 0)) + Math.max(0, Number(sourceParsed.favorites ?? 0)),
-          leads: Math.max(0, Number(targetParsed.leads ?? 0)) + Math.max(0, Number(sourceParsed.leads ?? 0)),
-          phoneReveals: Math.max(0, Number(targetParsed.phoneReveals ?? 0)) + Math.max(0, Number(sourceParsed.phoneReveals ?? 0)),
-          recentActivityListingIds: mergeIds(targetParsed.recentActivityListingIds, sourceParsed.recentActivityListingIds),
-          recentActivityListingIdsByKind: {
-            views: mergeIds(
-              (targetParsed.recentActivityListingIdsByKind as Record<string, unknown> | undefined)?.views,
-              (sourceParsed.recentActivityListingIdsByKind as Record<string, unknown> | undefined)?.views,
-            ),
-            favorites: mergeIds(
-              (targetParsed.recentActivityListingIdsByKind as Record<string, unknown> | undefined)?.favorites,
-              (sourceParsed.recentActivityListingIdsByKind as Record<string, unknown> | undefined)?.favorites,
-            ),
-            leads: mergeIds(
-              (targetParsed.recentActivityListingIdsByKind as Record<string, unknown> | undefined)?.leads,
-              (sourceParsed.recentActivityListingIdsByKind as Record<string, unknown> | undefined)?.leads,
-            ),
-            phoneReveals: mergeIds(
-              (targetParsed.recentActivityListingIdsByKind as Record<string, unknown> | undefined)?.phoneReveals,
-              (sourceParsed.recentActivityListingIdsByKind as Record<string, unknown> | undefined)?.phoneReveals,
-            ),
-          },
-          updatedAt: new Date().toISOString(),
-        }
-        localStorage.setItem(targetKey, JSON.stringify(merged))
-        localStorage.removeItem(sourceKey)
-      } catch {
-        /* ignore */
-      }
-    }
-
-    const mergeMessageThreads = () => {
-      try {
-        const raw = localStorage.getItem(MESSAGE_THREADS_KEY)
-        if (!raw) {
-          return
-        }
-        const parsed = JSON.parse(raw) as unknown
-        if (!Array.isArray(parsed)) {
-          return
-        }
-        const next = parsed
-          .map((item) => normalizeStoredMessageThread(item))
-          .filter((t): t is MessageThread => t !== null)
-          .map((thread) => {
-            if (!anonymousEmails.has(thread.publicEmail)) {
-              return thread
-            }
-            return { ...thread, publicEmail: targetEmail }
-          })
-        localStorage.setItem(MESSAGE_THREADS_KEY, JSON.stringify(next))
-      } catch {
-        /* ignore */
-      }
-    }
-
-    for (const sourceEmail of anonymousEmails) {
-      mergeArrayStorageByPrefix(SEARCHES_KEY_PREFIX, sourceEmail)
-      mergeArrayStorageByPrefix(MESSAGES_KEY_PREFIX, sourceEmail)
-      mergeLatestSearch(sourceEmail)
-      mergeProspectActivity(sourceEmail)
-      mergePublicProfileFromAnonymousSource(targetEmail, sourceEmail)
-    }
-    mergeMessageThreads()
-    applyReconciledContactPrefsFromMergedMessages(targetEmail)
-    syncCurrentUserContactPrefsFromPublicProfile(targetEmail)
-    try {
-      localStorage.removeItem(PREAUTH_IDENTITIES_KEY)
-    } catch {
-      /* ignore */
-    }
-    if (currentUser.value?.email?.trim().toLowerCase() === targetEmail) {
-      loadMessageThreads()
-    }
+    void targetEmailInput
     bumpProspectsDataVersion()
   }
 
@@ -732,76 +556,9 @@ export const useSiteStore = defineStore('site', () => {
     email: string,
     listingId: string | null,
   ) {
-    if (!import.meta.client || !email.trim()) {
-      return
-    }
-    try {
-      const key = prospectActivityStorageKey(email)
-      const raw = localStorage.getItem(key)
-      const parsed = raw ? JSON.parse(raw) as {
-        views?: number
-        favorites?: number
-        leads?: number
-        phoneReveals?: number
-        recentActivityListingIds?: string[]
-        recentActivityListingIdsByKind?: {
-          views?: string[]
-          favorites?: string[]
-          leads?: string[]
-          phoneReveals?: string[]
-        }
-        updatedAt?: string
-      } : {}
-      const parsedByKind = parsed.recentActivityListingIdsByKind ?? {}
-      const next = {
-        views: Math.max(0, Number(parsed.views ?? 0)),
-        favorites: Math.max(0, Number(parsed.favorites ?? 0)),
-        leads: Math.max(0, Number(parsed.leads ?? 0)),
-        phoneReveals: Math.max(0, Number(parsed.phoneReveals ?? 0)),
-        recentActivityListingIds: Array.isArray(parsed.recentActivityListingIds)
-          ? parsed.recentActivityListingIds.filter((id): id is string => typeof id === 'string' && id.trim() !== '').slice(0, 80)
-          : [],
-        recentActivityListingIdsByKind: {
-          views: Array.isArray(parsedByKind.views)
-            ? parsedByKind.views.filter((id): id is string => typeof id === 'string' && id.trim() !== '').slice(0, 80)
-            : [],
-          favorites: Array.isArray(parsedByKind.favorites)
-            ? parsedByKind.favorites.filter((id): id is string => typeof id === 'string' && id.trim() !== '').slice(0, 80)
-            : [],
-          leads: Array.isArray(parsedByKind.leads)
-            ? parsedByKind.leads.filter((id): id is string => typeof id === 'string' && id.trim() !== '').slice(0, 80)
-            : [],
-          phoneReveals: Array.isArray(parsedByKind.phoneReveals)
-            ? parsedByKind.phoneReveals.filter((id): id is string => typeof id === 'string' && id.trim() !== '').slice(0, 80)
-            : [],
-        },
-        updatedAt: new Date().toISOString(),
-      }
-      if (kind === 'view') {
-        next.views += 1
-      } else if (kind === 'favorite') {
-        next.favorites += 1
-      } else if (kind === 'lead') {
-        next.leads += 1
-      } else if (kind === 'phone') {
-        next.phoneReveals += 1
-      }
-      if (listingId) {
-        next.recentActivityListingIds = [listingId, ...next.recentActivityListingIds.filter((id) => id !== listingId)].slice(0, 80)
-        if (kind === 'view') {
-          next.recentActivityListingIdsByKind.views = [listingId, ...next.recentActivityListingIdsByKind.views.filter((id) => id !== listingId)].slice(0, 80)
-        } else if (kind === 'favorite') {
-          next.recentActivityListingIdsByKind.favorites = [listingId, ...next.recentActivityListingIdsByKind.favorites.filter((id) => id !== listingId)].slice(0, 80)
-        } else if (kind === 'lead') {
-          next.recentActivityListingIdsByKind.leads = [listingId, ...next.recentActivityListingIdsByKind.leads.filter((id) => id !== listingId)].slice(0, 80)
-        } else if (kind === 'phone') {
-          next.recentActivityListingIdsByKind.phoneReveals = [listingId, ...next.recentActivityListingIdsByKind.phoneReveals.filter((id) => id !== listingId)].slice(0, 80)
-        }
-      }
-      localStorage.setItem(key, JSON.stringify(next))
-    } catch {
-      /* ignore */
-    }
+    void kind
+    void email
+    void listingId
   }
 
   function bumpCurrentUserProspectActivity(
@@ -816,245 +573,94 @@ export const useSiteStore = defineStore('site', () => {
     bumpProspectActivityByEmail(kind, actorEmail, listingId)
   }
 
-  function listProspectActivitySnapshots(): ProspectActivitySnapshot[] {
+  const prospectSnapshotsFromApi = ref<ProspectActivitySnapshot[]>([])
+
+  async function resolveSupabaseAccessToken(): Promise<string> {
+    const fromState = useSupabaseSession().value?.access_token
+    if (fromState) {
+      return fromState
+    }
+    const supabase = useSupabaseClient()
+    if (!supabase) {
+      return ''
+    }
+    const { data } = await supabase.auth.getSession()
+    if (data.session) {
+      useSupabaseSession().value = data.session
+    }
+    return data.session?.access_token ?? ''
+  }
+
+  async function refreshProspectSnapshotsFromApi() {
     if (!import.meta.client) {
-      return []
+      prospectSnapshotsFromApi.value = []
+      return
     }
-    const byEmail = new Map<string, ProspectActivitySnapshot>()
-    const ensureSnapshot = (emailInput: string): ProspectActivitySnapshot | null => {
-      const email = emailInput.trim().toLowerCase()
-      if (!email) {
-        return null
-      }
-      const existing = byEmail.get(email)
-      if (existing) {
-        return existing
-      }
-      const demo = DEMO_USERS.find((u) => u.email.toLowerCase() === email)
-      const profile = loadPublicProfileByEmail(email)
-      const fallbackName = isAnonymousProspectEmail(email)
-        ? 'Visiteur anonyme'
-        : (email.split('@')[0]?.replace(/[._-]+/g, ' ') || email)
-      const snapshot: ProspectActivitySnapshot = {
-        email,
-        name: demo?.name ?? fallbackName,
-        hasAccount: Boolean(demo),
-        contactPhone: profile.contactPhone,
-        contactOptInPhone: profile.contactOptInPhone,
-        contactOptInEmail: profile.contactOptInEmail,
-        searches: [],
-        latestSearch: null,
-        sentMessages: [],
-        activityCounts: {
-          views: 0,
-          favorites: 0,
-          leads: 0,
-          phoneReveals: 0,
-        },
-        recentActivityListingIds: [],
-        recentActivityListingIdsByKind: {
-          views: [],
-          favorites: [],
-          leads: [],
-          phoneReveals: [],
-        },
-        lastActivityAt: null,
-      }
-      byEmail.set(email, snapshot)
-      return snapshot
+    const token = await resolveSupabaseAccessToken()
+    if (!token) {
+      prospectSnapshotsFromApi.value = []
+      return
     }
-
-    const bumpLastActivity = (snapshot: ProspectActivitySnapshot, ts: number | null) => {
-      if (!ts) {
-        return
-      }
-      const cur = snapshot.lastActivityAt ? new Date(snapshot.lastActivityAt).getTime() : 0
-      if (ts > cur) {
-        snapshot.lastActivityAt = new Date(ts).toISOString()
-      }
-    }
-
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (!key) {
-        continue
-      }
-      if (key.startsWith(`${SEARCHES_KEY_PREFIX}:`)) {
-        const email = key.slice(`${SEARCHES_KEY_PREFIX}:`.length)
-        const snapshot = ensureSnapshot(email)
-        if (!snapshot) {
-          continue
-        }
-        try {
-          const raw = localStorage.getItem(key)
-          const parsed = raw ? JSON.parse(raw) as unknown : []
-          if (!Array.isArray(parsed)) {
-            continue
-          }
-          snapshot.searches = parsed
-            .filter((s): s is SavedSearch =>
-              Boolean(
-                s
-                && typeof (s as SavedSearch).id === 'string'
-                && typeof (s as SavedSearch).title === 'string'
-                && typeof (s as SavedSearch).description === 'string'
-                && (s as SavedSearch).to?.path === '/annonces'
-                && typeof (s as SavedSearch).to?.query === 'object',
-              ),
-            )
-            .slice(0, 50)
-          for (const s of snapshot.searches) {
-            bumpLastActivity(snapshot, parseTimestampFromEntityId(s.id))
-          }
-        } catch {
-          /* ignore */
-        }
-      }
-      if (key.startsWith(`${LATEST_SEARCH_KEY_PREFIX}:`)) {
-        const email = key.slice(`${LATEST_SEARCH_KEY_PREFIX}:`.length)
-        const snapshot = ensureSnapshot(email)
-        if (!snapshot) {
-          continue
-        }
-        try {
-          const raw = localStorage.getItem(key)
-          const parsed = raw ? JSON.parse(raw) as SavedSearch : null
-          if (
-            parsed
-            && typeof parsed.id === 'string'
-            && parsed.to?.path === '/annonces'
-            && typeof parsed.to?.query === 'object'
-          ) {
-            snapshot.latestSearch = parsed
-            bumpLastActivity(snapshot, parseTimestampFromEntityId(parsed.id))
-          }
-        } catch {
-          /* ignore */
-        }
-      }
-      if (key.startsWith(`${MESSAGES_KEY_PREFIX}:`)) {
-        const keyEmail = key.slice(`${MESSAGES_KEY_PREFIX}:`.length)
-        try {
-          const raw = localStorage.getItem(key)
-          const parsed = raw ? JSON.parse(raw) as unknown : []
-          if (!Array.isArray(parsed)) {
-            continue
-          }
-          const normalizedMessages = parsed
-            .filter((m): m is SentMessage =>
-              Boolean(
-                m
-                && typeof (m as SentMessage).id === 'string'
-                && typeof (m as SentMessage).agency === 'string'
-                && typeof (m as SentMessage).text === 'string',
-              ),
-            )
-            .map((m) => ({
-              id: m.id,
-              agency: m.agency,
-              text: m.text,
-              messageBody: m.messageBody ?? '',
-              listingId: typeof m.listingId === 'string' ? m.listingId : null,
-              listingTitle: m.listingTitle ?? '',
-              optOutSimilar: m.optOutSimilar === true,
-              optInPartners: m.optInPartners === true,
-              desktopPushGranted: m.desktopPushGranted === true,
-              contactOptInPhone: m.contactOptInPhone === true,
-              contactOptInEmail: m.contactOptInEmail === true,
-              contactPhone: typeof m.contactPhone === 'string' ? m.contactPhone : '',
-              contactEmail: typeof m.contactEmail === 'string' ? m.contactEmail : '',
-              contactName: typeof m.contactName === 'string' ? m.contactName : '',
-            }))
-            .slice(0, 100)
-          for (const m of normalizedMessages) {
-            const contactEmail = typeof m.contactEmail === 'string' ? m.contactEmail.trim().toLowerCase() : ''
-            const targetEmail = isAnonymousProspectEmail(keyEmail) && contactEmail.includes('@')
-              ? contactEmail
-              : keyEmail
-            const snapshot = ensureSnapshot(targetEmail)
-            if (!snapshot) {
-              continue
-            }
-            snapshot.sentMessages.push(m)
-            bumpLastActivity(snapshot, parseTimestampFromEntityId(m.id))
-          }
-        } catch {
-          /* ignore */
-        }
-      }
-      if (key.startsWith(`${PROSPECT_ACTIVITY_KEY_PREFIX}:`)) {
-        const email = key.slice(`${PROSPECT_ACTIVITY_KEY_PREFIX}:`.length)
-        const snapshot = ensureSnapshot(email)
-        if (!snapshot) {
-          continue
-        }
-        try {
-          const raw = localStorage.getItem(key)
-          const parsed = raw ? JSON.parse(raw) as {
-            views?: number
-            favorites?: number
-            leads?: number
-            phoneReveals?: number
-            recentActivityListingIds?: string[]
-            recentActivityListingIdsByKind?: {
-              views?: string[]
-              favorites?: string[]
-              leads?: string[]
-              phoneReveals?: string[]
-            }
-            updatedAt?: string
-          } : {}
-          const parsedByKind = parsed.recentActivityListingIdsByKind ?? {}
-          snapshot.activityCounts = {
-            views: Math.max(0, Number(parsed.views ?? 0)),
-            favorites: Math.max(0, Number(parsed.favorites ?? 0)),
-            leads: Math.max(0, Number(parsed.leads ?? 0)),
-            phoneReveals: Math.max(0, Number(parsed.phoneReveals ?? 0)),
-          }
-          snapshot.recentActivityListingIds = Array.isArray(parsed.recentActivityListingIds)
-            ? parsed.recentActivityListingIds.filter((id): id is string => typeof id === 'string' && id.trim() !== '').slice(0, 60)
-            : []
-          snapshot.recentActivityListingIdsByKind = {
-            views: Array.isArray(parsedByKind.views)
-              ? parsedByKind.views.filter((id): id is string => typeof id === 'string' && id.trim() !== '').slice(0, 60)
-              : [],
-            favorites: Array.isArray(parsedByKind.favorites)
-              ? parsedByKind.favorites.filter((id): id is string => typeof id === 'string' && id.trim() !== '').slice(0, 60)
-              : [],
-            leads: Array.isArray(parsedByKind.leads)
-              ? parsedByKind.leads.filter((id): id is string => typeof id === 'string' && id.trim() !== '').slice(0, 60)
-              : [],
-            phoneReveals: Array.isArray(parsedByKind.phoneReveals)
-              ? parsedByKind.phoneReveals.filter((id): id is string => typeof id === 'string' && id.trim() !== '').slice(0, 60)
-              : [],
-          }
-          if (!snapshot.recentActivityListingIdsByKind.views.length && snapshot.recentActivityListingIds.length) {
-            // Compat ascendante: anciens enregistrements sans détail par interaction.
-            snapshot.recentActivityListingIdsByKind.views = [...snapshot.recentActivityListingIds]
-            snapshot.recentActivityListingIdsByKind.favorites = [...snapshot.recentActivityListingIds]
-            snapshot.recentActivityListingIdsByKind.phoneReveals = [...snapshot.recentActivityListingIds]
-          }
-          if (parsed.updatedAt) {
-            const ts = new Date(parsed.updatedAt).getTime()
-            bumpLastActivity(snapshot, Number.isFinite(ts) ? ts : null)
-          }
-        } catch {
-          /* ignore */
-        }
-      }
-    }
-    return [...byEmail.values()]
-      .filter((p) =>
-        p.searches.length > 0
-        || p.latestSearch
-        || p.sentMessages.length > 0
-        || (p.activityCounts.views + p.activityCounts.favorites + p.activityCounts.leads + p.activityCounts.phoneReveals) > 0,
-      )
-      .sort((a, b) => {
-        const at = a.lastActivityAt ? new Date(a.lastActivityAt).getTime() : 0
-        const bt = b.lastActivityAt ? new Date(b.lastActivityAt).getTime() : 0
-        return bt - at
+    const agencyId = currentProUser.value?.agencyId || ''
+    try {
+      console.info('[ProspectsDebug][list][client][send]', {
+        agencyId: agencyId || '(none)',
+        hasToken: Boolean(token),
       })
+      const res = await $fetch<{
+        snapshots: Array<{
+          identityId?: string
+          email: string
+          name: string
+          contactPhone: string
+          hasCallConsent: boolean
+          hasEmailConsent: boolean
+          searches: SavedSearch[]
+          latestSearch: SavedSearch | null
+          sentMessages: SentMessage[]
+          activityCounts: ProspectActivitySnapshot['activityCounts']
+          recentActivityListingIds: string[]
+          recentActivityListingIdsByKind: ProspectActivitySnapshot['recentActivityListingIdsByKind']
+          recentActivityListingHints?: ProspectActivitySnapshot['recentActivityListingHints']
+          lastActivityAt?: string | null
+        }>
+      }>('/api/prospects/list', {
+        query: agencyId ? { agencyId } : undefined,
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      console.info('[ProspectsDebug][list][client][ok]', {
+        agencyId: agencyId || '(none)',
+        snapshots: res.snapshots?.length ?? 0,
+      })
+      prospectSnapshotsFromApi.value = (res.snapshots || []).map((item) => ({
+        identityId: normalizeProspectIdentityId(typeof item.identityId === 'string' ? item.identityId : ''),
+        email: item.email,
+        name: item.name || 'Prospect',
+        hasAccount: !item.email.endsWith('@anonymous.matchaa'),
+        contactPhone: item.contactPhone || '',
+        contactOptInPhone: item.hasCallConsent === true,
+        contactOptInEmail: item.hasEmailConsent === true,
+        searches: item.searches || [],
+        latestSearch: item.latestSearch || null,
+        sentMessages: item.sentMessages || [],
+        activityCounts: item.activityCounts || { views: 0, favorites: 0, leads: 0, phoneReveals: 0 },
+        recentActivityListingIds: item.recentActivityListingIds || [],
+        recentActivityListingIdsByKind: item.recentActivityListingIdsByKind || { views: [], favorites: [], leads: [], phoneReveals: [] },
+        recentActivityListingHints: item.recentActivityListingHints || {},
+        lastActivityAt: typeof item.lastActivityAt === 'string' ? item.lastActivityAt : null,
+      }))
+      bumpProspectsDataVersion()
+    } catch (err) {
+      console.warn('[Matchaa] refreshProspectSnapshotsFromApi failed', {
+        agencyId: agencyId || '(none)',
+        message: err instanceof Error ? err.message : err,
+      })
+      prospectSnapshotsFromApi.value = []
+    }
+  }
+
+  function listProspectActivitySnapshots(): ProspectActivitySnapshot[] {
+    return [...prospectSnapshotsFromApi.value]
   }
 
   function loadSavedSearches() {
@@ -1331,6 +937,73 @@ export const useSiteStore = defineStore('site', () => {
       })
       messageThreadsSyncBound = true
     }
+    const supabase = useSupabaseClient()
+    const session = useSupabaseSession().value
+    if (supabase && session?.user) {
+      const loadFromCloud = async () => {
+        const publicEmail = currentUser.value?.email?.trim().toLowerCase() || null
+        const proAgencyId = currentProUser.value?.agencyId || null
+        if (!publicEmail && !proAgencyId) {
+          messageThreads.value = []
+          messageThreadsLoaded = true
+          return
+        }
+        const query = supabase
+          .from('conversation_threads')
+          .select('id,agency_id,public_email,public_name,unread_public,unread_pro,updated_at')
+          .order('updated_at', { ascending: false })
+        if (proAgencyId) {
+          query.eq('agency_id', proAgencyId)
+        } else if (publicEmail) {
+          query.eq('public_email', publicEmail)
+        }
+        const { data: threadsRows, error: threadsErr } = await query
+        if (threadsErr) {
+          messageThreadsLoaded = true
+          return
+        }
+        const ids = (threadsRows || []).map((r) => r.id)
+        const { data: msgRows } = ids.length
+          ? await supabase
+            .from('thread_messages')
+            .select('id,thread_id,author,body,occurred_at,listing_id,listing_title')
+            .in('thread_id', ids)
+            .order('occurred_at', { ascending: true })
+          : { data: [] as Array<Record<string, unknown>> }
+        const byThread = new Map<string, MessageThreadEntry[]>()
+        for (const row of (msgRows as Array<Record<string, unknown>>)) {
+          const threadId = String(row.thread_id || '')
+          if (!threadId) {
+            continue
+          }
+          const list = byThread.get(threadId) || []
+          list.push({
+            id: String(row.id || ''),
+            author: row.author === 'pro' ? 'pro' : 'public',
+            text: String(row.body || ''),
+            at: String(row.occurred_at || new Date().toISOString()),
+            listingId: typeof row.listing_id === 'string' ? row.listing_id : null,
+            listingTitle: typeof row.listing_title === 'string' ? row.listing_title : '',
+          })
+          byThread.set(threadId, list)
+        }
+        messageThreads.value = (threadsRows || []).map((t) => ({
+          id: t.id,
+          publicEmail: t.public_email,
+          proAgencyId: t.agency_id,
+          proAgencyName: proAgencies.value.find((a) => a.id === t.agency_id)?.name ?? 'Agence',
+          publicName: t.public_name || '',
+          messages: byThread.get(t.id) || [],
+          unreadPublic: Number(t.unread_public || 0),
+          unreadPro: Number(t.unread_pro || 0),
+          updatedAt: t.updated_at || new Date().toISOString(),
+        }))
+        messageThreads.value = sortThreadsByUpdatedAt(messageThreads.value)
+        messageThreadsLoaded = true
+      }
+      void loadFromCloud()
+      return
+    }
     try {
       const raw = localStorage.getItem(MESSAGE_THREADS_KEY)
       if (!raw) {
@@ -1359,6 +1032,11 @@ export const useSiteStore = defineStore('site', () => {
     if (!import.meta.client) {
       return
     }
+    const supabase = useSupabaseClient()
+    const session = useSupabaseSession().value
+    if (supabase && session?.user) {
+      return
+    }
     try {
       localStorage.setItem(MESSAGE_THREADS_KEY, JSON.stringify(messageThreads.value))
     } catch {
@@ -1373,15 +1051,22 @@ export const useSiteStore = defineStore('site', () => {
     return 'Prospect'
   }
 
-  function findProAgencyForListing(listingId: string | null | undefined): ProAgency | null {
-    if (!listingId) {
-      return null
+  function findProAgencyForListing(
+    listingId: string | null | undefined,
+    listingAgencyNumeric?: number | null,
+  ): ProAgency | null {
+    if (listingId) {
+      const listing = proListings.value.find((l) => l.id === listingId)
+      if (listing) {
+        return proAgencies.value.find((a) => a.id === listing.agencyId) ?? null
+      }
     }
-    const listing = proListings.value.find((l) => l.id === listingId)
-    if (!listing) {
-      return null
+    if (listingAgencyNumeric != null && Number.isFinite(listingAgencyNumeric)) {
+      return (
+        proAgencies.value.find((a) => proAgencyIdToPublicNumeric(a.id) === listingAgencyNumeric) ?? null
+      )
     }
-    return proAgencies.value.find((a) => a.id === listing.agencyId) ?? null
+    return null
   }
 
   function upsertThreadMessage(input: {
@@ -1393,6 +1078,8 @@ export const useSiteStore = defineStore('site', () => {
     text: string
     listingId?: string | null
     listingTitle?: string
+    /** Si vrai : pas d’écriture Supabase côté client (sync serveur / invités sans JWT). */
+    skipSupabaseClientWrite?: boolean
   }): MessageThread | null {
     if (import.meta.client && !messageThreadsLoaded) {
       loadMessageThreads()
@@ -1405,6 +1092,31 @@ export const useSiteStore = defineStore('site', () => {
       return null
     }
     persistMessageThreads()
+    const supabase = useSupabaseClient()
+    const session = useSupabaseSession().value
+    if (import.meta.client && supabase && session?.user && !input.skipSupabaseClientWrite) {
+      const lastMsg = nextThread.messages[nextThread.messages.length - 1]
+      void supabase.from('conversation_threads').upsert({
+        id: nextThread.id,
+        agency_id: nextThread.proAgencyId,
+        public_email: nextThread.publicEmail,
+        public_name: nextThread.publicName,
+        unread_public: nextThread.unreadPublic,
+        unread_pro: nextThread.unreadPro,
+        updated_at: nextThread.updatedAt,
+      })
+      if (lastMsg) {
+        void supabase.from('thread_messages').upsert({
+          id: lastMsg.id,
+          thread_id: nextThread.id,
+          author: lastMsg.author,
+          body: lastMsg.text,
+          occurred_at: lastMsg.at,
+          listing_id: lastMsg.listingId ?? null,
+          listing_title: lastMsg.listingTitle ?? null,
+        })
+      }
+    }
     if (import.meta.client && typeof window !== 'undefined') {
       const recipient = input.author === 'public' ? 'pro' : 'public'
       const incomingPayload = {
@@ -1569,7 +1281,7 @@ export const useSiteStore = defineStore('site', () => {
       return null
     }
     const agency = proAgencies.value.find((a) => a.id === agencyId)
-    return upsertThreadMessage({
+    const thread = upsertThreadMessage({
       publicEmail: input.prospectEmail,
       publicName: input.prospectName?.trim() || 'Prospect',
       proAgencyId: agencyId,
@@ -1579,6 +1291,15 @@ export const useSiteStore = defineStore('site', () => {
       listingId: input.listingId ?? null,
       listingTitle: input.listingTitle,
     })
+    if (thread && input.listingId) {
+      void ingestProspectActivityEvent({
+        listingId: input.listingId,
+        eventType: 'message_received',
+        prospectEmail: input.prospectEmail,
+        metadata: { threadId: thread.id },
+      })
+    }
+    return thread
   }
 
   function sendPublicMessageToAgency(input: { threadId: string; text: string }) {
@@ -1590,14 +1311,25 @@ export const useSiteStore = defineStore('site', () => {
     if (!thread) {
       return null
     }
-    return upsertThreadMessage({
+    const threadUpdated = upsertThreadMessage({
       publicEmail: email,
       publicName: currentUser.value?.name ?? thread.publicName,
       proAgencyId: thread.proAgencyId,
       proAgencyName: thread.proAgencyName,
       author: 'public',
       text: input.text,
+      listingId: thread.messages[thread.messages.length - 1]?.listingId ?? null,
     })
+    const listingId = thread.messages[thread.messages.length - 1]?.listingId ?? null
+    if (threadUpdated && listingId) {
+      void ingestProspectActivityEvent({
+        listingId,
+        eventType: 'message_sent',
+        prospectEmail: email,
+        metadata: { threadId: threadUpdated.id },
+      })
+    }
+    return threadUpdated
   }
 
   function login(email: string, password: string): boolean {
@@ -2023,7 +1755,8 @@ export const useSiteStore = defineStore('site', () => {
         mergedMembers.push(member)
       }
     }
-    // Seed catalogue démo seulement pour l'agence du compte pro connecté.
+    // Agence « principale » pour l’hydratation session ; le catalogue démo est fusionné pour
+    // toutes les agences connues (les interactions prospect peuvent citer d’autres agences).
     let targetSeedAgencyId: string | null = currentProUser.value?.agencyId ?? null
     if (!targetSeedAgencyId && import.meta.client) {
       try {
@@ -2052,31 +1785,36 @@ export const useSiteStore = defineStore('site', () => {
     let mergedListings = fromStorage.filter(
       (l) => !LEGACY_SEEDED_PRO_LISTING_IDS.has(l.id),
     )
-    if (targetSeedAgencyId) {
-      mergedListings = mergedListings.filter(
-        (l) => !l.id.startsWith('demo-catalog-') || l.agencyId === targetSeedAgencyId,
-      )
-    }
     const removedLegacySeed = fromStorage.length !== mergedListings.length
+    const agencyIdsForDemoSeed = new Set<string>()
+    agencyIdsForDemoSeed.add(targetSeedAgencyId)
+    for (const a of mergedAgencies) {
+      const aid = typeof a.id === 'string' ? a.id.trim() : ''
+      if (aid) {
+        agencyIdsForDemoSeed.add(aid)
+      }
+    }
     const byIdIndex = new Map(mergedListings.map((l, i) => [l.id, i]))
     let addedDemoCatalog = 0
     let refreshedDemoCatalog = 0
-    for (const row of buildDemoProCatalogListings(targetSeedAgencyId)) {
-      const existingIdx = byIdIndex.get(row.id)
-      if (existingIdx === undefined) {
-        mergedListings.push(row as ProListing)
-        byIdIndex.set(row.id, mergedListings.length - 1)
-        addedDemoCatalog++
-      } else {
-        const existing = mergedListings[existingIdx]
-        mergedListings[existingIdx] = {
-          ...(row as ProListing),
-          viewCount: existing.viewCount ?? 0,
-          favoriteCount: existing.favoriteCount ?? 0,
-          leadCount: existing.leadCount ?? 0,
-          phoneRevealCount: existing.phoneRevealCount ?? 0,
+    for (const seedAgencyId of agencyIdsForDemoSeed) {
+      for (const row of buildDemoProCatalogListings(seedAgencyId)) {
+        const existingIdx = byIdIndex.get(row.id)
+        if (existingIdx === undefined) {
+          mergedListings.push(row as ProListing)
+          byIdIndex.set(row.id, mergedListings.length - 1)
+          addedDemoCatalog++
+        } else {
+          const existing = mergedListings[existingIdx]
+          mergedListings[existingIdx] = {
+            ...(row as ProListing),
+            viewCount: existing.viewCount ?? 0,
+            favoriteCount: existing.favoriteCount ?? 0,
+            leadCount: existing.leadCount ?? 0,
+            phoneRevealCount: existing.phoneRevealCount ?? 0,
+          }
+          refreshedDemoCatalog++
         }
-        refreshedDemoCatalog++
       }
     }
 
@@ -2116,14 +1854,129 @@ export const useSiteStore = defineStore('site', () => {
   }
 
   let proPublicCatalogLoaded = false
+  let proPublicCatalogAgencyId: string | null = null
+
+  function preferredPublicCatalogAgencyId(): string {
+    const fromCurrent = (currentProUser.value?.agencyId || '').trim()
+    if (fromCurrent) {
+      return fromCurrent
+    }
+    if (import.meta.client) {
+      try {
+        const raw = localStorage.getItem(PRO_SESSION_KEY)
+        if (raw) {
+          const parsed = JSON.parse(raw) as Partial<CurrentProUser>
+          const fromStored = (parsed.agencyId || '').trim()
+          if (fromStored) {
+            return fromStored
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    return 'agency-demo-test'
+  }
 
   function ensureProListingsLoadedForPublic() {
-    if (!import.meta.client || proPublicCatalogLoaded) {
+    if (!import.meta.client) {
+      return
+    }
+    const desiredAgencyId = preferredPublicCatalogAgencyId()
+    if (proPublicCatalogLoaded && proPublicCatalogAgencyId === desiredAgencyId) {
       return
     }
     proPublicCatalogLoaded = true
+    proPublicCatalogAgencyId = desiredAgencyId
     loadProData()
     enforceListingExpiry()
+  }
+
+  function buildProspectActivityListingMetadata(listingId: string): Record<string, unknown> {
+    const listing = proListings.value.find((l) => l.id === listingId)
+    if (!listing) {
+      return {}
+    }
+    return {
+      listingTitle: listing.title,
+      listingCity: listing.city,
+      listingPropertyType: listing.propertyType,
+      listingProjectType: listing.projectType,
+      listingPrice: listing.price,
+      listingSurface: listing.surface,
+      listingRooms: listing.rooms,
+    }
+  }
+
+  function readActorLatestSearchQuery(actorEmail: string): Record<string, string> | null {
+    if (currentUser.value?.email && latestSearch.value?.to?.query) {
+      return latestSearch.value.to.query
+    }
+    if (!import.meta.client) {
+      return null
+    }
+    try {
+      const raw = localStorage.getItem(latestSearchStorageKey(actorEmail))
+      if (!raw) {
+        return null
+      }
+      const parsed = JSON.parse(raw) as { to?: { query?: Record<string, string> } }
+      const query = parsed?.to?.query
+      return query && typeof query === 'object' ? query : null
+    } catch {
+      return null
+    }
+  }
+
+  async function ingestProspectActivityEvent(input: {
+    listingId: string
+    eventType: 'view' | 'favorite' | 'lead' | 'phone_reveal' | 'message_sent' | 'message_received'
+    prospectEmail?: string | null
+    metadata?: Record<string, unknown>
+  }) {
+    if (!import.meta.client || !input.listingId) {
+      return
+    }
+    const actorEmail = (input.prospectEmail || prospectActorEmail()).trim().toLowerCase()
+    const anonCandidate = actorEmail.endsWith('@anonymous.matchaa') ? actorEmail.split('@')[0] : null
+    const actorSearchQuery = readActorLatestSearchQuery(actorEmail)
+    try {
+      console.info('[ProspectsDebug][activity][client][send]', {
+        eventType: input.eventType,
+        listingId: input.listingId,
+        hasProspectEmail: Boolean(input.prospectEmail),
+      })
+      await $fetch('/api/prospects/activity', {
+        method: 'POST',
+        body: {
+          eventType: input.eventType,
+          listingId: input.listingId,
+          prospectEmail: actorEmail.endsWith('@anonymous.matchaa') ? null : actorEmail,
+          anonymousId: anonCandidate,
+          metadata: {
+            ...buildProspectActivityListingMetadata(input.listingId),
+            ...(actorSearchQuery ? { searchQuery: actorSearchQuery, searchPath: '/annonces' } : {}),
+            ...(input.metadata || {}),
+          },
+        },
+      })
+      console.info('[ProspectsDebug][activity][client][ok]', {
+        eventType: input.eventType,
+        listingId: input.listingId,
+      })
+    } catch (err) {
+      console.error('[ProspectsDebug][activity][client][error]', {
+        eventType: input.eventType,
+        listingId: input.listingId,
+        message: err instanceof Error ? err.message : err,
+      })
+      console.warn('[Matchaa] ingestProspectActivityEvent failed', {
+        eventType: input.eventType,
+        listingId: input.listingId,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        message: err instanceof Error ? err.message : err,
+      })
+    }
   }
 
   function recordListingView(listingId: string) {
@@ -2134,6 +1987,7 @@ export const useSiteStore = defineStore('site', () => {
     try {
       const key = `matchaa-listing-view-once:${listingId}`
       if (sessionStorage.getItem(key)) {
+        console.info('[ProspectsDebug][activity][client][skip-view-once]', { listingId })
         return
       }
       sessionStorage.setItem(key, '1')
@@ -2151,6 +2005,7 @@ export const useSiteStore = defineStore('site', () => {
     }
     persistProData()
     bumpCurrentUserProspectActivity('view', listingId)
+    void ingestProspectActivityEvent({ listingId, eventType: 'view' })
   }
 
   function applyListingFavoriteDelta(listingId: string, delta: number) {
@@ -2170,6 +2025,7 @@ export const useSiteStore = defineStore('site', () => {
     persistProData()
     if (delta > 0) {
       bumpCurrentUserProspectActivity('favorite', listingId)
+      void ingestProspectActivityEvent({ listingId, eventType: 'favorite' })
     }
   }
 
@@ -2179,20 +2035,25 @@ export const useSiteStore = defineStore('site', () => {
     }
     ensureProListingsLoadedForPublic()
     const idx = proListings.value.findIndex((l) => l.id === listingId)
-    if (idx < 0) {
-      return
+    if (idx >= 0) {
+      const cur = proListings.value[idx]
+      proListings.value[idx] = {
+        ...cur,
+        leadCount: Math.max(0, (cur.leadCount ?? 0) + 1),
+      }
+      persistProData()
     }
-    const cur = proListings.value[idx]
-    proListings.value[idx] = {
-      ...cur,
-      leadCount: Math.max(0, (cur.leadCount ?? 0) + 1),
-    }
-    persistProData()
     if (prospectEmailOverride && prospectEmailOverride.trim()) {
       bumpProspectActivityByEmail('lead', prospectEmailOverride.trim().toLowerCase(), listingId)
+      void ingestProspectActivityEvent({
+        listingId,
+        eventType: 'lead',
+        prospectEmail: prospectEmailOverride.trim().toLowerCase(),
+      })
       return
     }
     bumpCurrentUserProspectActivity('lead', listingId)
+    void ingestProspectActivityEvent({ listingId, eventType: 'lead' })
   }
 
   function recordListingPhoneReveal(listingId: string) {
@@ -2211,6 +2072,7 @@ export const useSiteStore = defineStore('site', () => {
     }
     persistProData()
     bumpCurrentUserProspectActivity('phone', listingId)
+    void ingestProspectActivityEvent({ listingId, eventType: 'phone_reveal' })
   }
 
   const publicActiveSearchListings = computed<SearchListing[]>(() =>
@@ -2348,8 +2210,6 @@ export const useSiteStore = defineStore('site', () => {
     loadMessageThreads()
     if (import.meta.client) {
       localStorage.removeItem(SESSION_KEY)
-      localStorage.removeItem(ANON_PROSPECT_ID_KEY)
-      localStorage.removeItem(PREAUTH_IDENTITIES_KEY)
       useFavoritesStore().loadFromStorage(true)
     }
   }
@@ -2504,72 +2364,51 @@ export const useSiteStore = defineStore('site', () => {
       return
     }
     const supabase = useSupabaseClient()
-    if (supabase) {
-      void supabase.auth.getSession().then(async ({ data }) => {
-        const session = data.session
-        if (!session?.user) {
-          return
-        }
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('account_kind')
-          .eq('id', session.user.id)
-          .maybeSingle()
-        if (profile?.account_kind !== 'pro') {
-          return
-        }
-        const { data: membership } = await supabase
-          .from('agency_members')
-          .select('id, agency_id, role, display_name')
-          .eq('user_id', session.user.id)
-          .limit(1)
-          .maybeSingle()
-        const hasAgency = Boolean(membership?.agency_id)
-        const { data: agency } = hasAgency
-          ? await supabase
-              .from('agencies')
-              .select('name')
-              .eq('id', membership?.agency_id ?? '')
-              .maybeSingle()
-          : { data: null as { name?: string } | null }
-        currentProUser.value = {
-          id: session.user.id,
-          agencyId: membership?.agency_id ?? '',
-          name: ((membership?.display_name as string | undefined) || session.user.email || 'Compte pro').trim(),
-          email: (session.user.email || '').trim().toLowerCase(),
-          role: membership?.role === 'manager' ? 'manager' : 'agent',
-          companyName: agency?.name || 'Agence non renseignee',
-        }
-        loadMessageThreads()
-      })
+    if (!supabase) {
+      currentProUser.value = null
       return
     }
-    loadProData()
-    enforceListingExpiry()
-    try {
-      const raw = localStorage.getItem(PRO_SESSION_KEY)
-      if (!raw) {
+    void supabase.auth.getSession().then(async ({ data }) => {
+      const session = data.session
+      if (!session?.user) {
+        currentProUser.value = null
         return
       }
-      const parsed = JSON.parse(raw) as Partial<CurrentProUser>
-      if (parsed?.id) {
-        const found = proMembers.value.find((m) => m.id === parsed.id)
-        if (found) {
-          currentProUser.value = toSessionProUser(found)
-          loadMessageThreads()
-          return
-        }
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('account_kind')
+        .eq('id', session.user.id)
+        .maybeSingle()
+      if (profile?.account_kind !== 'pro') {
+        currentProUser.value = null
+        return
       }
-      if (parsed?.email) {
-        const found = proMembers.value.find((m) => m.email.toLowerCase() === parsed.email?.toLowerCase())
-        if (found) {
-          currentProUser.value = toSessionProUser(found)
-          loadMessageThreads()
-        }
+      const { data: membership } = await supabase
+        .from('agency_members')
+        .select('id, agency_id, role, display_name')
+        .eq('user_id', session.user.id)
+        .limit(1)
+        .maybeSingle()
+      const hasAgency = Boolean(membership?.agency_id)
+      const { data: agency } = hasAgency
+        ? await supabase
+            .from('agencies')
+            .select('name')
+            .eq('id', membership?.agency_id ?? '')
+            .maybeSingle()
+        : { data: null as { name?: string } | null }
+      currentProUser.value = {
+        id: session.user.id,
+        agencyId: membership?.agency_id ?? '',
+        name: ((membership?.display_name as string | undefined) || session.user.email || 'Compte pro').trim(),
+        email: (session.user.email || '').trim().toLowerCase(),
+        role: membership?.role === 'manager' ? 'manager' : 'agent',
+        companyName: agency?.name || 'Agence non renseignee',
       }
-    } catch {
-      /* ignore */
-    }
+      // Recalibre le catalogue public sur l'agence réellement connectée.
+      ensureProListingsLoadedForPublic()
+      loadMessageThreads()
+    })
   }
 
   const currentProAgency = computed(() =>
@@ -3468,11 +3307,41 @@ export const useSiteStore = defineStore('site', () => {
     persistSavedSearches()
   }
 
+  async function syncPublicListingContactToCloud(payload: {
+    threadId: string
+    proAgencyId: string
+    proAgencyName: string
+    publicEmail: string
+    publicName: string
+    listingId: string | null
+    listingTitle: string
+    messageId: string
+    messageBody: string
+    occurredAt: string
+  }) {
+    if (!import.meta.client) {
+      return
+    }
+    try {
+      await $fetch('/api/public/listing-contact', {
+        method: 'POST',
+        body: payload,
+        credentials: 'include',
+      })
+    } catch (err) {
+      console.warn('[Matchaa] syncPublicListingContactToCloud failed', {
+        message: err instanceof Error ? err.message : err,
+      })
+    }
+  }
+
   function addSentMessage(input: {
     agency: string
     listingTitle: string
     listingId: string | null
     messageBody: string
+    /** `SearchListing.agencyId` (numérique) si la fiche n’est pas dans `proListings` (ex. catalogue distant). */
+    listingAgencyNumeric?: number | null
     contactName?: string
     contactEmail?: string
     optOutSimilar?: boolean
@@ -3526,18 +3395,38 @@ export const useSiteStore = defineStore('site', () => {
     if (input.listingId) {
       recordListingLead(input.listingId, actorEmail)
     }
-    const agency = findProAgencyForListing(input.listingId)
+    const agency = findProAgencyForListing(input.listingId, input.listingAgencyNumeric ?? null)
     if (agency) {
-      upsertThreadMessage({
+      const publicName =
+        currentUser.value?.name ?? (shouldStayAnonymous ? 'Prospect' : (input.contactName?.trim() || 'Prospect'))
+      const text = input.messageBody.trim() || `Demande de contact : ${input.listingTitle}`
+      const thread = upsertThreadMessage({
         publicEmail: actorEmail,
-        publicName: currentUser.value?.name ?? (shouldStayAnonymous ? 'Prospect' : (input.contactName?.trim() || 'Prospect')),
+        publicName,
         proAgencyId: agency.id,
         proAgencyName: agency.name,
         author: 'public',
-        text: input.messageBody.trim() || `Demande de contact : ${input.listingTitle}`,
+        text,
         listingId: input.listingId,
         listingTitle: input.listingTitle,
+        skipSupabaseClientWrite: true,
       })
+      const lastMsg =
+        thread && thread.messages.length > 0 ? thread.messages[thread.messages.length - 1] : null
+      if (thread && lastMsg) {
+        void syncPublicListingContactToCloud({
+          threadId: thread.id,
+          proAgencyId: agency.id,
+          proAgencyName: agency.name,
+          publicEmail: actorEmail,
+          publicName,
+          listingId: input.listingId,
+          listingTitle: input.listingTitle,
+          messageId: lastMsg.id,
+          messageBody: lastMsg.text,
+          occurredAt: lastMsg.at,
+        })
+      }
     }
     bumpProspectsDataVersion()
   }
@@ -3557,7 +3446,6 @@ export const useSiteStore = defineStore('site', () => {
         localStorage.removeItem(searchesStorageKey(email))
         localStorage.removeItem(latestSearchStorageKey(email))
         localStorage.removeItem(messagesStorageKey(email))
-        localStorage.removeItem(prospectActivityStorageKey(email))
         localStorage.removeItem(publicProfileStorageKey(email))
       } catch {
         /* ignore */
@@ -3648,6 +3536,7 @@ export const useSiteStore = defineStore('site', () => {
     recordListingPhoneReveal,
     getPublicAgencyByListingAgencyId,
     listProspectActivitySnapshots,
+    refreshProspectSnapshotsFromApi,
     enforceListingExpiry,
     creditPacks: CREDIT_PACKS,
     annualSubscriptionOffer: ANNUAL_SUBSCRIPTION,

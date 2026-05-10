@@ -13,6 +13,9 @@ import {
   type ProspectHeatLevel,
 } from '~/utils/prospect-temperature'
 import { useSiteStore } from '~/stores/site'
+import { inferDemoCatalogAgencyId } from '~/utils/infer-demo-catalog-agency-id'
+import { proAgencyIdToPublicNumeric } from '~/utils/pro-listing-to-search'
+import { normalizeProspectIdentityId } from '~/utils/prospect-identity-id'
 
 export type ProspectsCriteria = ProspectAppetiteCriteria
 
@@ -25,6 +28,8 @@ export type ProspectListSortKey =
   | 'engagement'
 
 export type ProspectMatchRow = {
+  /** Identifiant `prospect_identities` (pour masquer du CRM agence). */
+  prospectIdentityId: string
   email: string
   name: string
   contactPhone: string
@@ -55,6 +60,14 @@ export type ProspectMatchRow = {
     favorites: SearchListing[]
     messages: SearchListing[]
     phone: SearchListing[]
+  }
+  interactionListingsRecent: SearchListing[]
+  inferredPreferences: {
+    preferredType: string
+    zones: string
+    budget: string
+    surface: string
+    rooms: string
   }
   messageFallbackTitles: string[]
 }
@@ -173,11 +186,19 @@ function buildTopCriteria(
   queries: Record<string, string>[],
   listingIds: string[],
   publicListings: SearchListing[],
+  listingHints?: Record<string, {
+    city?: string
+    price?: number
+    surface?: number
+    rooms?: number
+  }>,
 ): string[] {
   const projectCounts = new Map<string, number>()
   const typeCounts = new Map<string, number>()
   const cityCounts = new Map<string, number>()
   const piecesCounts = new Map<string, number>()
+  const budgetCandidates: number[] = []
+  const surfaceCandidates: number[] = []
   const byId = new Map(publicListings.map((l) => [l.id, l]))
 
   for (const q of queries) {
@@ -196,6 +217,12 @@ function buildTopCriteria(
     if (parsed.piecesMin !== undefined) {
       incrementCount(piecesCounts, `T${Math.max(1, parsed.piecesMin)}+`)
     }
+    if (typeof parsed.budgetMax === 'number' && Number.isFinite(parsed.budgetMax) && parsed.budgetMax > 0) {
+      budgetCandidates.push(parsed.budgetMax)
+    }
+    if (typeof parsed.surfaceMin === 'number' && Number.isFinite(parsed.surfaceMin) && parsed.surfaceMin > 0) {
+      surfaceCandidates.push(parsed.surfaceMin)
+    }
   }
 
   for (const id of listingIds) {
@@ -207,14 +234,50 @@ function buildTopCriteria(
     incrementCount(typeCounts, labelForPropertyType(listing.propertyType))
     incrementCount(cityCounts, listing.city)
     incrementCount(piecesCounts, `T${Math.max(1, listing.rooms)}`)
+    if (Number.isFinite(listing.price) && listing.price > 0) {
+      budgetCandidates.push(listing.price)
+    }
+    if (Number.isFinite(listing.surface) && listing.surface > 0) {
+      surfaceCandidates.push(listing.surface)
+    }
   }
+
+  if (listingHints) {
+    for (const id of listingIds) {
+      const hint = listingHints[id]
+      if (!hint) {
+        continue
+      }
+      if (hint.city?.trim()) {
+        incrementCount(cityCounts, hint.city.trim())
+      }
+      if (typeof hint.rooms === 'number' && Number.isFinite(hint.rooms) && hint.rooms > 0) {
+        incrementCount(piecesCounts, `T${Math.max(1, Math.round(hint.rooms))}`)
+      }
+      if (typeof hint.price === 'number' && Number.isFinite(hint.price) && hint.price > 0) {
+        budgetCandidates.push(hint.price)
+      }
+      if (typeof hint.surface === 'number' && Number.isFinite(hint.surface) && hint.surface > 0) {
+        surfaceCandidates.push(hint.surface)
+      }
+    }
+  }
+
+  const budgetLabel = budgetCandidates.length
+    ? `Budget ≤ ${Math.max(...budgetCandidates).toLocaleString('fr-FR')} €`
+    : null
+  const surfaceLabel = surfaceCandidates.length
+    ? `Surface ≥ ${Math.min(...surfaceCandidates)} m²`
+    : null
 
   return [
     ...topLabelsFromMap(typeCounts, 2),
     ...topLabelsFromMap(projectCounts, 1),
     ...topLabelsFromMap(cityCounts, 1),
     ...topLabelsFromMap(piecesCounts, 1),
-  ].slice(0, 5)
+    budgetLabel,
+    surfaceLabel,
+  ].filter((v): v is string => Boolean(v)).slice(0, 7)
 }
 
 function summarizeQueryCriteria(parsed: AnnoncesParsedQuery): string {
@@ -245,6 +308,138 @@ function summarizeQueryCriteria(parsed: AnnoncesParsedQuery): string {
     chunks.push(`Chambres min ${parsed.chambresMin}`)
   }
   return chunks.length ? chunks.join(' · ') : 'Recherche sans critère explicite'
+}
+
+function summarizeListingCriteria(listing: SearchListing): string {
+  const chunks: string[] = []
+  chunks.push(listing.projet === 'louer' ? 'Location' : 'Achat')
+  chunks.push(labelForPropertyType(listing.propertyType))
+  if (listing.city.trim()) {
+    chunks.push(listing.city.trim())
+  }
+  if (Number.isFinite(listing.price) && listing.price > 0) {
+    chunks.push(`Budget 0-${Math.round(listing.price).toLocaleString('fr-FR')} €`)
+  }
+  if (Number.isFinite(listing.surface) && listing.surface > 0) {
+    chunks.push(`Surface min ${Math.round(listing.surface)} m²`)
+  }
+  if (Number.isFinite(listing.rooms) && listing.rooms > 0) {
+    chunks.push(`Pièces min ${Math.round(listing.rooms)}`)
+  }
+  return chunks.join(' · ')
+}
+
+function summarizeListingHintCriteria(hint: {
+  city?: string
+  propertyType?: string
+  projectType?: 'acheter' | 'louer'
+  price?: number
+  surface?: number
+  rooms?: number
+}): string {
+  const chunks: string[] = []
+  if (hint.projectType === 'louer') {
+    chunks.push('Location')
+  } else if (hint.projectType === 'acheter') {
+    chunks.push('Achat')
+  }
+  if (hint.propertyType?.trim()) {
+    chunks.push(hint.propertyType.trim())
+  }
+  if (hint.city?.trim()) {
+    chunks.push(hint.city.trim())
+  }
+  if (typeof hint.price === 'number' && Number.isFinite(hint.price) && hint.price > 0) {
+    chunks.push(`Budget 0-${Math.round(hint.price).toLocaleString('fr-FR')} €`)
+  }
+  if (typeof hint.surface === 'number' && Number.isFinite(hint.surface) && hint.surface > 0) {
+    chunks.push(`Surface min ${Math.round(hint.surface)} m²`)
+  }
+  if (typeof hint.rooms === 'number' && Number.isFinite(hint.rooms) && hint.rooms > 0) {
+    chunks.push(`Pièces min ${Math.round(hint.rooms)}`)
+  }
+  return chunks.join(' · ')
+}
+
+function normalizeHintPropertyType(input: string | undefined): PropertyTypeSlug {
+  const value = (input || '').trim().toLowerCase()
+  if (!value) {
+    return 'appartement'
+  }
+  if (value.includes('studio')) return 'studio'
+  if (value.includes('loft')) return 'loft'
+  if (value.includes('duplex')) return 'duplex'
+  if (value.includes('villa')) return 'villa'
+  if (value.includes('chalet')) return 'chalet'
+  if (value.includes('terrain')) return 'terrain'
+  if (value.includes('parking') || value.includes('box')) return 'parking'
+  if (value.includes('peniche')) return 'peniche'
+  if (value.includes('bateau')) return 'bateau'
+  if (value.includes('chateau')) return 'chateau'
+  if (value.includes('moulin')) return 'moulin'
+  if (value.includes('maison')) return 'maison'
+  return 'appartement'
+}
+
+function publicNumericAgencyForHintListing(listingId: string): number {
+  const inferredAgency = inferDemoCatalogAgencyId(listingId)
+  if (inferredAgency) {
+    return proAgencyIdToPublicNumeric(inferredAgency)
+  }
+  return proAgencyIdToPublicNumeric('')
+}
+
+function buildSearchListingFromHint(
+  listingId: string,
+  hint: {
+    title?: string
+    city?: string
+    propertyType?: string
+    projectType?: 'acheter' | 'louer'
+    price?: number
+    surface?: number
+    rooms?: number
+  },
+  hintAgencyNumericId: number,
+): SearchListing {
+  const rooms = typeof hint.rooms === 'number' && Number.isFinite(hint.rooms) && hint.rooms > 0
+    ? Math.max(1, Math.round(hint.rooms))
+    : 2
+  return {
+    id: listingId,
+    projet: hint.projectType === 'louer' ? 'louer' : 'acheter',
+    propertyType: normalizeHintPropertyType(hint.propertyType),
+    title: (hint.title || '').trim() || 'Annonce',
+    city: (hint.city || '').trim() || 'Ville inconnue',
+    price: typeof hint.price === 'number' && Number.isFinite(hint.price) ? Math.max(0, Math.round(hint.price)) : 0,
+    surface: typeof hint.surface === 'number' && Number.isFinite(hint.surface) ? Math.max(0, Math.round(hint.surface)) : 0,
+    rooms,
+    bedrooms: Math.max(0, rooms - 1),
+    dpe: null,
+    ges: null,
+    features: [],
+    images: [
+      'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
+    ],
+    description: '',
+    publishedAt: new Date().toISOString(),
+    relevanceScore: 0,
+    ref: listingId,
+    floor: null,
+    totalFloors: null,
+    buildingYear: null,
+    chargesMonthly: null,
+    propertyTaxAnnual: null,
+    coproLots: null,
+    coproAnnualCharges: null,
+    coproSharePerMille: null,
+    exposure: '',
+    heatingType: '',
+    hotWaterType: '',
+    generalCondition: '',
+    furnished: null,
+    agencyId: hintAgencyNumericId,
+  }
 }
 
 function getListingById(id: string, byId: Map<string, SearchListing>): SearchListing | null {
@@ -368,10 +563,39 @@ export function buildProspectRows(
       lastActivityAt: p.lastActivityAt,
       diversity,
     })
+    const listingIdsFromInteractions = dedupeNonEmpty([
+      ...p.recentActivityListingIdsByKind.phoneReveals,
+      ...p.recentActivityListingIdsByKind.leads,
+      ...p.recentActivityListingIdsByKind.favorites,
+      ...p.recentActivityListingIdsByKind.views,
+    ], 20)
+    const interactionListingsResolved = listingIdsFromInteractions
+      .map((id) => getListingById(id, listingByIdMap))
+      .filter((l): l is SearchListing => l !== null)
+    const interactionHints = listingIdsFromInteractions
+      .map((id) => p.recentActivityListingHints?.[id])
+      .filter((h): h is NonNullable<typeof h> => Boolean(h))
+    const listingSummariesFallback = dedupeNonEmpty(
+      listingIdsFromInteractions
+        .map((id) => getListingById(id, listingByIdMap))
+        .filter((l): l is SearchListing => l !== null)
+        .map((listing) => summarizeListingCriteria(listing)),
+      6,
+    )
+    const listingHintSummariesFallback = dedupeNonEmpty(
+      listingIdsFromInteractions
+        .map((id) => p.recentActivityListingHints?.[id])
+        .filter((h): h is NonNullable<typeof h> => Boolean(h))
+        .map((hint) => summarizeListingHintCriteria(hint)),
+      6,
+    )
     const searchCriteriaSummaries = dedupeNonEmpty(
       parsedQueries.map((parsedQuery) => summarizeQueryCriteria(parsedQuery)),
       6,
     )
+    const resolvedSearchCriteriaSummaries = searchCriteriaSummaries.length
+      ? searchCriteriaSummaries
+      : (listingSummariesFallback.length ? listingSummariesFallback : listingHintSummariesFallback)
     const viewedListings = dedupeListings(
       p.recentActivityListingIdsByKind.views.map((id) => getListingById(id, listingByIdMap)),
       8,
@@ -394,6 +618,99 @@ export function buildProspectRows(
         .map((m) => m.listingTitle || null),
       6,
     )
+    const interactionListingsRecent = dedupeListings(
+      p.recentActivityListingIds
+        .map((id) => {
+          const resolved = getListingById(id, listingByIdMap)
+          if (resolved) {
+            return resolved
+          }
+          const hint = p.recentActivityListingHints?.[id]
+          if (!hint) {
+            return null
+          }
+          return buildSearchListingFromHint(id, hint, publicNumericAgencyForHintListing(id))
+        }),
+      10,
+    )
+    const preferredTypeCounts = new Map<string, number>()
+    const zoneCounts = new Map<string, number>()
+    const budgetCandidates: number[] = []
+    const surfaceCandidates: number[] = []
+    const roomsCandidates: number[] = []
+    for (const parsedQuery of parsedQueries) {
+      for (const t of parsedQuery.types) {
+        incrementCount(preferredTypeCounts, labelForPropertyType(t))
+      }
+      if (parsedQuery.ville.trim()) {
+        incrementCount(zoneCounts, parsedQuery.ville.trim())
+      }
+      if (typeof parsedQuery.budgetMax === 'number' && Number.isFinite(parsedQuery.budgetMax) && parsedQuery.budgetMax > 0) {
+        budgetCandidates.push(parsedQuery.budgetMax)
+      }
+      if (typeof parsedQuery.surfaceMin === 'number' && Number.isFinite(parsedQuery.surfaceMin) && parsedQuery.surfaceMin > 0) {
+        surfaceCandidates.push(parsedQuery.surfaceMin)
+      }
+      if (typeof parsedQuery.piecesMin === 'number' && Number.isFinite(parsedQuery.piecesMin) && parsedQuery.piecesMin > 0) {
+        roomsCandidates.push(parsedQuery.piecesMin)
+      }
+    }
+    for (const listing of interactionListingsResolved) {
+      incrementCount(preferredTypeCounts, labelForPropertyType(listing.propertyType))
+      if (listing.city.trim()) {
+        incrementCount(zoneCounts, listing.city.trim())
+      }
+      if (Number.isFinite(listing.price) && listing.price > 0) {
+        budgetCandidates.push(listing.price)
+      }
+      if (Number.isFinite(listing.surface) && listing.surface > 0) {
+        surfaceCandidates.push(listing.surface)
+      }
+      if (Number.isFinite(listing.rooms) && listing.rooms > 0) {
+        roomsCandidates.push(listing.rooms)
+      }
+    }
+    for (const hint of interactionHints) {
+      if (hint.propertyType?.trim()) {
+        incrementCount(preferredTypeCounts, hint.propertyType.trim())
+      }
+      if (hint.city?.trim()) {
+        incrementCount(zoneCounts, hint.city.trim())
+      }
+      if (typeof hint.price === 'number' && Number.isFinite(hint.price) && hint.price > 0) {
+        budgetCandidates.push(hint.price)
+      }
+      if (typeof hint.surface === 'number' && Number.isFinite(hint.surface) && hint.surface > 0) {
+        surfaceCandidates.push(hint.surface)
+      }
+      if (typeof hint.rooms === 'number' && Number.isFinite(hint.rooms) && hint.rooms > 0) {
+        roomsCandidates.push(hint.rooms)
+      }
+    }
+    const preferredType = topLabelsFromMap(preferredTypeCounts, 1)[0] || 'Non déterminé'
+    const zones = topLabelsFromMap(zoneCounts, 2).join(', ') || 'Zone non déterminée'
+    const budget = budgetCandidates.length
+      ? `<= ${Math.max(...budgetCandidates).toLocaleString('fr-FR')} €`
+      : 'Non estimé'
+    const surface = surfaceCandidates.length
+      ? `>= ${Math.min(...surfaceCandidates)} m²`
+      : 'Non estimée'
+    const rooms = roomsCandidates.length
+      ? `${Math.max(...roomsCandidates)}+ pièces`
+      : 'Non déterminé'
+    const unresolvedInteractionIds = dedupeNonEmpty(
+      listingIdsFromInteractions.filter((id) => !getListingById(id, listingByIdMap)),
+      6,
+    ).map((id) => {
+      const hint = p.recentActivityListingHints?.[id]
+      if (hint?.title?.trim()) {
+        return hint.title.trim()
+      }
+      if (hint?.city?.trim()) {
+        return `Annonce à ${hint.city.trim()} (${id})`
+      }
+      return `Annonce (${id})`
+    })
     const hasAccount = p.hasAccount === true
     const latestSentMessage = [...p.sentMessages]
       .sort((a, b) => messageTimestamp(b.id) - messageTimestamp(a.id))[0]
@@ -443,6 +760,7 @@ export function buildProspectRows(
           : (hasAccount || (p.sentMessages.length > 0 && hasEligibleOptInMessage)))
 
     rows.push({
+      prospectIdentityId: normalizeProspectIdentityId(typeof p.identityId === 'string' ? p.identityId : ''),
       email: resolvedProspectEmail,
       name: resolvedProspectName,
       contactPhone:
@@ -455,7 +773,7 @@ export function buildProspectRows(
       hasDesktopPushConsent,
       hasCallConsent,
       hasEmailConsent,
-      topCriteria: buildTopCriteria(queries, p.recentActivityListingIds, publicListings),
+      topCriteria: buildTopCriteria(queries, p.recentActivityListingIds, publicListings, p.recentActivityListingHints),
       searchCount,
       activity,
       maxProximity: temperature.similarity,
@@ -465,14 +783,22 @@ export function buildProspectRows(
       heatLabel: temperature.label,
       heatUxLabel: temperature.uxLabel,
       temperatureReasons: temperature.reasons,
-      searchCriteriaSummaries,
+      searchCriteriaSummaries: resolvedSearchCriteriaSummaries,
       interactionListings: {
         views: viewedListings,
         favorites: favoriteListings,
         messages: messageListings,
         phone: phoneListings,
       },
-      messageFallbackTitles,
+      interactionListingsRecent,
+      inferredPreferences: {
+        preferredType,
+        zones,
+        budget,
+        surface,
+        rooms,
+      },
+      messageFallbackTitles: dedupeNonEmpty([...messageFallbackTitles, ...unresolvedInteractionIds], 6),
     })
   }
 
