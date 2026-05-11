@@ -258,6 +258,25 @@
             <aside class="prospects-layout__list">
               <ul class="pro-members-list">
                 <li
+                  class="pro-members-list__item prospect-list-card pro-listing__row--select-all"
+                  @click.stop
+                >
+                  <label class="pro-listing__select" @click.stop>
+                    <input
+                      ref="selectAllProspectsPageInputRef"
+                      class="pro-listing__select-input"
+                      type="checkbox"
+                      :checked="isAllCurrentPageProspectsSelected"
+                      aria-label="Sélectionner tous les prospects de cette page"
+                      @change="onToggleSelectAllProspectsCurrentPage(($event.target as HTMLInputElement).checked)"
+                    >
+                  </label>
+                  <div class="pro-listing__select-all-label">
+                    <span class="pro-listing__select-all-text">Tout sélectionner</span>
+                    <span class="pro-listing__select-all-hint">page courante</span>
+                  </div>
+                </li>
+                <li
                   v-for="p in paginatedProspects"
                   :key="p.email"
                   class="pro-members-list__item prospect-list-card"
@@ -1816,6 +1835,31 @@ const paginatedProspects = computed(() => {
 })
 const selectedProspectEmails = ref<string[]>([])
 const lastSelectedProspectEmail = ref<string | null>(null)
+
+const currentPageProspectEmails = computed(() => paginatedProspects.value.map((p) => p.email))
+
+const isAllCurrentPageProspectsSelected = computed(() => {
+  const emails = currentPageProspectEmails.value
+  if (!emails.length) {
+    return false
+  }
+  return emails.every((e) => selectedProspectEmails.value.includes(e))
+})
+
+const isSomeCurrentPageProspectsSelected = computed(() =>
+  currentPageProspectEmails.value.some((e) => selectedProspectEmails.value.includes(e)),
+)
+
+const selectAllProspectsPageInputRef = ref<HTMLInputElement | null>(null)
+
+watchEffect(() => {
+  const el = selectAllProspectsPageInputRef.value
+  if (!el) {
+    return
+  }
+  el.indeterminate =
+    isSomeCurrentPageProspectsSelected.value && !isAllCurrentPageProspectsSelected.value
+})
 const selectedProspectsCount = computed(() => selectedProspectEmails.value.length)
 
 const bulkSelectedProspectRows = computed(() => {
@@ -1938,6 +1982,24 @@ function selectAllFilteredProspects() {
 function clearSelectedProspects() {
   selectedProspectEmails.value = []
   lastSelectedProspectEmail.value = null
+}
+
+function onToggleSelectAllProspectsCurrentPage(checked: boolean) {
+  const emails = currentPageProspectEmails.value
+  if (!emails.length) {
+    return
+  }
+  const next = new Set(selectedProspectEmails.value)
+  if (checked) {
+    for (const e of emails) {
+      next.add(e)
+    }
+  } else {
+    for (const e of emails) {
+      next.delete(e)
+    }
+  }
+  selectedProspectEmails.value = [...next]
 }
 
 const selectedProspectEmail = ref<string | null>(null)

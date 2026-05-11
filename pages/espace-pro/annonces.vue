@@ -153,6 +153,22 @@
           </div>
 
           <ul v-if="paginatedListings.length" class="pro-members-list">
+            <li class="pro-members-list__item pro-listing__row pro-listing__row--select-all">
+              <label class="pro-listing__select" @click.stop>
+                <input
+                  ref="selectAllPageInputRef"
+                  class="pro-listing__select-input"
+                  type="checkbox"
+                  :checked="isAllCurrentPageListingsSelected"
+                  aria-label="Sélectionner toutes les annonces de cette page"
+                  @change="onToggleSelectAllCurrentPage(($event.target as HTMLInputElement).checked)"
+                >
+              </label>
+              <div class="pro-listing__select-all-label">
+                <span class="pro-listing__select-all-text">Tout sélectionner</span>
+                <span class="pro-listing__select-all-hint">(page courante)</span>
+              </div>
+            </li>
             <li
               v-for="item in paginatedListings"
               :key="item.id"
@@ -430,24 +446,38 @@
               </div>
             </li>
           </ul>
-          <nav v-if="filteredListings.length > PAGE_SIZE" class="compte-panel__pagination" aria-label="Pagination des annonces pro">
-            <button
-              type="button"
-              class="compte-panel__pagination-btn"
-              :disabled="currentPage <= 1"
-              @click="currentPage -= 1"
-            >
-              Précédent
-            </button>
-            <span class="compte-panel__pagination-info">Page {{ currentPage }} / {{ totalPages }}</span>
-            <button
-              type="button"
-              class="compte-panel__pagination-btn"
-              :disabled="currentPage >= totalPages"
-              @click="currentPage += 1"
-            >
-              Suivant
-            </button>
+          <nav v-if="totalPages > 1" class="annonces-pagination" aria-label="Pagination des annonces pro">
+            <p class="annonces-pagination__info">
+              Page {{ currentPage }} sur {{ totalPages }}
+            </p>
+            <div class="annonces-pagination__nav">
+              <span v-if="currentPage <= 1" class="annonces-pagination__btn annonces-pagination__btn--off">Précédent</span>
+              <NuxtLink
+                v-else
+                :to="proListingsPageLink(currentPage - 1)"
+                class="annonces-pagination__btn"
+              >
+                Précédent
+              </NuxtLink>
+              <NuxtLink
+                v-for="n in totalPages"
+                :key="n"
+                :to="proListingsPageLink(n)"
+                class="annonces-pagination__btn"
+                :class="{ 'is-current': n === currentPage }"
+                :aria-current="n === currentPage ? 'page' : undefined"
+              >
+                {{ n }}
+              </NuxtLink>
+              <span v-if="currentPage >= totalPages" class="annonces-pagination__btn annonces-pagination__btn--off">Suivant</span>
+              <NuxtLink
+                v-else
+                :to="proListingsPageLink(currentPage + 1)"
+                class="annonces-pagination__btn"
+              >
+                Suivant
+              </NuxtLink>
+            </div>
           </nav>
           <div v-if="listingListEmptyState" class="pro-listing-tab-empty">
             <AccountEmptyState
@@ -1022,6 +1052,7 @@
 <script setup lang="ts">
 import type { CommuneResult } from '~/composables/useCommuneSearch'
 import {
+  ANNONCES_PAGE_SIZE,
   buildParsedQueryFromFilterDraft,
   type AnnoncesFilterDraft,
   type AnnoncesParsedQuery,
@@ -1095,17 +1126,32 @@ type ListingForm = {
 
 type ListingStatusTab = 'all' | 'active' | 'draft' | 'archived'
 type ListingPerformanceSegment = 'all' | 'over' | 'under'
-const PAGE_SIZE = 32
 const ENERGY_LETTERS: EnergyLetter[] = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
 const maxBuildingYearInput = new Date().getFullYear() + 1
 const siteStore = useSiteStore()
+const route = useRoute()
 const { suggestions, debouncedFetch, clearSuggestions } = useCommuneSearch()
 const isManager = computed(() => siteStore.currentProUser?.role === 'manager')
 const router = useRouter()
+
+/** Même modèle que `/annonces` : `?page=` + liens numérotés (`annonces-pagination`). */
+function proListingsPageLink(target: number) {
+  const q = { ...route.query } as Record<string, string | string[] | undefined>
+  if (target <= 1) {
+    delete q.page
+  } else {
+    q.page = String(target)
+  }
+  return { path: '/espace-pro/annonces', query: q }
+}
+
+function goProAnnoncesFirstPage() {
+  void router.replace(proListingsPageLink(1))
+}
+
 const agencyListings = computed(() => siteStore.currentProAgencyListings)
 const activeStatusTab = ref<ListingStatusTab>('all')
 const listingPerformanceSegment = ref<ListingPerformanceSegment>('all')
-const currentPage = ref(1)
 const sortBy = ref<
   | 'pertinence'
   | 'performance_asc'
@@ -1164,6 +1210,7 @@ const editFeatureInput = ref('')
 const listingFormStep = ref(1)
 const selectedListingIds = ref<string[]>([])
 const lastSelectedListingId = ref<string | null>(null)
+const selectAllPageInputRef = ref<HTMLInputElement | null>(null)
 type ProspectHeatCounts = { hot: number; warm: number; cold: number }
 const prospectsHeatCountsByListingId = ref<Record<string, ProspectHeatCounts>>({})
 
@@ -1582,18 +1629,53 @@ const filteredListings = computed(() => {
     }
     const ad = new Date(a.updatedAt).getTime()
     const bd = new Date(b.updatedAt).getTime()
-    return bd - ad
+    if (bd !== ad) {
+      return bd - ad
+    }
+    const ac = new Date(a.createdAt).getTime()
+    const bc = new Date(b.createdAt).getTime()
+    return bc - ac
   })
 })
 
 const totalPages = computed(() =>
-  Math.max(1, Math.ceil(filteredListings.value.length / PAGE_SIZE)),
+  Math.max(1, Math.ceil(filteredListings.value.length / ANNONCES_PAGE_SIZE)),
 )
 
-const paginatedListings = computed(() => {
-  const start = (currentPage.value - 1) * PAGE_SIZE
-  return filteredListings.value.slice(start, start + PAGE_SIZE)
+const currentPage = computed(() => {
+  const raw = Number(route.query.page)
+  const p0 = Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : 1
+  return Math.min(Math.max(1, p0), totalPages.value)
 })
+
+const paginatedListings = computed(() => {
+  const start = (currentPage.value - 1) * ANNONCES_PAGE_SIZE
+  return filteredListings.value.slice(start, start + ANNONCES_PAGE_SIZE)
+})
+
+const currentPageListingIds = computed(() => paginatedListings.value.map((item) => item.id))
+
+const isAllCurrentPageListingsSelected = computed(() => {
+  const ids = currentPageListingIds.value
+  if (!ids.length) {
+    return false
+  }
+  return ids.every((id) => selectedListingIds.value.includes(id))
+})
+
+const isSomeCurrentPageListingsSelected = computed(() =>
+  currentPageListingIds.value.some((id) => selectedListingIds.value.includes(id)),
+)
+
+watchEffect(() => {
+  const el = selectAllPageInputRef.value
+  if (!el) {
+    return
+  }
+  el.indeterminate =
+    isSomeCurrentPageListingsSelected.value && !isAllCurrentPageListingsSelected.value
+})
+
 const selectedListingsCount = computed(() => selectedListingIds.value.length)
 const selectedListingItems = computed(() => {
   const byId = new Map(agencyListings.value.map((item) => [item.id, item]))
@@ -2131,6 +2213,24 @@ function clearSelectedListings() {
   lastSelectedListingId.value = null
 }
 
+function onToggleSelectAllCurrentPage(checked: boolean) {
+  const pageIds = currentPageListingIds.value
+  if (!pageIds.length) {
+    return
+  }
+  const next = new Set(selectedListingIds.value)
+  if (checked) {
+    for (const id of pageIds) {
+      next.add(id)
+    }
+  } else {
+    for (const id of pageIds) {
+      next.delete(id)
+    }
+  }
+  selectedListingIds.value = [...next]
+}
+
 function collectListingPublishIssuesFromListing(item: AgencyListingItem): string[] {
   const missing: string[] = []
   const hasTitle = item.title.trim().length > 0
@@ -2234,7 +2334,7 @@ function confirmDeleteSelectedListings() {
   }
   bulkDeleteModalOpen.value = false
   clearSelectedListings()
-  currentPage.value = 1
+  goProAnnoncesFirstPage()
   showToast('Suppression effectuée', `${removedCount} annonce(s) supprimée(s).`)
 }
 
@@ -2598,12 +2698,22 @@ async function onSubmitListing() {
     closeListingModal()
     showToast('Annonce modifiée', 'Les informations de l’annonce ont été mises à jour.')
   } else {
-    const created = siteStore.createCurrentAgencyListing(payload)
-    if (!created) {
+    const newListingId = siteStore.createCurrentAgencyListing(payload)
+    if (!newListingId) {
       return
     }
     closeListingModal()
-    currentPage.value = 1
+    const createdRow = agencyListings.value.find((l) => l.id === newListingId)
+    listingPerformanceSegment.value = 'all'
+    if (createdRow?.status === 'active') {
+      activeStatusTab.value = 'active'
+    } else if (createdRow?.status === 'archived') {
+      activeStatusTab.value = 'archived'
+    } else {
+      activeStatusTab.value = 'draft'
+    }
+    sortBy.value = 'date'
+    goProAnnoncesFirstPage()
     showToast('Annonce créée', 'L’annonce a bien été ajoutée.')
   }
   } finally {
@@ -2664,14 +2774,14 @@ function onDeleteListing() {
     return
   }
   closeDeleteModal()
-  currentPage.value = 1
+  goProAnnoncesFirstPage()
   showToast('Annonce supprimée', 'L’annonce a bien été supprimée.')
 }
 
 watch(
   [activeStatusTab, listingPerformanceSegment, sortBy, listingFiltersParsed],
   () => {
-    currentPage.value = 1
+    goProAnnoncesFirstPage()
   },
 )
 
@@ -2681,11 +2791,27 @@ watch(listingPerformanceSegment, (segment) => {
   }
 })
 
-watch(totalPages, (value) => {
-  if (currentPage.value > value) {
-    currentPage.value = value
-  }
-})
+watch(
+  [totalPages, () => route.query.page],
+  () => {
+    const raw = Number(route.query.page) || 1
+    if (raw > totalPages.value) {
+      void router.replace(proListingsPageLink(totalPages.value <= 1 ? 1 : totalPages.value))
+    }
+  },
+  { immediate: true },
+)
+
+watch(
+  () => route.query.page,
+  () => {
+    const raw = Number(route.query.page) || 1
+    if (raw < 1 && route.query.page !== undefined && route.query.page !== null && String(route.query.page).trim() !== '') {
+      void router.replace(proListingsPageLink(1))
+    }
+  },
+  { immediate: true },
+)
 
 watch(filteredListings, (list) => {
   const visibleIds = new Set(list.map((item) => item.id))
@@ -2699,10 +2825,15 @@ watch(agencyListings, () => {
   prospectsHeatCountsByListingId.value = {}
 })
 
-onMounted(() => {
+onMounted(async () => {
   siteStore.enforceListingExpiry()
   if (import.meta.client) {
     document.addEventListener('click', onDocumentClickCloseListingMenus)
+    await nextTick()
+    const agencyId = (siteStore.currentProUser?.agencyId || '').trim()
+    if (agencyId) {
+      await siteStore.refreshProListingsFromSupabase(agencyId)
+    }
   }
 })
 
