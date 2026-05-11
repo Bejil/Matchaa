@@ -1,6 +1,6 @@
 import type { EnergyLetter, SearchListing } from '~/data/mock-listings'
 import { getAgencyById, type Agency } from '~/data/agencies'
-import { ALL_PROPERTY_TYPE_SLUGS, PROPERTY_TYPE_GROUPS, type PropertyTypeSlug } from '~/data/property-types'
+import type { PropertyTypeSlug } from '~/data/property-types'
 import { proAgencyIdToPublicNumeric, proListingToSearchListing } from '~/utils/pro-listing-to-search'
 import {
   addMonthsIso as addMonthsIsoFromModule,
@@ -18,71 +18,12 @@ import {
 } from '~/stores/modules/messages'
 import { useFavoritesStore } from '~/stores/favorites'
 import { normalizeProspectIdentityId } from '~/utils/prospect-identity-id'
-
-function normalizeProListingPropertyType(raw: string | undefined | null): PropertyTypeSlug {
-  const input = (raw ?? '').trim()
-  if (!input) {
-    return 'appartement'
-  }
-  const lower = input.toLowerCase()
-  if ((ALL_PROPERTY_TYPE_SLUGS as readonly string[]).includes(lower)) {
-    return lower as PropertyTypeSlug
-  }
-  for (const g of PROPERTY_TYPE_GROUPS) {
-    for (const t of g.types) {
-      if (t.label.toLowerCase() === lower) {
-        return t.slug
-      }
-    }
-  }
-  const compact = lower.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-  for (const g of PROPERTY_TYPE_GROUPS) {
-    for (const t of g.types) {
-      const labelNorm = t.label.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      if (compact.includes(labelNorm)) {
-        return t.slug
-      }
-    }
-  }
-  if (compact.includes('studio')) {
-    return 'studio'
-  }
-  if (compact.includes('loft')) {
-    return 'loft'
-  }
-  if (compact.includes('duplex')) {
-    return 'duplex'
-  }
-  if (compact.includes('villa')) {
-    return 'villa'
-  }
-  if (compact.includes('chalet')) {
-    return 'chalet'
-  }
-  if (compact.includes('terrain')) {
-    return 'terrain'
-  }
-  if (compact.includes('parking') || compact.includes('box')) {
-    return 'parking'
-  }
-  if (compact.includes('peniche')) {
-    return 'peniche'
-  }
-  if (compact.includes('bateau')) {
-    return 'bateau'
-  }
-  if (compact.includes('chateau')) {
-    return 'chateau'
-  }
-  if (compact.includes('moulin')) {
-    return 'moulin'
-  }
-  if (compact.includes('maison')) {
-    return 'maison'
-  }
-  return 'appartement'
-}
-
+import {
+  normalizeProListingPropertyType,
+  proListingFromPartial,
+  proListingFromSupabaseListingRow,
+} from '~/utils/pro-listing-from-partial'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 export const useSiteStore = defineStore('site', () => {
   type SavedSearch = {
     id: string
@@ -324,6 +265,9 @@ export const useSiteStore = defineStore('site', () => {
   const LATEST_SEARCH_KEY_PREFIX = 'matchaa-latest-search'
   const MESSAGES_KEY_PREFIX = 'matchaa-sent-messages'
   const MESSAGE_THREADS_KEY = 'matchaa-message-threads-v1'
+  /** Masquage unilatéral (côté client) : évite qu’un thread “supprimé” réapparaisse au rechargement,
+   *  tout en laissant l’interlocuteur conserver le thread. */
+  const HIDDEN_THREAD_IDS_KEY_PREFIX = 'matchaa-hidden-thread-ids-v1'
   const PROSPECT_ACTIVITY_KEY_PREFIX = 'matchaa-prospect-activity'
   let runtimeAnonymousProspectId: string | null = null
   const PUBLIC_PROFILE_KEY_PREFIX = 'matchaa-public-profile'
@@ -344,6 +288,9 @@ export const useSiteStore = defineStore('site', () => {
   const prospectsDataVersion = ref(0)
   let messageThreadsLoaded = false
   let messageThreadsSyncBound = false
+  let messageThreadsRealtimeChannel: RealtimeChannel | null = null
+  let messageThreadsRealtimeBoundKey: string | null = null
+  let messageThreadsRealtimeReloadTimer: number | null = null
 
   function bumpProspectsDataVersion() {
     prospectsDataVersion.value += 1
@@ -922,6 +869,146 @@ export const useSiteStore = defineStore('site', () => {
     return normalizeStoredMessageThread(raw)
   }
 
+  function hiddenThreadIdsStorageKey(audience: 'public' | 'pro', audienceKey: string): string {
+    return `${HIDDEN_THREAD_IDS_KEY_PREFIX}:${audience}:${audienceKey}`
+  }
+
+  function loadHiddenThreadIds(audience: 'public' | 'pro', audienceKey: string | null): Set<string> {
+    if (!audienceKey) {
+      return new Set<string>()
+    }
+    try {
+      const raw = localStorage.getItem(hiddenThreadIdsStorageKey(audience, audienceKey))
+      if (!raw) {
+        return new Set<string>()
+      }
+      const parsed = JSON.parse(raw) as unknown
+      if (!Array.isArray(parsed)) {
+        return new Set<string>()
+      }
+      return new Set(parsed.filter((x): x is string => typeof x === 'string'))
+    } catch {
+      return new Set<string>()
+    }
+  }
+
+  function persistHiddenThreadIds(audience: 'public' | 'pro', audienceKey: string, ids: Set<string>) {
+    if (!import.meta.client) {
+      return
+    }
+    try {
+      localStorage.setItem(hiddenThreadIdsStorageKey(audience, audienceKey), JSON.stringify(Array.from(ids)))
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function stopMessageThreadsRealtimeSync() {
+    if (messageThreadsRealtimeReloadTimer) {
+      clearTimeout(messageThreadsRealtimeReloadTimer)
+      messageThreadsRealtimeReloadTimer = null
+    }
+    if (!import.meta.client) {
+      return
+    }
+    const supabase = useSupabaseClient()
+    if (messageThreadsRealtimeChannel && supabase) {
+      void supabase.removeChannel(messageThreadsRealtimeChannel)
+    }
+    messageThreadsRealtimeChannel = null
+    messageThreadsRealtimeBoundKey = null
+  }
+
+  function scheduleMessageThreadsReloadFromRealtime() {
+    if (!import.meta.client) {
+      return
+    }
+    if (messageThreadsRealtimeReloadTimer) {
+      clearTimeout(messageThreadsRealtimeReloadTimer)
+    }
+    messageThreadsRealtimeReloadTimer = window.setTimeout(() => {
+      messageThreadsRealtimeReloadTimer = null
+      loadMessageThreads()
+    }, 200)
+  }
+
+  function startMessageThreadsRealtimeSync() {
+    if (!import.meta.client) {
+      return
+    }
+    const supabase = useSupabaseClient()
+    const session = useSupabaseSession().value
+    if (!supabase || !session?.user) {
+      stopMessageThreadsRealtimeSync()
+      return
+    }
+    const publicEmail = currentUser.value?.email?.trim().toLowerCase() || ''
+    const proAgencyId = (currentProUser.value?.agencyId || '').trim()
+    if (!publicEmail && !proAgencyId) {
+      stopMessageThreadsRealtimeSync()
+      return
+    }
+    const userId = session.user.id
+    if (messageThreadsRealtimeBoundKey === userId && messageThreadsRealtimeChannel) {
+      return
+    }
+    stopMessageThreadsRealtimeSync()
+    messageThreadsRealtimeBoundKey = userId
+
+    const channelName = `matchaa-msg-${userId.replace(/[^a-z0-9:_-]/gi, '_').slice(0, 120)}`
+    const ch = supabase.channel(channelName)
+    // Pas de filtre sur colonne : la livraison suit les politiques SELECT (RLS). Les filtres Realtime
+    // peuvent ne pas matcher (casse, encodage) et les UPSERT peuvent n’émettre qu’en UPDATE.
+    ch.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'conversation_threads' },
+      scheduleMessageThreadsReloadFromRealtime,
+    )
+    ch.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'thread_messages' },
+      scheduleMessageThreadsReloadFromRealtime,
+    )
+    void ch.subscribe((status) => {
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        console.warn('[Matchaa] realtime messages:', status)
+      }
+    })
+    messageThreadsRealtimeChannel = ch
+  }
+
+  function loadMessageThreadsFromLocalStorage() {
+    try {
+      stopMessageThreadsRealtimeSync()
+      const raw = localStorage.getItem(MESSAGE_THREADS_KEY)
+      if (!raw) {
+        messageThreads.value = []
+        messageThreadsLoaded = true
+        return
+      }
+      const publicEmail = currentUser.value?.email?.trim().toLowerCase() || null
+      const proAgencyId = currentProUser.value?.agencyId || null
+      const hiddenThreadIds = proAgencyId
+        ? loadHiddenThreadIds('pro', proAgencyId)
+        : loadHiddenThreadIds('public', publicEmail)
+      const parsed = JSON.parse(raw) as unknown
+      if (!Array.isArray(parsed)) {
+        messageThreads.value = []
+        messageThreadsLoaded = true
+        return
+      }
+      messageThreads.value = parsed
+        .map((item) => normalizeMessageThread(item))
+        .filter((t): t is MessageThread => t !== null)
+        .filter((t) => !hiddenThreadIds.has(t.id))
+      messageThreads.value = sortThreadsByUpdatedAt(messageThreads.value)
+      messageThreadsLoaded = true
+    } catch {
+      messageThreads.value = []
+      messageThreadsLoaded = true
+    }
+  }
+
   function loadMessageThreads() {
     if (!import.meta.client) {
       messageThreads.value = []
@@ -937,58 +1024,102 @@ export const useSiteStore = defineStore('site', () => {
       messageThreadsSyncBound = true
     }
     const supabase = useSupabaseClient()
-    const session = useSupabaseSession().value
-    if (supabase && session?.user) {
-      const loadFromCloud = async () => {
-        const publicEmail = currentUser.value?.email?.trim().toLowerCase() || null
-        const proAgencyId = currentProUser.value?.agencyId || null
-        if (!publicEmail && !proAgencyId) {
-          messageThreads.value = []
-          messageThreadsLoaded = true
-          return
+    if (!supabase) {
+      stopMessageThreadsRealtimeSync()
+      loadMessageThreadsFromLocalStorage()
+      return
+    }
+    void (async () => {
+      let session = useSupabaseSession().value
+      if (!session?.user) {
+        const { data } = await supabase.auth.getSession()
+        if (data.session?.user) {
+          useSupabaseSession().value = data.session
+          session = data.session
         }
-        const query = supabase
-          .from('conversation_threads')
-          .select('id,agency_id,public_email,public_name,unread_public,unread_pro,updated_at')
-          .order('updated_at', { ascending: false })
-        if (proAgencyId) {
-          query.eq('agency_id', proAgencyId)
-        } else if (publicEmail) {
-          query.eq('public_email', publicEmail)
+      }
+      if (!session?.user) {
+        stopMessageThreadsRealtimeSync()
+        loadMessageThreadsFromLocalStorage()
+        return
+      }
+      const publicEmail = currentUser.value?.email?.trim().toLowerCase() || null
+      const proAgencyId = currentProUser.value?.agencyId || null
+      if (!publicEmail && !proAgencyId) {
+        messageThreads.value = []
+        messageThreadsLoaded = true
+        stopMessageThreadsRealtimeSync()
+        return
+      }
+      const hiddenThreadIds = proAgencyId
+        ? loadHiddenThreadIds('pro', proAgencyId)
+        : loadHiddenThreadIds('public', publicEmail)
+      const query = supabase
+        .from('conversation_threads')
+        .select(
+          'id,agency_id,public_email,public_name,unread_public,unread_pro,updated_at,hidden_from_public_at,hidden_from_agency_at',
+        )
+        .order('updated_at', { ascending: false })
+      if (proAgencyId) {
+        query.eq('agency_id', proAgencyId)
+      } else if (publicEmail) {
+        query.eq('public_email', publicEmail)
+      }
+      const { data: threadsRows, error: threadsErr } = await query
+      if (threadsErr) {
+        messageThreadsLoaded = true
+        return
+      }
+      const ids = (threadsRows || []).map((r) => r.id)
+      const { data: msgRows } = ids.length
+        ? await supabase
+          .from('thread_messages')
+          .select('id,thread_id,author,body,occurred_at,listing_id,listing_title')
+          .in('thread_id', ids)
+          .order('occurred_at', { ascending: true })
+        : { data: [] as Array<Record<string, unknown>> }
+      const byThread = new Map<string, MessageThreadEntry[]>()
+      for (const row of (msgRows as Array<Record<string, unknown>>)) {
+        const threadId = String(row.thread_id || '')
+        if (!threadId) {
+          continue
         }
-        const { data: threadsRows, error: threadsErr } = await query
-        if (threadsErr) {
-          messageThreadsLoaded = true
-          return
-        }
-        const ids = (threadsRows || []).map((r) => r.id)
-        const { data: msgRows } = ids.length
-          ? await supabase
-            .from('thread_messages')
-            .select('id,thread_id,author,body,occurred_at,listing_id,listing_title')
-            .in('thread_id', ids)
-            .order('occurred_at', { ascending: true })
-          : { data: [] as Array<Record<string, unknown>> }
-        const byThread = new Map<string, MessageThreadEntry[]>()
-        for (const row of (msgRows as Array<Record<string, unknown>>)) {
-          const threadId = String(row.thread_id || '')
-          if (!threadId) {
-            continue
+        const list = byThread.get(threadId) || []
+        list.push({
+          id: String(row.id || ''),
+          author: row.author === 'pro' ? 'pro' : 'public',
+          text: String(row.body || ''),
+          at: String(row.occurred_at || new Date().toISOString()),
+          listingId: typeof row.listing_id === 'string' ? row.listing_id : null,
+          listingTitle: typeof row.listing_title === 'string' ? row.listing_title : '',
+        })
+        byThread.set(threadId, list)
+      }
+      type ThreadRow = {
+        id: string
+        agency_id: string
+        public_email: string
+        public_name?: string | null
+        unread_public?: number | null
+        unread_pro?: number | null
+        updated_at?: string | null
+        hidden_from_public_at?: string | null
+        hidden_from_agency_at?: string | null
+      }
+      const rows: ThreadRow[] = Array.isArray(threadsRows) ? (threadsRows as ThreadRow[]) : []
+      messageThreads.value = rows
+        .filter((t) => {
+          if (hiddenThreadIds.has(String(t.id))) {
+            return false
           }
-          const list = byThread.get(threadId) || []
-          list.push({
-            id: String(row.id || ''),
-            author: row.author === 'pro' ? 'pro' : 'public',
-            text: String(row.body || ''),
-            at: String(row.occurred_at || new Date().toISOString()),
-            listingId: typeof row.listing_id === 'string' ? row.listing_id : null,
-            listingTitle: typeof row.listing_title === 'string' ? row.listing_title : '',
-          })
-          byThread.set(threadId, list)
-        }
-        messageThreads.value = (threadsRows || []).map((t) => ({
+          if (proAgencyId) {
+            return !t.hidden_from_agency_at
+          }
+          return !t.hidden_from_public_at
+        })
+        .map((t) => ({
           id: t.id,
-          publicEmail: t.public_email,
+          publicEmail: (t.public_email || '').trim().toLowerCase(),
           proAgencyId: t.agency_id,
           proAgencyName: proAgencies.value.find((a) => a.id === t.agency_id)?.name ?? 'Agence',
           publicName: t.public_name || '',
@@ -997,34 +1128,19 @@ export const useSiteStore = defineStore('site', () => {
           unreadPro: Number(t.unread_pro || 0),
           updatedAt: t.updated_at || new Date().toISOString(),
         }))
-        messageThreads.value = sortThreadsByUpdatedAt(messageThreads.value)
-        messageThreadsLoaded = true
-      }
-      void loadFromCloud()
-      return
-    }
-    try {
-      const raw = localStorage.getItem(MESSAGE_THREADS_KEY)
-      if (!raw) {
-        messageThreads.value = []
-        messageThreadsLoaded = true
-        return
-      }
-      const parsed = JSON.parse(raw) as unknown
-      if (!Array.isArray(parsed)) {
-        messageThreads.value = []
-        messageThreadsLoaded = true
-        return
-      }
-      messageThreads.value = parsed
-        .map((item) => normalizeMessageThread(item))
-        .filter((t): t is MessageThread => t !== null)
       messageThreads.value = sortThreadsByUpdatedAt(messageThreads.value)
       messageThreadsLoaded = true
-    } catch {
-      messageThreads.value = []
-      messageThreadsLoaded = true
+      startMessageThreadsRealtimeSync()
+    })()
+  }
+
+  /** Au retour d’onglet / focus : coupe le canal Realtime puis recharge (reconnexion fiable). */
+  function syncMessageThreadsAfterTabVisible() {
+    if (!import.meta.client) {
+      return
     }
+    stopMessageThreadsRealtimeSync()
+    loadMessageThreads()
   }
 
   function persistMessageThreads() {
@@ -1038,6 +1154,25 @@ export const useSiteStore = defineStore('site', () => {
     }
     try {
       localStorage.setItem(MESSAGE_THREADS_KEY, JSON.stringify(messageThreads.value))
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function broadcastIncomingMessageSignal(detail: {
+    recipient: 'public' | 'pro'
+    threadId: string
+    publicEmail: string
+    proAgencyId: string
+    author: 'public' | 'pro'
+    at: string
+  }) {
+    if (!import.meta.client || typeof window === 'undefined') {
+      return
+    }
+    window.dispatchEvent(new CustomEvent('matchaa:incoming-message', { detail }))
+    try {
+      localStorage.setItem('matchaa:incoming-message-event', JSON.stringify(detail))
     } catch {
       /* ignore */
     }
@@ -1084,18 +1219,66 @@ export const useSiteStore = defineStore('site', () => {
       loadMessageThreads()
     }
     const now = new Date().toISOString()
-    const upserted = upsertMessageThread(messageThreads.value, { ...input, nowIso: now })
+    const normalizedEmail = input.publicEmail.trim().toLowerCase()
+    const upserted = upsertMessageThread(messageThreads.value, {
+      ...input,
+      publicEmail: normalizedEmail,
+      nowIso: now,
+    })
     messageThreads.value = upserted.threads
     const nextThread = upserted.thread
     if (!nextThread) {
       return null
     }
-    persistMessageThreads()
+
+    if (!import.meta.client) {
+      return nextThread
+    }
+
+    if (input.skipSupabaseClientWrite) {
+      persistMessageThreads()
+      // Pas d’événement ici : l’appelant persiste via l’API puis appelle `broadcastIncomingMessageSignal`.
+      return nextThread
+    }
+
     const supabase = useSupabaseClient()
-    const session = useSupabaseSession().value
-    if (import.meta.client && supabase && session?.user && !input.skipSupabaseClientWrite) {
+    if (!supabase) {
+      persistMessageThreads()
+      broadcastIncomingMessageSignal({
+        recipient: input.author === 'public' ? 'pro' : 'public',
+        threadId: nextThread.id,
+        publicEmail: nextThread.publicEmail,
+        proAgencyId: nextThread.proAgencyId,
+        author: input.author,
+        at: now,
+      })
+      return nextThread
+    }
+
+    void (async () => {
+      let session = useSupabaseSession().value
+      if (!session?.user) {
+        const { data } = await supabase.auth.getSession()
+        if (data.session?.user) {
+          useSupabaseSession().value = data.session
+          session = data.session
+        }
+      }
+      if (!session?.user) {
+        persistMessageThreads()
+        broadcastIncomingMessageSignal({
+          recipient: input.author === 'public' ? 'pro' : 'public',
+          threadId: nextThread.id,
+          publicEmail: nextThread.publicEmail,
+          proAgencyId: nextThread.proAgencyId,
+          author: input.author,
+          at: now,
+        })
+        return
+      }
+
       const lastMsg = nextThread.messages[nextThread.messages.length - 1]
-      void supabase.from('conversation_threads').upsert({
+      const { error: threadErr } = await supabase.from('conversation_threads').upsert({
         id: nextThread.id,
         agency_id: nextThread.proAgencyId,
         public_email: nextThread.publicEmail,
@@ -1104,8 +1287,13 @@ export const useSiteStore = defineStore('site', () => {
         unread_pro: nextThread.unreadPro,
         updated_at: nextThread.updatedAt,
       })
+      if (threadErr) {
+        console.warn('[Matchaa] conversation_threads non enregistré:', threadErr.message)
+        void loadMessageThreads()
+        return
+      }
       if (lastMsg) {
-        void supabase.from('thread_messages').upsert({
+        const { error: msgErr } = await supabase.from('thread_messages').upsert({
           id: lastMsg.id,
           thread_id: nextThread.id,
           author: lastMsg.author,
@@ -1114,27 +1302,22 @@ export const useSiteStore = defineStore('site', () => {
           listing_id: lastMsg.listingId ?? null,
           listing_title: lastMsg.listingTitle ?? null,
         })
+        if (msgErr) {
+          console.warn('[Matchaa] thread_messages non enregistré:', msgErr.message)
+          void loadMessageThreads()
+          return
+        }
       }
-    }
-    if (import.meta.client && typeof window !== 'undefined') {
-      const recipient = input.author === 'public' ? 'pro' : 'public'
-      const incomingPayload = {
-        recipient,
+      broadcastIncomingMessageSignal({
+        recipient: input.author === 'public' ? 'pro' : 'public',
         threadId: nextThread.id,
         publicEmail: nextThread.publicEmail,
         proAgencyId: nextThread.proAgencyId,
         author: input.author,
         at: now,
-      }
-      window.dispatchEvent(new CustomEvent('matchaa:incoming-message', {
-        detail: incomingPayload,
-      }))
-      try {
-        localStorage.setItem('matchaa:incoming-message-event', JSON.stringify(incomingPayload))
-      } catch {
-        /* ignore */
-      }
-    }
+      })
+    })()
+
     return nextThread
   }
 
@@ -1144,8 +1327,9 @@ export const useSiteStore = defineStore('site', () => {
       return 0
     }
     return messageThreads.value
-      .filter((t) => t.publicEmail === email)
-      .reduce((acc, t) => acc + Math.max(0, t.unreadPublic), 0)
+      .filter((t) => (t.publicEmail || '').trim().toLowerCase() === email)
+      .filter((t) => Math.max(0, t.unreadPublic) > 0)
+      .length
   })
 
   const proUnreadMessagesCount = computed(() => {
@@ -1154,8 +1338,9 @@ export const useSiteStore = defineStore('site', () => {
       return 0
     }
     return messageThreads.value
-      .filter((t) => t.proAgencyId === agencyId)
-      .reduce((acc, t) => acc + Math.max(0, t.unreadPro), 0)
+      .filter((t) => (t.proAgencyId || '').trim() === agencyId)
+      .filter((t) => Math.max(0, t.unreadPro) > 0)
+      .length
   })
 
   const currentPublicMessageThreads = computed(() => {
@@ -1164,7 +1349,7 @@ export const useSiteStore = defineStore('site', () => {
       return [] as MessageThread[]
     }
     return messageThreads.value
-      .filter((t) => t.publicEmail === email)
+      .filter((t) => (t.publicEmail || '').trim().toLowerCase() === email)
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
   })
 
@@ -1174,7 +1359,7 @@ export const useSiteStore = defineStore('site', () => {
       return [] as MessageThread[]
     }
     return messageThreads.value
-      .filter((t) => t.proAgencyId === agencyId)
+      .filter((t) => (t.proAgencyId || '').trim() === agencyId)
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
   })
 
@@ -1187,6 +1372,20 @@ export const useSiteStore = defineStore('site', () => {
     messageThreads.value = result.threads
     if (result.changed) {
       persistMessageThreads()
+      // Sync côté DB pour que le badge header (rechargé via `loadMessageThreads`) reflète
+      // uniquement les messages non lus.
+      const supabase = useSupabaseClient()
+      if (import.meta.client && supabase) {
+        void supabase
+          .from('conversation_threads')
+          .update({ unread_public: 0 })
+          .eq('public_email', email)
+          .then(({ error }) => {
+            if (error) {
+              console.warn('[Matchaa] markCurrentPublicMessagesRead sync failed', error.message)
+            }
+          })
+      }
     }
   }
 
@@ -1199,6 +1398,18 @@ export const useSiteStore = defineStore('site', () => {
     messageThreads.value = result.threads
     if (result.changed) {
       persistMessageThreads()
+      const supabase = useSupabaseClient()
+      if (import.meta.client && supabase) {
+        void supabase
+          .from('conversation_threads')
+          .update({ unread_public: 0 })
+          .eq('id', threadId)
+          .then(({ error }) => {
+            if (error) {
+              console.warn('[Matchaa] markPublicThreadRead sync failed', error.message)
+            }
+          })
+      }
     }
   }
 
@@ -1211,6 +1422,18 @@ export const useSiteStore = defineStore('site', () => {
     messageThreads.value = result.threads
     if (result.changed) {
       persistMessageThreads()
+      const supabase = useSupabaseClient()
+      if (import.meta.client && supabase) {
+        void supabase
+          .from('conversation_threads')
+          .update({ unread_pro: 0 })
+          .eq('agency_id', agencyId)
+          .then(({ error }) => {
+            if (error) {
+              console.warn('[Matchaa] markCurrentProMessagesRead sync failed', error.message)
+            }
+          })
+      }
     }
   }
 
@@ -1223,6 +1446,18 @@ export const useSiteStore = defineStore('site', () => {
     messageThreads.value = result.threads
     if (result.changed) {
       persistMessageThreads()
+      const supabase = useSupabaseClient()
+      if (import.meta.client && supabase) {
+        void supabase
+          .from('conversation_threads')
+          .update({ unread_pro: 0 })
+          .eq('id', threadId)
+          .then(({ error }) => {
+            if (error) {
+              console.warn('[Matchaa] markProThreadRead sync failed', error.message)
+            }
+          })
+      }
     }
   }
 
@@ -1235,6 +1470,18 @@ export const useSiteStore = defineStore('site', () => {
     messageThreads.value = result.threads
     if (result.changed) {
       persistMessageThreads()
+      const supabase = useSupabaseClient()
+      if (import.meta.client && supabase) {
+        void supabase
+          .from('conversation_threads')
+          .update({ unread_public: 1 })
+          .eq('id', threadId)
+          .then(({ error }) => {
+            if (error) {
+              console.warn('[Matchaa] markPublicThreadUnread sync failed', error.message)
+            }
+          })
+      }
     }
   }
 
@@ -1247,6 +1494,18 @@ export const useSiteStore = defineStore('site', () => {
     messageThreads.value = result.threads
     if (result.changed) {
       persistMessageThreads()
+      const supabase = useSupabaseClient()
+      if (import.meta.client && supabase) {
+        void supabase
+          .from('conversation_threads')
+          .update({ unread_pro: 1 })
+          .eq('id', threadId)
+          .then(({ error }) => {
+            if (error) {
+              console.warn('[Matchaa] markProThreadUnread sync failed', error.message)
+            }
+          })
+      }
     }
   }
 
@@ -1255,7 +1514,44 @@ export const useSiteStore = defineStore('site', () => {
       return
     }
     messageThreads.value = messageThreads.value.filter((t) => t.id !== threadId)
-    persistMessageThreads()
+    // Ne pas appeler `persistMessageThreads()` ici : la clé `MESSAGE_THREADS_KEY` est unique
+    // au navigateur — réécrire la liste sans ce fil effaçait le thread pour l’autre « côté » aussi.
+
+    const publicEmail = currentUser.value?.email?.trim().toLowerCase() || null
+    const proAgencyId = currentProUser.value?.agencyId || null
+    const side: 'public' | 'pro' = proAgencyId ? 'pro' : 'public'
+
+    if (proAgencyId) {
+      const ids = loadHiddenThreadIds('pro', proAgencyId)
+      ids.add(threadId)
+      persistHiddenThreadIds('pro', proAgencyId, ids)
+    } else if (publicEmail) {
+      const ids = loadHiddenThreadIds('public', publicEmail)
+      ids.add(threadId)
+      persistHiddenThreadIds('public', publicEmail, ids)
+    }
+
+    if (import.meta.client) {
+      void (async () => {
+        try {
+          const token = await resolveSupabaseAccessToken()
+          if (!token) {
+            return
+          }
+          await $fetch('/api/public/thread-hide', {
+            method: 'POST',
+            body: { threadId, side },
+            headers: { Authorization: `Bearer ${token}` },
+          })
+        } catch (err) {
+          console.warn('[Matchaa] thread-hide failed', {
+            threadId,
+            side,
+            message: err instanceof Error ? err.message : err,
+          })
+        }
+      })()
+    }
   }
 
   function listMessagesForProspectFromPro(prospectEmail: string): MessageThreadEntry[] {
@@ -1264,7 +1560,9 @@ export const useSiteStore = defineStore('site', () => {
       return []
     }
     const email = prospectEmail.trim().toLowerCase()
-    const thread = messageThreads.value.find((t) => t.proAgencyId === agencyId && t.publicEmail === email)
+    const thread = messageThreads.value.find(
+      (t) => (t.proAgencyId || '').trim() === agencyId && (t.publicEmail || '').trim().toLowerCase() === email,
+    )
     return thread?.messages ?? []
   }
 
@@ -1306,7 +1604,9 @@ export const useSiteStore = defineStore('site', () => {
     if (!email || !input.threadId) {
       return null
     }
-    const thread = messageThreads.value.find((t) => t.id === input.threadId && t.publicEmail === email)
+    const thread = messageThreads.value.find(
+      (t) => t.id === input.threadId && (t.publicEmail || '').trim().toLowerCase() === email,
+    )
     if (!thread) {
       return null
     }
@@ -1620,86 +1920,6 @@ export const useSiteStore = defineStore('site', () => {
       if (!Array.isArray(parsed)) {
         return []
       }
-      const toFullListing = (raw: Partial<ProListing> & { id: string; agencyId: string }): ProListing => {
-        const nowIso = new Date().toISOString()
-        const r = raw as Partial<ProListing>
-        return {
-          id: raw.id,
-          agencyId: raw.agencyId,
-          projectType: raw.projectType === 'louer' ? 'louer' : 'acheter',
-          bedrooms: Math.max(0, Math.round(raw.bedrooms ?? Math.max(0, (raw.rooms ?? 1) - 1))),
-          dpe: raw.dpe && ['A', 'B', 'C', 'D', 'E', 'F', 'G'].includes(raw.dpe) ? (raw.dpe as EnergyLetter) : null,
-          ges: raw.ges && ['A', 'B', 'C', 'D', 'E', 'F', 'G'].includes(raw.ges) ? (raw.ges as EnergyLetter) : null,
-          features: Array.isArray(raw.features) ? raw.features.filter((f): f is string => typeof f === 'string') : [],
-          images: Array.isArray(raw.images) && raw.images.length
-            ? raw.images.filter((u): u is string => typeof u === 'string')
-            : ['https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80'],
-          description: typeof raw.description === 'string' ? raw.description : 'Annonce agence (espace pro).',
-          publishedAt: typeof raw.publishedAt === 'string' ? raw.publishedAt : nowIso,
-          relevanceScore: typeof raw.relevanceScore === 'number' ? raw.relevanceScore : 50,
-          ref: typeof raw.ref === 'string' ? raw.ref : `PRO-${Date.now().toString().slice(-6)}`,
-          floor: raw.floor === null || typeof raw.floor === 'number' ? raw.floor : null,
-          totalFloors: raw.totalFloors === null || typeof raw.totalFloors === 'number' ? raw.totalFloors : null,
-          buildingYear:
-            raw.buildingYear === null
-              ? null
-              : typeof raw.buildingYear === 'number' && Number.isFinite(raw.buildingYear)
-                ? raw.buildingYear
-                : null,
-          chargesMonthly: raw.chargesMonthly === null || typeof raw.chargesMonthly === 'number' ? raw.chargesMonthly : null,
-          propertyTaxAnnual: raw.propertyTaxAnnual === null || typeof raw.propertyTaxAnnual === 'number' ? raw.propertyTaxAnnual : null,
-          coproLots: raw.coproLots === null || typeof raw.coproLots === 'number' ? raw.coproLots : null,
-          coproAnnualCharges: raw.coproAnnualCharges === null || typeof raw.coproAnnualCharges === 'number' ? raw.coproAnnualCharges : null,
-          coproSharePerMille: raw.coproSharePerMille === null || typeof raw.coproSharePerMille === 'number' ? raw.coproSharePerMille : null,
-          exposure: typeof raw.exposure === 'string' ? raw.exposure : '',
-          heatingType: typeof raw.heatingType === 'string' ? raw.heatingType : '',
-          hotWaterType: typeof raw.hotWaterType === 'string' ? raw.hotWaterType : '',
-          generalCondition: typeof raw.generalCondition === 'string' ? raw.generalCondition : '',
-          furnished: raw.furnished === null || typeof raw.furnished === 'boolean' ? raw.furnished : null,
-          title: typeof raw.title === 'string' ? raw.title : 'Annonce',
-          city: typeof raw.city === 'string' ? raw.city : '',
-          propertyType: normalizeProListingPropertyType(
-            typeof raw.propertyType === 'string' ? raw.propertyType : undefined,
-          ),
-          price: Math.max(0, Math.round(raw.price ?? 0)),
-          surface: Math.max(0, Math.round(raw.surface ?? 0)),
-          rooms: Math.max(1, Math.round(raw.rooms ?? 1)),
-          status: raw.status === 'active' || raw.status === 'draft' || raw.status === 'archived' ? raw.status : 'draft',
-          updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : nowIso.slice(0, 10),
-          createdAt:
-            typeof r.createdAt === 'string'
-              ? r.createdAt
-              : typeof raw.publishedAt === 'string'
-                ? raw.publishedAt
-                : nowIso,
-          viewCount:
-            typeof r.viewCount === 'number' && Number.isFinite(r.viewCount)
-              ? Math.max(0, Math.round(r.viewCount))
-              : 0,
-          favoriteCount:
-            typeof r.favoriteCount === 'number' && Number.isFinite(r.favoriteCount)
-              ? Math.max(0, Math.round(r.favoriteCount))
-              : 0,
-          leadCount:
-            typeof r.leadCount === 'number' && Number.isFinite(r.leadCount)
-              ? Math.max(0, Math.round(r.leadCount))
-              : 0,
-          phoneRevealCount:
-            typeof r.phoneRevealCount === 'number' && Number.isFinite(r.phoneRevealCount)
-              ? Math.max(0, Math.round(r.phoneRevealCount))
-              : 0,
-          lifetimeMonths:
-            r.lifetimeMonths === 1 || r.lifetimeMonths === 3 || r.lifetimeMonths === 6 || r.lifetimeMonths === 12
-              ? r.lifetimeMonths
-              : 3,
-          lifetimeStartedAt: typeof r.lifetimeStartedAt === 'string' ? r.lifetimeStartedAt : null,
-          expiresAt: typeof r.expiresAt === 'string' ? r.expiresAt : null,
-          publishedCreditsConsumed:
-            typeof r.publishedCreditsConsumed === 'number' && Number.isFinite(r.publishedCreditsConsumed)
-              ? Math.max(0, Math.round(r.publishedCreditsConsumed))
-              : 0,
-        }
-      }
       return parsed
         .map((l) => {
           if (
@@ -1709,7 +1929,7 @@ export const useSiteStore = defineStore('site', () => {
           ) {
             return null
           }
-          return toFullListing(l as Partial<ProListing> & { id: string; agencyId: string })
+          return proListingFromPartial(l as Partial<ProListing> & { id: string; agencyId: string }) as ProListing
         })
         .filter((l): l is ProListing => l !== null)
     } catch {
@@ -1834,6 +2054,61 @@ export const useSiteStore = defineStore('site', () => {
     proPublicCatalogAgencyId = desiredAgencyId
     loadProData()
     enforceListingExpiry()
+  }
+
+  /** Remplace en mémoire les annonces de l’agence par le contenu de `public.listings` (RLS : membres de l’agence). */
+  async function refreshProListingsFromSupabase(agencyId: string) {
+    const aid = (agencyId || '').trim()
+    if (!import.meta.client || !aid) {
+      return
+    }
+    const supabase = useSupabaseClient()
+    if (!supabase) {
+      return
+    }
+    const { data, error } = await supabase
+      .from('listings')
+      .select('id, agency_id, project_type, status, payload')
+      .eq('agency_id', aid)
+    if (error) {
+      console.warn('[Matchaa] refreshProListingsFromSupabase', error.message)
+      return
+    }
+    const rows = data ?? []
+    const fromDb: ProListing[] = []
+    for (const row of rows) {
+      if (!row || typeof row.id !== 'string' || typeof (row as { agency_id?: unknown }).agency_id !== 'string') {
+        continue
+      }
+      try {
+        fromDb.push(proListingFromSupabaseListingRow(row as Parameters<typeof proListingFromSupabaseListingRow>[0]))
+      } catch {
+        /* ligne payload invalide */
+      }
+    }
+    loadProData()
+    const remoteIds = new Set(fromDb.map((l) => l.id))
+    const otherAgencies = proListings.value.filter((l) => l.agencyId !== aid)
+    const sameAgencyNotInRemote = proListings.value.filter((l) => l.agencyId === aid && !remoteIds.has(l.id))
+    proListings.value = [...otherAgencies, ...sameAgencyNotInRemote, ...fromDb]
+    for (let i = 0; i < proListings.value.length; i += 1) {
+      const listing = proListings.value[i]
+      proListings.value[i] = {
+        ...listing,
+        lifetimeMonths:
+          listing.lifetimeMonths === 1 || listing.lifetimeMonths === 3 || listing.lifetimeMonths === 6 || listing.lifetimeMonths === 12
+            ? listing.lifetimeMonths
+            : 3,
+        lifetimeStartedAt: listing.lifetimeStartedAt ?? null,
+        expiresAt: listing.expiresAt ?? null,
+        publishedCreditsConsumed: Math.max(0, Math.round(listing.publishedCreditsConsumed ?? 0)),
+      }
+    }
+    for (const agency of proAgencies.value) {
+      refreshMemberCreditConsumptionCounters(agency.id)
+    }
+    enforceListingExpiry()
+    persistProData()
   }
 
   function buildProspectActivityListingMetadata(listingId: string): Record<string, unknown> {
@@ -2131,6 +2406,7 @@ export const useSiteStore = defineStore('site', () => {
   }
 
   function logoutPro() {
+    stopMessageThreadsRealtimeSync()
     currentProUser.value = null
     loadMessageThreads()
     if (import.meta.client) {
@@ -2147,6 +2423,7 @@ export const useSiteStore = defineStore('site', () => {
   }
 
   function logout() {
+    stopMessageThreadsRealtimeSync()
     currentUser.value = null
     savedSearches.value = []
     latestSearch.value = null
@@ -2351,6 +2628,7 @@ export const useSiteStore = defineStore('site', () => {
       }
       // Recalibre le catalogue public sur l'agence réellement connectée.
       ensureProListingsLoadedForPublic()
+      void refreshProListingsFromSupabase((membership?.agency_id ?? '').trim())
       loadMessageThreads()
     })
   }
@@ -2955,9 +3233,9 @@ export const useSiteStore = defineStore('site', () => {
     rooms: number
     status: 'active' | 'draft' | 'archived'
     lifetimeMonths?: 1 | 3 | 6 | 12
-  }) {
+  }): string | null {
     if (currentProUser.value?.role !== 'manager') {
-      return false
+      return null
     }
     const listingId = `pro-listing-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
     proListings.value.push({
@@ -3003,7 +3281,7 @@ export const useSiteStore = defineStore('site', () => {
       surface: Math.max(0, Math.round(input.surface)),
       rooms: Math.max(1, Math.round(input.rooms)),
       status: input.status,
-      updatedAt: new Date().toISOString().slice(0, 10),
+      updatedAt: new Date().toISOString(),
       createdAt: new Date().toISOString(),
       viewCount: 0,
       favoriteCount: 0,
@@ -3019,7 +3297,11 @@ export const useSiteStore = defineStore('site', () => {
       if (!ok) {
         const idx = proListings.value.findIndex((l) => l.id === listingId)
         if (idx >= 0) {
-          proListings.value[idx] = { ...proListings.value[idx], status: 'draft' }
+          proListings.value[idx] = {
+            ...proListings.value[idx],
+            status: 'draft',
+            updatedAt: new Date().toISOString(),
+          }
         }
       }
     } else if (input.status === 'archived') {
@@ -3029,7 +3311,7 @@ export const useSiteStore = defineStore('site', () => {
       }
     }
     persistProData()
-    return true
+    return listingId
   }
 
   function updateCurrentAgencyListing(
@@ -3262,20 +3544,22 @@ export const useSiteStore = defineStore('site', () => {
     messageId: string
     messageBody: string
     occurredAt: string
-  }) {
+  }): Promise<boolean> {
     if (!import.meta.client) {
-      return
+      return false
     }
     try {
-      await $fetch('/api/public/listing-contact', {
+      const res = await $fetch<{ ok?: boolean }>('/api/public/listing-contact', {
         method: 'POST',
         body: payload,
         credentials: 'include',
       })
+      return res?.ok !== false
     } catch (err) {
       console.warn('[Matchaa] syncPublicListingContactToCloud failed', {
         message: err instanceof Error ? err.message : err,
       })
+      return false
     }
   }
 
@@ -3358,18 +3642,32 @@ export const useSiteStore = defineStore('site', () => {
       const lastMsg =
         thread && thread.messages.length > 0 ? thread.messages[thread.messages.length - 1] : null
       if (thread && lastMsg) {
-        void syncPublicListingContactToCloud({
-          threadId: thread.id,
-          proAgencyId: agency.id,
-          proAgencyName: agency.name,
-          publicEmail: actorEmail,
-          publicName,
-          listingId: input.listingId,
-          listingTitle: input.listingTitle,
-          messageId: lastMsg.id,
-          messageBody: lastMsg.text,
-          occurredAt: lastMsg.at,
-        })
+        void (async () => {
+          const ok = await syncPublicListingContactToCloud({
+            threadId: thread.id,
+            proAgencyId: agency.id,
+            proAgencyName: agency.name,
+            publicEmail: actorEmail,
+            publicName,
+            listingId: input.listingId,
+            listingTitle: input.listingTitle,
+            messageId: lastMsg.id,
+            messageBody: lastMsg.text,
+            occurredAt: lastMsg.at,
+          })
+          if (ok) {
+            broadcastIncomingMessageSignal({
+              recipient: 'pro',
+              threadId: thread.id,
+              publicEmail: actorEmail,
+              proAgencyId: agency.id,
+              author: 'public',
+              at: lastMsg.at,
+            })
+          } else {
+            void loadMessageThreads()
+          }
+        })()
       }
     }
     bumpProspectsDataVersion()
@@ -3395,7 +3693,9 @@ export const useSiteStore = defineStore('site', () => {
         /* ignore */
       }
     }
-    messageThreads.value = messageThreads.value.filter((t) => t.publicEmail !== email)
+    messageThreads.value = messageThreads.value.filter(
+      (t) => (t.publicEmail || '').trim().toLowerCase() !== email,
+    )
     persistMessageThreads()
     if (currentUser.value?.email?.trim().toLowerCase() === email) {
       savedSearches.value = []
@@ -3466,6 +3766,8 @@ export const useSiteStore = defineStore('site', () => {
     markPublicThreadUnread,
     markProThreadUnread,
     deleteMessageThread,
+    loadMessageThreads,
+    syncMessageThreadsAfterTabVisible,
     listMessagesForProspectFromPro,
     sendProMessageToProspect,
     sendPublicMessageToAgency,
@@ -3473,6 +3775,7 @@ export const useSiteStore = defineStore('site', () => {
     removeSentMessage,
     deleteProspectData,
     ensureProListingsLoadedForPublic,
+    refreshProListingsFromSupabase,
     publicActiveSearchListings,
     recordListingView,
     applyListingFavoriteDelta,
@@ -3514,6 +3817,7 @@ export const useSiteStore = defineStore('site', () => {
         localStorage.setItem(PRO_SESSION_KEY, JSON.stringify(currentProUser.value))
       }
       loadMessageThreads()
+      void refreshProListingsFromSupabase((input.agencyId || '').trim())
     },
   }
 })

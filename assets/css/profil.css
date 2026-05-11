@@ -1726,6 +1726,48 @@ button.prospect-kpi-card {
   background: color-mix(in srgb, var(--color-accent, #db3846) 8%, #fff);
 }
 
+.pro-members-list__item.pro-listing__row--select-all {
+  padding: 0.5rem 1rem;
+  background: color-mix(in srgb, var(--color-border) 42%, #fff);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.pro-members-list__item.pro-listing__row--select-all:hover {
+  background: color-mix(in srgb, var(--color-border) 52%, #fff);
+}
+
+.pro-members-list__item.prospect-list-card.pro-listing__row--select-all {
+  cursor: default;
+  padding: 0.5rem 1rem;
+  background: color-mix(in srgb, var(--color-border) 42%, #fff);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.pro-members-list__item.prospect-list-card.pro-listing__row--select-all:hover {
+  background: color-mix(in srgb, var(--color-border) 52%, #fff);
+}
+
+.pro-listing__select-all-label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.pro-listing__select-all-text {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.pro-listing__select-all-hint {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
 .pro-listing__select {
   display: inline-flex;
   align-items: flex-start;

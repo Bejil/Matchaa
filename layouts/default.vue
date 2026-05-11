@@ -83,11 +83,17 @@ onMounted(async () => {
   await useFavoritesStore().ensureRemoteHydration()
   window.addEventListener('matchaa:incoming-message', onIncomingMessage as EventListener)
   window.addEventListener('storage', onIncomingMessageStorage)
+  window.addEventListener('focus', onWindowFocusRefreshThreads)
+  window.addEventListener('pageshow', onPageShowRefreshThreads as EventListener)
+  document.addEventListener('visibilitychange', onVisibilityChangeRefreshThreads)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('matchaa:incoming-message', onIncomingMessage as EventListener)
   window.removeEventListener('storage', onIncomingMessageStorage)
+  window.removeEventListener('focus', onWindowFocusRefreshThreads)
+  window.removeEventListener('pageshow', onPageShowRefreshThreads as EventListener)
+  document.removeEventListener('visibilitychange', onVisibilityChangeRefreshThreads)
 })
 
 function onIncomingMessage(event: Event) {
@@ -105,6 +111,7 @@ function onIncomingMessage(event: Event) {
   if ((custom.detail?.publicEmail ?? '').trim().toLowerCase() !== email) {
     return
   }
+  siteStore.loadMessageThreads()
   desktopPush.notify({
     title: 'Matchaa - Nouveau message',
     body: 'Vous avez reçu un nouveau message d’une agence.',
@@ -128,6 +135,23 @@ function onIncomingMessageStorage(event: StorageEvent) {
     onIncomingMessage(new CustomEvent('matchaa:incoming-message', { detail }))
   } catch {
     /* ignore */
+  }
+}
+
+function onWindowFocusRefreshThreads() {
+  siteStore.syncMessageThreadsAfterTabVisible()
+}
+
+function onPageShowRefreshThreads(ev: Event) {
+  const e = ev as PageTransitionEvent
+  if (e.persisted) {
+    siteStore.syncMessageThreadsAfterTabVisible()
+  }
+}
+
+function onVisibilityChangeRefreshThreads() {
+  if (document.visibilityState === 'visible') {
+    siteStore.syncMessageThreadsAfterTabVisible()
   }
 }
 
