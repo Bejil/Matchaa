@@ -857,6 +857,47 @@ button.prospect-kpi-card {
   background: var(--color-accent-hover);
 }
 
+.profil-auth__submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.profil-auth__submit:disabled:hover {
+  background: var(--color-accent);
+}
+
+.profil-auth__forgot {
+  margin: 0.35rem 0 0;
+  text-align: center;
+  font-size: 0.86rem;
+}
+
+.profil-auth__forgot-link {
+  color: var(--color-accent);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
+.profil-auth__forgot-link:hover {
+  color: var(--color-accent-hover);
+}
+
+button.profil-auth__forgot-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  text-align: center;
+}
+
+.profil-auth__forgot-hint {
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
 .profil-auth__social {
   margin-top: 0.95rem;
   border-top: 1px solid var(--color-border);

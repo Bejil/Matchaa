@@ -24,6 +24,20 @@ import {
   proListingFromSupabaseListingRow,
 } from '~/utils/pro-listing-from-partial'
 import type { RealtimeChannel } from '@supabase/supabase-js'
+
+/** Brouillon « Contacter l’annonceur » persisté en `profiles.contact_form_draft` (compte public Supabase). */
+export type ContactFormDraftPersisted = {
+  name?: string
+  email?: string
+  phoneCc?: string
+  phone?: string
+  hasSell?: 'oui' | 'non'
+  optOutSimilar?: boolean
+  optInPartners?: boolean
+  message?: string
+  showMessage?: boolean
+}
+
 export const useSiteStore = defineStore('site', () => {
   type SavedSearch = {
     id: string
@@ -316,7 +330,7 @@ export const useSiteStore = defineStore('site', () => {
     return `${PUBLIC_PROFILE_KEY_PREFIX}:${email.toLowerCase()}`
   }
 
-  function loadPublicProfileByEmail(emailInput: string): {
+  function readPublicProfileFromLocalStorage(emailInput: string): {
     contactPhone: string
     contactOptInPhone: boolean
     contactOptInEmail: boolean
@@ -338,6 +352,112 @@ export const useSiteStore = defineStore('site', () => {
       }
     } catch {
       return { contactPhone: '', contactOptInPhone: false, contactOptInEmail: false }
+    }
+  }
+
+  function loadPublicProfileByEmail(emailInput: string): {
+    contactPhone: string
+    contactOptInPhone: boolean
+    contactOptInEmail: boolean
+  } {
+    const email = emailInput.trim().toLowerCase()
+    if (!email) {
+      return { contactPhone: '', contactOptInPhone: false, contactOptInEmail: false }
+    }
+    const session = useSupabaseSession().value
+    if (
+      import.meta.client
+      && session?.user
+      && currentUser.value
+      && email === (session.user.email || '').trim().toLowerCase()
+      && email === currentUser.value.email.trim().toLowerCase()
+    ) {
+      return {
+        contactPhone: currentUser.value.contactPhone ?? '',
+        contactOptInPhone: currentUser.value.contactOptInPhone === true,
+        contactOptInEmail: currentUser.value.contactOptInEmail === true,
+      }
+    }
+    return readPublicProfileFromLocalStorage(emailInput)
+  }
+
+  async function pushPublicProfileContactToSupabase() {
+    const supabase = useSupabaseClient()
+    const session = useSupabaseSession().value
+    if (!supabase || !session?.user || !currentUser.value) {
+      return
+    }
+    const { data: prof, error: readErr } = await supabase
+      .from('profiles')
+      .select('account_kind')
+      .eq('id', session.user.id)
+      .maybeSingle()
+    if (readErr || prof?.account_kind !== 'public') {
+      return
+    }
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        display_name: currentUser.value.name.trim() || null,
+        contact_phone: currentUser.value.contactPhone ?? '',
+        contact_opt_in_phone: currentUser.value.contactOptInPhone === true,
+        contact_opt_in_email: currentUser.value.contactOptInEmail === true,
+      })
+      .eq('id', session.user.id)
+    if (error) {
+      console.warn('[Matchaa] profiles contact sync', error.message)
+    }
+  }
+
+  async function loadContactFormDraftFromSupabase(): Promise<ContactFormDraftPersisted | null> {
+    const supabase = useSupabaseClient()
+    const session = useSupabaseSession().value
+    if (!supabase || !session?.user) {
+      return null
+    }
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('contact_form_draft, account_kind')
+      .eq('id', session.user.id)
+      .maybeSingle()
+    if (error || !data || data.account_kind !== 'public') {
+      return null
+    }
+    const d = data.contact_form_draft
+    if (!d || typeof d !== 'object' || Array.isArray(d)) {
+      return null
+    }
+    const o = d as Record<string, unknown>
+    if (Object.keys(o).length === 0) {
+      return null
+    }
+    return d as ContactFormDraftPersisted
+  }
+
+  async function persistContactFormDraftToSupabase(draft: ContactFormDraftPersisted) {
+    const supabase = useSupabaseClient()
+    const session = useSupabaseSession().value
+    if (!supabase || !session?.user) {
+      return
+    }
+    const { error } = await supabase
+      .from('profiles')
+      .update({ contact_form_draft: draft })
+      .eq('id', session.user.id)
+    if (error) {
+      console.warn('[Matchaa] contact_form_draft persist', error.message)
+    }
+  }
+
+  async function clearContactFormDraftInSupabase() {
+    const supabase = useSupabaseClient()
+    const session = useSupabaseSession().value
+    if (!supabase || !session?.user) {
+      return
+    }
+    const { error } = await supabase.from('profiles').update({ contact_form_draft: {} }).eq('id', session.user.id)
+    if (error) {
+      console.warn('[Matchaa] contact_form_draft clear', error.message)
     }
   }
 
@@ -385,6 +505,81 @@ export const useSiteStore = defineStore('site', () => {
   function mergePublicProfileFromAnonymousSource(targetEmail: string, sourceEmail: string) {
     const sourceKey = publicProfileStorageKey(sourceEmail)
     const targetKey = publicProfileStorageKey(targetEmail)
+    const targetNorm = targetEmail.trim().toLowerCase()
+    const session = useSupabaseSession().value
+    const supabase = useSupabaseClient()
+    if (
+      import.meta.client
+      && supabase
+      && session?.user
+      && targetNorm === (session.user.email || '').trim().toLowerCase()
+    ) {
+      void (async () => {
+        try {
+          const sourceRaw = localStorage.getItem(sourceKey)
+          const sourceParsed = sourceRaw
+            ? JSON.parse(sourceRaw) as Partial<DemoUser>
+            : null
+          const sPhone = sourceParsed && typeof sourceParsed.contactPhone === 'string'
+            ? sourceParsed.contactPhone.trim()
+            : ''
+          const sOptP = sourceParsed?.contactOptInPhone === true
+          const sOptE = sourceParsed?.contactOptInEmail === true
+          if (!sPhone && !sOptP && !sOptE) {
+            try {
+              localStorage.removeItem(sourceKey)
+            } catch {
+              /* ignore */
+            }
+            return
+          }
+          const basePhone = (currentUser.value?.contactPhone ?? '').trim()
+          const baseOptP = currentUser.value?.contactOptInPhone === true
+          const baseOptE = currentUser.value?.contactOptInEmail === true
+          const nextPhone = basePhone || sPhone
+          const nextOptP = baseOptP || sOptP
+          const nextOptE = baseOptE || sOptE
+          const { error } = await supabase
+            .from('profiles')
+            .update({
+              contact_phone: nextPhone,
+              contact_opt_in_phone: nextOptP,
+              contact_opt_in_email: nextOptE,
+            })
+            .eq('id', session.user.id)
+          if (error) {
+            console.warn('[Matchaa] merge anonymous profile', error.message)
+            return
+          }
+          if (currentUser.value?.email.trim().toLowerCase() === targetNorm) {
+            currentUser.value = {
+              ...currentUser.value,
+              contactPhone: nextPhone,
+              contactOptInPhone: nextOptP,
+              contactOptInEmail: nextOptE,
+            }
+            try {
+              localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser.value))
+            } catch {
+              /* ignore */
+            }
+          }
+          try {
+            localStorage.removeItem(sourceKey)
+            localStorage.removeItem(targetKey)
+          } catch {
+            /* ignore */
+          }
+        } catch {
+          try {
+            localStorage.removeItem(sourceKey)
+          } catch {
+            /* ignore */
+          }
+        }
+      })()
+      return
+    }
     try {
       const sourceRaw = localStorage.getItem(sourceKey)
       const sourceParsed = sourceRaw
@@ -419,23 +614,35 @@ export const useSiteStore = defineStore('site', () => {
     if (!import.meta.client) {
       return
     }
+    const emailNorm = targetEmail.trim().toLowerCase()
+    const session = useSupabaseSession().value
+    const supabase = useSupabaseClient()
+    const useCloudMessages =
+      Boolean(supabase && session?.user && emailNorm === (session.user.email || '').trim().toLowerCase())
     try {
-      const raw = localStorage.getItem(messagesStorageKey(targetEmail))
-      if (!raw) {
-        return
+      let messages: SentMessage[] = []
+      if (useCloudMessages) {
+        messages = sentMessages.value.filter((m) =>
+          Boolean(m?.id && m?.agency && m?.text),
+        )
+      } else {
+        const raw = localStorage.getItem(messagesStorageKey(targetEmail))
+        if (!raw) {
+          return
+        }
+        const parsed = JSON.parse(raw) as unknown
+        if (!Array.isArray(parsed)) {
+          return
+        }
+        messages = parsed.filter((m): m is SentMessage =>
+          Boolean(
+            m
+            && typeof (m as SentMessage).id === 'string'
+            && typeof (m as SentMessage).agency === 'string'
+            && typeof (m as SentMessage).text === 'string',
+          ),
+        )
       }
-      const parsed = JSON.parse(raw) as unknown
-      if (!Array.isArray(parsed)) {
-        return
-      }
-      const messages = parsed.filter((m): m is SentMessage =>
-        Boolean(
-          m
-          && typeof (m as SentMessage).id === 'string'
-          && typeof (m as SentMessage).agency === 'string'
-          && typeof (m as SentMessage).text === 'string',
-        ),
-      )
       if (!messages.length) {
         return
       }
@@ -452,10 +659,48 @@ export const useSiteStore = defineStore('site', () => {
       const phoneFromMsg = typeof latestConsentful.contactPhone === 'string'
         ? latestConsentful.contactPhone.trim()
         : ''
+      const nextPhone = prof.contactPhone.trim() ? prof.contactPhone : phoneFromMsg
+      const nextOptP = latestConsentful.contactOptInPhone === true
+      const nextOptE = latestConsentful.contactOptInEmail === true
+      if (useCloudMessages && session?.user) {
+        void (async () => {
+          const { error } = await supabase!
+            .from('profiles')
+            .update({
+              contact_phone: nextPhone,
+              contact_opt_in_phone: nextOptP,
+              contact_opt_in_email: nextOptE,
+            })
+            .eq('id', session.user.id)
+          if (error) {
+            console.warn('[Matchaa] reconcile contact prefs', error.message)
+            return
+          }
+          if (currentUser.value?.email.trim().toLowerCase() === emailNorm) {
+            currentUser.value = {
+              ...currentUser.value,
+              contactPhone: nextPhone,
+              contactOptInPhone: nextOptP,
+              contactOptInEmail: nextOptE,
+            }
+            try {
+              localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser.value))
+            } catch {
+              /* ignore */
+            }
+          }
+          try {
+            localStorage.removeItem(publicProfileStorageKey(emailNorm))
+          } catch {
+            /* ignore */
+          }
+        })()
+        return
+      }
       localStorage.setItem(publicProfileStorageKey(targetEmail), JSON.stringify({
-        contactPhone: prof.contactPhone.trim() ? prof.contactPhone : phoneFromMsg,
-        contactOptInPhone: latestConsentful.contactOptInPhone === true,
-        contactOptInEmail: latestConsentful.contactOptInEmail === true,
+        contactPhone: nextPhone,
+        contactOptInPhone: nextOptP,
+        contactOptInEmail: nextOptE,
       }))
     } catch {
       /* ignore */
@@ -535,6 +780,184 @@ export const useSiteStore = defineStore('site', () => {
       useSupabaseSession().value = data.session
     }
     return data.session?.access_token ?? ''
+  }
+
+  function rowToSentMessage(row: { id: string; payload: unknown }): SentMessage | null {
+    const p = row.payload
+    if (!p || typeof p !== 'object' || Array.isArray(p)) {
+      return null
+    }
+    const o = p as Record<string, unknown>
+    return {
+      id: row.id,
+      agency: typeof o.agency === 'string' ? o.agency : '',
+      text: typeof o.text === 'string' ? o.text : '',
+      messageBody: typeof o.messageBody === 'string' ? o.messageBody : '',
+      listingId: typeof o.listingId === 'string' ? o.listingId : null,
+      listingTitle: typeof o.listingTitle === 'string' ? o.listingTitle : '',
+      optOutSimilar: o.optOutSimilar === true,
+      optInPartners: o.optInPartners === true,
+      desktopPushGranted: o.desktopPushGranted === true,
+      contactOptInPhone: o.contactOptInPhone === true,
+      contactOptInEmail: o.contactOptInEmail === true,
+      contactPhone: typeof o.contactPhone === 'string' ? o.contactPhone : '',
+      contactEmail: typeof o.contactEmail === 'string' ? o.contactEmail : '',
+      contactName: typeof o.contactName === 'string' ? o.contactName : '',
+    }
+  }
+
+  async function trimUserSentMessagesInCloud(userId: string) {
+    const supabase = useSupabaseClient()
+    if (!supabase) {
+      return
+    }
+    const { data, error } = await supabase
+      .from('user_sent_messages')
+      .select('id')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+    if (error || !data?.length) {
+      return
+    }
+    const excess = data.slice(30).map((r) => String((r as { id?: string }).id || '')).filter(Boolean)
+    if (!excess.length) {
+      return
+    }
+    await supabase.from('user_sent_messages').delete().in('id', excess)
+  }
+
+  async function insertUserSentMessageInCloud(msg: SentMessage, userId: string) {
+    const supabase = useSupabaseClient()
+    if (!supabase) {
+      return
+    }
+    const payload = {
+      agency: msg.agency,
+      text: msg.text,
+      messageBody: msg.messageBody,
+      listingId: msg.listingId,
+      listingTitle: msg.listingTitle,
+      optOutSimilar: msg.optOutSimilar === true,
+      optInPartners: msg.optInPartners === true,
+      desktopPushGranted: msg.desktopPushGranted === true,
+      contactOptInPhone: msg.contactOptInPhone === true,
+      contactOptInEmail: msg.contactOptInEmail === true,
+      contactPhone: msg.contactPhone ?? '',
+      contactEmail: msg.contactEmail ?? '',
+      contactName: msg.contactName ?? '',
+    }
+    const { error } = await supabase.from('user_sent_messages').insert({
+      id: msg.id,
+      user_id: userId,
+      payload,
+    })
+    if (error) {
+      console.warn('[Matchaa] user_sent_messages insert', error.message)
+      return
+    }
+    await trimUserSentMessagesInCloud(userId)
+  }
+
+  async function migrateLocalSentMessagesToCloudIfNeeded(userId: string, email: string) {
+    const supabase = useSupabaseClient()
+    if (!supabase) {
+      return
+    }
+    let parsed: SentMessage[] = []
+    try {
+      const raw = localStorage.getItem(messagesStorageKey(email))
+      if (!raw) {
+        return
+      }
+      const arr = JSON.parse(raw) as unknown
+      if (!Array.isArray(arr)) {
+        return
+      }
+      parsed = arr
+        .filter((m): m is Partial<SentMessage> & { id: string; agency: string; text: string } =>
+          Boolean(m?.id && m?.agency && m?.text),
+        )
+        .map((m) => ({
+          id: m.id,
+          agency: m.agency,
+          text: m.text,
+          messageBody: m.messageBody ?? '',
+          listingId:
+            typeof m.listingId === 'string'
+              ? m.listingId
+              : typeof m.listingId === 'number'
+                ? String(m.listingId)
+                : null,
+          listingTitle: m.listingTitle ?? '',
+          optOutSimilar: m.optOutSimilar === true,
+          optInPartners: m.optInPartners === true,
+          desktopPushGranted: m.desktopPushGranted === true,
+          contactOptInPhone: m.contactOptInPhone === true,
+          contactOptInEmail: m.contactOptInEmail === true,
+          contactPhone: typeof m.contactPhone === 'string' ? m.contactPhone : '',
+          contactEmail: typeof m.contactEmail === 'string' ? m.contactEmail : '',
+          contactName: typeof m.contactName === 'string' ? m.contactName : '',
+        }))
+    } catch {
+      return
+    }
+    if (!parsed.length) {
+      return
+    }
+    const rows = parsed.slice(0, 30).map((msg) => {
+      const { id, ...rest } = msg
+      return {
+        id,
+        user_id: userId,
+        payload: { ...rest },
+      }
+    })
+    const { error } = await supabase.from('user_sent_messages').upsert(rows, { onConflict: 'id' })
+    if (error) {
+      console.warn('[Matchaa] user_sent_messages migrate', error.message)
+      return
+    }
+    await trimUserSentMessagesInCloud(userId)
+    try {
+      localStorage.removeItem(messagesStorageKey(email))
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function fetchSentMessagesFromSupabase(userId: string, emailForMigrate: string) {
+    const supabase = useSupabaseClient()
+    if (!supabase) {
+      sentMessages.value = []
+      return
+    }
+    const { data, error } = await supabase
+      .from('user_sent_messages')
+      .select('id, payload')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(30)
+    if (error) {
+      console.warn('[Matchaa] user_sent_messages select', error.message)
+      sentMessages.value = []
+      return
+    }
+    let rows = data ?? []
+    if (rows.length === 0 && emailForMigrate) {
+      await migrateLocalSentMessagesToCloudIfNeeded(userId, emailForMigrate)
+      const { data: data2, error: err2 } = await supabase
+        .from('user_sent_messages')
+        .select('id, payload')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(30)
+      if (!err2) {
+        rows = data2 ?? []
+      }
+    }
+    sentMessages.value = rows
+      .map((row) => rowToSentMessage(row as { id: string; payload: unknown }))
+      .filter((m): m is SentMessage => m !== null)
   }
 
   async function refreshProspectSnapshotsFromApi() {
@@ -806,6 +1229,12 @@ export const useSiteStore = defineStore('site', () => {
       sentMessages.value = []
       return
     }
+    const supabase = useSupabaseClient()
+    const session = useSupabaseSession().value
+    if (supabase && session?.user) {
+      void fetchSentMessagesFromSupabase(session.user.id, currentUser.value.email.trim().toLowerCase())
+      return
+    }
     try {
       const raw = localStorage.getItem(messagesStorageKey(currentUser.value.email))
       if (!raw) {
@@ -849,6 +1278,11 @@ export const useSiteStore = defineStore('site', () => {
 
   function persistSentMessages() {
     if (!import.meta.client || !currentUser.value) {
+      return
+    }
+    const supabase = useSupabaseClient()
+    const session = useSupabaseSession().value
+    if (supabase && session?.user) {
       return
     }
     try {
@@ -988,9 +1422,11 @@ export const useSiteStore = defineStore('site', () => {
       }
       const publicEmail = currentUser.value?.email?.trim().toLowerCase() || null
       const proAgencyId = currentProUser.value?.agencyId || null
-      const hiddenThreadIds = proAgencyId
-        ? loadHiddenThreadIds('pro', proAgencyId)
-        : loadHiddenThreadIds('public', publicEmail)
+      const hiddenThreadIds = session?.user
+        ? new Set<string>()
+        : (proAgencyId
+            ? loadHiddenThreadIds('pro', proAgencyId)
+            : loadHiddenThreadIds('public', publicEmail))
       const parsed = JSON.parse(raw) as unknown
       if (!Array.isArray(parsed)) {
         messageThreads.value = []
@@ -1051,9 +1487,11 @@ export const useSiteStore = defineStore('site', () => {
         stopMessageThreadsRealtimeSync()
         return
       }
-      const hiddenThreadIds = proAgencyId
-        ? loadHiddenThreadIds('pro', proAgencyId)
-        : loadHiddenThreadIds('public', publicEmail)
+      const hiddenThreadIds = session?.user
+        ? new Set<string>()
+        : (proAgencyId
+            ? loadHiddenThreadIds('pro', proAgencyId)
+            : loadHiddenThreadIds('public', publicEmail))
       const query = supabase
         .from('conversation_threads')
         .select(
@@ -1520,12 +1958,13 @@ export const useSiteStore = defineStore('site', () => {
     const publicEmail = currentUser.value?.email?.trim().toLowerCase() || null
     const proAgencyId = currentProUser.value?.agencyId || null
     const side: 'public' | 'pro' = proAgencyId ? 'pro' : 'public'
+    const hasSupabaseSession = Boolean(useSupabaseSession().value?.user)
 
-    if (proAgencyId) {
+    if (!hasSupabaseSession && proAgencyId) {
       const ids = loadHiddenThreadIds('pro', proAgencyId)
       ids.add(threadId)
       persistHiddenThreadIds('pro', proAgencyId, ids)
-    } else if (publicEmail) {
+    } else if (!hasSupabaseSession && publicEmail) {
       const ids = loadHiddenThreadIds('public', publicEmail)
       ids.add(threadId)
       persistHiddenThreadIds('public', publicEmail, ids)
@@ -2460,11 +2899,21 @@ export const useSiteStore = defineStore('site', () => {
     }
     if (import.meta.client) {
       localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser.value))
-      localStorage.setItem(publicProfileStorageKey(nextEmail), JSON.stringify({
-        contactPhone: currentUser.value.contactPhone ?? '',
-        contactOptInPhone: currentUser.value.contactOptInPhone === true,
-        contactOptInEmail: currentUser.value.contactOptInEmail === true,
-      }))
+      const supabase = useSupabaseClient()
+      const session = useSupabaseSession().value
+      if (supabase && session?.user && nextEmail === (session.user.email || '').trim().toLowerCase()) {
+        void pushPublicProfileContactToSupabase()
+      } else {
+        try {
+          localStorage.setItem(publicProfileStorageKey(nextEmail), JSON.stringify({
+            contactPhone: currentUser.value.contactPhone ?? '',
+            contactOptInPhone: currentUser.value.contactOptInPhone === true,
+            contactOptInEmail: currentUser.value.contactOptInEmail === true,
+          }))
+        } catch {
+          /* ignore */
+        }
+      }
     }
   }
 
@@ -2518,18 +2967,49 @@ export const useSiteStore = defineStore('site', () => {
         }
         const { data: profile } = await supabase
           .from('profiles')
-          .select('display_name, account_kind')
+          .select(
+            'display_name, account_kind, contact_phone, contact_opt_in_phone, contact_opt_in_email',
+          )
           .eq('id', session.user.id)
           .maybeSingle()
         if (profile?.account_kind !== 'public') {
           return
         }
+        const emailLower = (session.user.email || '').trim().toLowerCase()
+        let contactPhone = typeof profile.contact_phone === 'string' ? profile.contact_phone : ''
+        let contactOptInPhone = profile.contact_opt_in_phone === true
+        let contactOptInEmail = profile.contact_opt_in_email === true
+        if (!contactPhone && !contactOptInPhone && !contactOptInEmail && emailLower) {
+          const localProf = readPublicProfileFromLocalStorage(emailLower)
+          if (localProf.contactPhone || localProf.contactOptInPhone || localProf.contactOptInEmail) {
+            contactPhone = localProf.contactPhone
+            contactOptInPhone = localProf.contactOptInPhone
+            contactOptInEmail = localProf.contactOptInEmail
+            const { error: upErr } = await supabase
+              .from('profiles')
+              .update({
+                contact_phone: contactPhone,
+                contact_opt_in_phone: contactOptInPhone,
+                contact_opt_in_email: contactOptInEmail,
+              })
+              .eq('id', session.user.id)
+            if (upErr) {
+              console.warn('[Matchaa] migrate public profile contact', upErr.message)
+            } else {
+              try {
+                localStorage.removeItem(publicProfileStorageKey(emailLower))
+              } catch {
+                /* ignore */
+              }
+            }
+          }
+        }
         currentUser.value = {
           name: (profile.display_name || session.user.email || 'Utilisateur Matchaa').trim(),
-          email: (session.user.email || '').trim().toLowerCase(),
-          contactPhone: '',
-          contactOptInPhone: false,
-          contactOptInEmail: false,
+          email: emailLower,
+          contactPhone,
+          contactOptInPhone,
+          contactOptInEmail,
         }
         if (currentUser.value.email) {
           mergeAnonymousProspectDataIntoEmail(currentUser.value.email)
@@ -3608,7 +4088,16 @@ export const useSiteStore = defineStore('site', () => {
     }
     if (currentUser.value) {
       sentMessages.value = [next, ...sentMessages.value].slice(0, 30)
-      persistSentMessages()
+      const supabase = useSupabaseClient()
+      const session = useSupabaseSession().value
+      if (supabase && session?.user) {
+        void (async () => {
+          await insertUserSentMessageInCloud(next, session.user.id)
+          await fetchSentMessagesFromSupabase(session.user.id, currentUser.value!.email.trim().toLowerCase())
+        })()
+      } else {
+        persistSentMessages()
+      }
     } else if (import.meta.client) {
       try {
         const key = messagesStorageKey(actorEmail)
@@ -3676,6 +4165,24 @@ export const useSiteStore = defineStore('site', () => {
   function removeSentMessage(id: string) {
     sentMessages.value = sentMessages.value.filter((m) => m.id !== id)
     persistSentMessages()
+    if (!import.meta.client || !currentUser.value) {
+      return
+    }
+    const supabase = useSupabaseClient()
+    const session = useSupabaseSession().value
+    if (!supabase || !session?.user) {
+      return
+    }
+    void supabase
+      .from('user_sent_messages')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', session.user.id)
+      .then(({ error }) => {
+        if (error) {
+          console.warn('[Matchaa] user_sent_messages delete', error.message)
+        }
+      })
   }
 
   function deleteProspectData(emailInput: string) {
@@ -3752,6 +4259,9 @@ export const useSiteStore = defineStore('site', () => {
     saveLatestSearch,
     createAlertFromLatestSearch,
     removeSavedSearch,
+    loadContactFormDraftFromSupabase,
+    persistContactFormDraftToSupabase,
+    clearContactFormDraftInSupabase,
     sentMessages,
     prospectsDataVersion,
     messageThreads,
@@ -3810,6 +4320,7 @@ export const useSiteStore = defineStore('site', () => {
       loadLatestSearch()
       loadSentMessages()
       loadMessageThreads()
+      void pushPublicProfileContactToSupabase()
     },
     setCurrentProUserForSession: (input: CurrentProUser) => {
       currentProUser.value = { ...input }

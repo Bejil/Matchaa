@@ -103,6 +103,14 @@
               <button type="submit" class="profil-auth__submit">Connexion</button>
             </form>
 
+            <p class="profil-auth__forgot">
+              <button type="button" class="profil-auth__forgot-link" @click="forgotPasswordOpen = true">
+                Mot de passe oublié ?
+              </button>
+            </p>
+
+            <ForgotPasswordModal v-model="forgotPasswordOpen" :initial-email="loginEmail" />
+
             <div class="profil-auth__social">
               <p class="profil-auth__social-title">ou continuer avec</p>
               <div class="profil-auth__social-list">
@@ -138,9 +146,25 @@
               <input id="register-email" v-model.trim="registerEmail" class="profil-auth__input" type="email" autocomplete="email" required>
 
               <label class="profil-auth__label" for="register-password">Mot de passe</label>
-              <input id="register-password" v-model="registerPassword" class="profil-auth__input" type="password" autocomplete="new-password" required>
+              <input
+                id="register-password"
+                v-model="registerPassword"
+                class="profil-auth__input"
+                type="password"
+                autocomplete="new-password"
+                :minlength="PASSWORD_SIGNUP_MIN_LENGTH"
+                required
+              >
 
-              <button type="submit" class="profil-auth__submit">Créer mon compte</button>
+              <PasswordSignupRequirements :password="registerPassword" />
+
+              <button
+                type="submit"
+                class="profil-auth__submit"
+                :disabled="!passwordMeetsSignupPolicy(registerPassword)"
+              >
+                Créer mon compte
+              </button>
             </form>
 
             <div class="profil-auth__social">
@@ -176,6 +200,10 @@
 </template>
 
 <script setup lang="ts">
+import ForgotPasswordModal from '~/components/auth/ForgotPasswordModal.vue'
+import PasswordSignupRequirements from '~/components/auth/PasswordSignupRequirements.vue'
+import { PASSWORD_SIGNUP_MIN_LENGTH, passwordMeetsSignupPolicy } from '~/utils/passwordSignupPolicy'
+
 const siteStore = useSiteStore()
 const favoritesStore = useFavoritesStore()
 const router = useRouter()
@@ -192,6 +220,7 @@ const registerEmail = ref('')
 const registerPassword = ref('')
 
 const feedback = ref('')
+const forgotPasswordOpen = ref(false)
 
 async function onLoginSubmit() {
   try {
@@ -225,6 +254,10 @@ async function onLoginSubmit() {
 }
 
 async function onRegisterSubmit() {
+  if (!passwordMeetsSignupPolicy(registerPassword.value)) {
+    feedback.value = 'Le mot de passe doit respecter tous les critères affichés sous le champ.'
+    return
+  }
   try {
     const { session, user } = await auth.signUpWithKind(
       registerEmail.value,
