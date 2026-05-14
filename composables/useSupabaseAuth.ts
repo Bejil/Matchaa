@@ -57,6 +57,18 @@ export function useSupabaseAuth() {
     return data
   }
 
+  async function resetPasswordForEmail(email: string, redirectTo: string) {
+    if (!client) {
+      throw new Error('Supabase n’est pas configuré (SUPABASE_URL / SUPABASE_KEY).')
+    }
+    const { error } = await client.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+      redirectTo,
+    })
+    if (error) {
+      throw error
+    }
+  }
+
   async function signOut() {
     if (!client) {
       session.value = null
@@ -89,6 +101,7 @@ export function useSupabaseAuth() {
     refreshSession,
     signInWithEmail,
     signUpWithKind,
+    resetPasswordForEmail,
     signOut,
     deleteMyAccount,
   }

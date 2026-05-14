@@ -84,7 +84,7 @@ export default defineEventHandler(async (event) => {
   const { data: identities, error: identitiesErr } = identityIds.length
     ? await admin
         .from('prospect_identities')
-        .select('id,email_normalized,anonymous_id')
+        .select('id,email_normalized,anonymous_id,user_id')
         .in('id', identityIds)
     : { data: [], error: null }
   if (identitiesErr) {
@@ -94,8 +94,28 @@ export default defineEventHandler(async (event) => {
     identities: identities?.length ?? 0,
   })
 
-  const identityById = new Map<string, { id: string; email_normalized: string | null; anonymous_id: string | null }>(
+  const identityById = new Map<string, { id: string; email_normalized: string | null; anonymous_id: string | null; user_id?: string | null }>(
     (identities || []).map((i) => [normalizeProspectIdentityId(i.id), i]),
+  )
+
+  const profileIds = [
+    ...new Set(
+      (identities || [])
+        .map((i) => String(i.user_id || '').trim())
+        .filter(Boolean),
+    ),
+  ]
+  const { data: profiles, error: profilesErr } = profileIds.length
+    ? await admin
+        .from('profiles')
+        .select('id,account_kind,display_name,contact_phone,contact_opt_in_phone,contact_opt_in_email')
+        .in('id', profileIds)
+    : { data: [], error: null }
+  if (profilesErr) {
+    throw createError({ statusCode: 400, statusMessage: `Chargement profiles impossible: ${profilesErr.message}` })
+  }
+  const profileByUserId = new Map(
+    (profiles || []).map((row) => [String(row.id).trim(), row]),
   )
 
   const { data: crmStates, error: crmErr } = resolvedAgencyId
@@ -263,6 +283,22 @@ export default defineEventHandler(async (event) => {
   }
 
   const snapshots = [...snapshotsByIdentity.entries()].map(([identityId, snapshot]) => {
+    const identity = identityById.get(identityId)
+    const profile = identity?.user_id ? profileByUserId.get(String(identity.user_id).trim()) : null
+    if (profile?.account_kind === 'public') {
+      if (typeof profile.display_name === 'string' && profile.display_name.trim()) {
+        snapshot.name = profile.display_name.trim()
+      }
+      if (typeof profile.contact_phone === 'string' && profile.contact_phone.trim() && !snapshot.contactPhone.trim()) {
+        snapshot.contactPhone = profile.contact_phone.trim()
+      }
+      if (profile.contact_opt_in_phone === true) {
+        snapshot.hasCallConsent = true
+      }
+      if (profile.contact_opt_in_email === true) {
+        snapshot.hasEmailConsent = true
+      }
+    }
     const { _latestSearchAt: _discarded, ...publicSnapshot } = snapshot
     void _discarded
     return {

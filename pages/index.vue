@@ -332,11 +332,14 @@
         :agency-phone-tel="siteStore.getPublicAgencyByListingAgencyId(contactListing.agencyId)?.phoneTel"
       />
     </AppCenterModal>
+
+    <ResetPasswordRecoveryModal />
   </div>
 </template>
 
 <script setup lang="ts">
 import AppCenterModal from '~/components/ui/AppCenterModal.vue'
+import ResetPasswordRecoveryModal from '~/components/auth/ResetPasswordRecoveryModal.vue'
 import { formatListingPrice } from '~/composables/useAnnoncesSearch'
 import { editoArticles } from '~/data/articles'
 import type { SearchListing } from '~/data/mock-listings'

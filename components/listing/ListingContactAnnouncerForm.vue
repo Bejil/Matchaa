@@ -220,6 +220,7 @@ import { getAgencyById } from '~/data/agencies'
 import type { SearchListing } from '~/data/mock-listings'
 import { labelForPropertyType } from '~/data/property-types'
 import { pickSimilarListings } from '~/utils/annonce-detail-related'
+import type { ContactFormDraftPersisted } from '~/stores/site'
 
 /** Brouillon contact pour visiteurs non connectés (préremplissage des prochains envois). */
 const GUEST_CONTACT_FORM_STORAGE_KEY = 'matchaa-guest-contact-form'
@@ -347,6 +348,86 @@ function persistGuestContactFormDraft(): void {
   }
 }
 
+let contactDraftDebounce: ReturnType<typeof setTimeout> | null = null
+let skipContactDraftPersist = false
+
+function applyContactDraftFromCloud(d: ContactFormDraftPersisted) {
+  if (typeof d.name === 'string' && d.name.trim()) {
+    name.value = d.name
+  }
+  if (typeof d.email === 'string' && d.email.trim()) {
+    email.value = d.email
+  }
+  if (typeof d.phoneCc === 'string' && phoneCountries.some((c) => c.dial === d.phoneCc)) {
+    phoneCc.value = d.phoneCc
+  }
+  if (typeof d.phone === 'string') {
+    phone.value = d.phone
+  }
+  if (d.hasSell === 'oui' || d.hasSell === 'non') {
+    hasSell.value = d.hasSell
+  }
+  if (typeof d.optOutSimilar === 'boolean') {
+    optOutSimilar.value = d.optOutSimilar
+  }
+  if (typeof d.optInPartners === 'boolean') {
+    optInPartners.value = d.optInPartners
+  }
+  if (typeof d.message === 'string') {
+    message.value = d.message
+  }
+  if (typeof d.showMessage === 'boolean') {
+    showMessage.value = d.showMessage
+  }
+}
+
+async function hydrateCloudContactDraft() {
+  if (!siteStore.currentUser || !useSupabaseSession().value?.user) {
+    return
+  }
+  skipContactDraftPersist = true
+  const draft = await siteStore.loadContactFormDraftFromSupabase()
+  if (draft) {
+    applyContactDraftFromCloud(draft)
+  }
+  await nextTick()
+  skipContactDraftPersist = false
+}
+
+function schedulePersistContactDraft() {
+  if (skipContactDraftPersist) {
+    return
+  }
+  if (contactDraftDebounce) {
+    clearTimeout(contactDraftDebounce)
+  }
+  contactDraftDebounce = setTimeout(() => {
+    contactDraftDebounce = null
+    if (siteStore.currentUser && useSupabaseSession().value?.user) {
+      const payload: ContactFormDraftPersisted = {
+        name: name.value.trim(),
+        email: email.value.trim().toLowerCase(),
+        phoneCc: phoneCc.value,
+        phone: phone.value.trim(),
+        hasSell: hasSell.value,
+        optOutSimilar: optOutSimilar.value,
+        optInPartners: optInPartners.value,
+        message: message.value,
+        showMessage: showMessage.value,
+      }
+      void siteStore.persistContactFormDraftToSupabase(payload)
+    } else if (!siteStore.currentUser) {
+      persistGuestContactFormDraft()
+    }
+  }, 700)
+}
+
+function clearCloudContactDraftIfLoggedIn() {
+  if (siteStore.currentUser && useSupabaseSession().value?.user) {
+    void siteStore.clearContactFormDraftInSupabase()
+  }
+}
+
 const currentListing = computed(() => {
   siteStore.ensureProListingsLoadedForPublic()
   return siteStore.publicActiveSearchListings.find((l) => l.id === props.listingId)
@@ -362,6 +443,23 @@ const similarSuggestions = computed<SearchListing[]>(() => {
 watch(similarSuggestions, (items) => {
   selectedSuggestionIds.value = items.map((item) => item.id)
 }, { immediate: true })
+
+watch(
+  [name, email, phoneCc, phone, hasSell, optOutSimilar, optInPartners, message, showMessage],
+  () => {
+    schedulePersistContactDraft()
+  },
+  { deep: true },
+)
+
+watch(
+  () => useSupabaseSession().value?.user?.id,
+  (uid) => {
+    if (uid && siteStore.currentUser) {
+      void hydrateCloudContactDraft()
+    }
+  },
+)
 
 function onRevealPhone() {
   showPhoneModal.value = true
@@ -403,6 +501,8 @@ function onSubmit() {
   })
   if (!siteStore.currentUser) {
     persistGuestContactFormDraft()
+  } else {
+    clearCloudContactDraftIfLoggedIn()
   }
   desktopPush.openPermissionPromptIfNeeded('public')
   if (props.hideTitle) {
@@ -485,6 +585,8 @@ function contactSelectedSuggestion() {
   }
   if (!siteStore.currentUser) {
     persistGuestContactFormDraft()
+  } else {
+    clearCloudContactDraftIfLoggedIn()
   }
   desktopPush.openPermissionPromptIfNeeded('public')
   showSentModal.value = false
@@ -522,6 +624,7 @@ watch(
     const acceptsAgencyContact = user.contactOptInPhone === true || user.contactOptInEmail === true
     // Liaison inverse avec "Je ne souhaite pas recevoir..."
     optOutSimilar.value = !acceptsAgencyContact
+    void hydrateCloudContactDraft()
   },
   { immediate: true },
 )

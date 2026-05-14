@@ -71,6 +71,14 @@
               <button type="submit" class="profil-auth__submit">Accéder à l’espace</button>
             </form>
 
+            <p class="profil-auth__forgot">
+              <button type="button" class="profil-auth__forgot-link" @click="forgotPasswordOpen = true">
+                Mot de passe oublié ?
+              </button>
+            </p>
+
+            <ForgotPasswordModal v-model="forgotPasswordOpen" from-pro :initial-email="loginEmail" />
+
             <div class="profil-auth__social">
               <p class="profil-auth__social-title">ou continuer avec</p>
               <div class="profil-auth__social-list">
@@ -106,9 +114,25 @@
               <input id="pro-register-email" v-model.trim="registerEmail" class="profil-auth__input" type="email" autocomplete="email" required>
 
               <label class="profil-auth__label" for="pro-register-password">Mot de passe</label>
-              <input id="pro-register-password" v-model="registerPassword" class="profil-auth__input" type="password" autocomplete="new-password" required>
+              <input
+                id="pro-register-password"
+                v-model="registerPassword"
+                class="profil-auth__input"
+                type="password"
+                autocomplete="new-password"
+                :minlength="PASSWORD_SIGNUP_MIN_LENGTH"
+                required
+              >
 
-              <button type="submit" class="profil-auth__submit">Créer mon espace</button>
+              <PasswordSignupRequirements :password="registerPassword" />
+
+              <button
+                type="submit"
+                class="profil-auth__submit"
+                :disabled="!passwordMeetsSignupPolicy(registerPassword)"
+              >
+                Créer mon espace
+              </button>
             </form>
 
             <div class="profil-auth__social">
@@ -144,6 +168,10 @@
 </template>
 
 <script setup lang="ts">
+import ForgotPasswordModal from '~/components/auth/ForgotPasswordModal.vue'
+import PasswordSignupRequirements from '~/components/auth/PasswordSignupRequirements.vue'
+import { PASSWORD_SIGNUP_MIN_LENGTH, passwordMeetsSignupPolicy } from '~/utils/passwordSignupPolicy'
+
 definePageMeta({ layout: 'pro' })
 
 const siteStore = useSiteStore()
@@ -159,6 +187,7 @@ const registerEmail = ref('')
 const registerPassword = ref('')
 
 const feedback = ref('')
+const forgotPasswordOpen = ref(false)
 
 async function resolveProMembershipWithInvite(uid: string, email: string) {
   if (!supabase) {
@@ -251,7 +280,7 @@ async function onProLoginSubmit() {
       return
     }
     feedback.value = `Bienvenue, ${siteStore.currentProUser?.companyName}. Redirection…`
-    await router.push('/espace-pro/dashboard')
+    await router.push('/espace-pro/prospects')
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Connexion impossible.'
     feedback.value = `Connexion échouée : ${message}`
@@ -259,8 +288,8 @@ async function onProLoginSubmit() {
 }
 
 async function onProRegisterSubmit() {
-  if (registerPassword.value.length < 4) {
-    feedback.value = 'Choisissez un mot de passe d’au moins 4 caractères (maquette).'
+  if (!passwordMeetsSignupPolicy(registerPassword.value)) {
+    feedback.value = 'Le mot de passe doit respecter tous les critères affichés sous le champ.'
     return
   }
   if (!supabase) {
@@ -299,7 +328,7 @@ async function onProRegisterSubmit() {
     })
     if (hasAgency) {
       feedback.value = 'Compte pro créé et invitation acceptée. Redirection...'
-      await router.push('/espace-pro/dashboard')
+      await router.push('/espace-pro/prospects')
       return
     }
     feedback.value = 'Compte pro créé. Renseignez votre agence dans les réglages pour activer les fonctionnalités pro.'
@@ -319,7 +348,7 @@ onMounted(async () => {
   siteStore.hydrateProSession()
   if (siteStore.currentProUser) {
     if ((siteStore.currentProUser.agencyId || '').trim()) {
-      await router.replace('/espace-pro/dashboard')
+      await router.replace('/espace-pro/prospects')
     } else {
       await router.replace('/espace-pro/compte')
     }

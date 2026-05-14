@@ -11,6 +11,7 @@ import {
 import {
   evaluateProspectTemperature,
   type ProspectHeatLevel,
+  type ProspectTemperatureResult,
 } from '~/utils/prospect-temperature'
 import { useSiteStore } from '~/stores/site'
 import { inferDemoCatalogAgencyId } from '~/utils/infer-demo-catalog-agency-id'
@@ -54,6 +55,7 @@ export type ProspectMatchRow = {
   heatLabel: 'Froid' | 'Tiède' | 'Chaud'
   heatUxLabel: string
   temperatureReasons: string[]
+  temperatureBreakdown: ProspectTemperatureResult['breakdown']
   searchCriteriaSummaries: string[]
   interactionListings: {
     views: SearchListing[]
@@ -757,7 +759,7 @@ export function buildProspectRows(
       ? true
       : (shouldRevealContactName
           ? false
-          : (hasAccount || (p.sentMessages.length > 0 && hasEligibleOptInMessage)))
+          : !(hasAccount || (p.sentMessages.length > 0 && hasEligibleOptInMessage)))
 
     rows.push({
       prospectIdentityId: normalizeProspectIdentityId(typeof p.identityId === 'string' ? p.identityId : ''),
@@ -783,6 +785,7 @@ export function buildProspectRows(
       heatLabel: temperature.label,
       heatUxLabel: temperature.uxLabel,
       temperatureReasons: temperature.reasons,
+      temperatureBreakdown: temperature.breakdown,
       searchCriteriaSummaries: resolvedSearchCriteriaSummaries,
       interactionListings: {
         views: viewedListings,

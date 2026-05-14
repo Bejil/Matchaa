@@ -1,8 +1,36 @@
+import { fileURLToPath } from 'node:url'
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
+/** Stub local pour l’alias `#app-manifest` (voir nuxt/nuxt#33606). */
+const appManifestStub = fileURLToPath(new URL('./app-manifest.stub.mjs', import.meta.url))
+
 export default defineNuxtConfig({
   compatibilityDate: '2025-04-01',
   devtools: { enabled: true },
   modules: ['@pinia/nuxt'],
+  // Contournement Nuxt 3.21 + Vite 7 : l’alias doit être absolu et réappliqué via le hook sinon il est
+  // noyé / non résolu pour les pré-transforms depuis `node_modules/nuxt/...`.
+  vite: {
+    resolve: {
+      alias: {
+        '#app-manifest': appManifestStub,
+      },
+    },
+  },
+  hooks: {
+    'vite:extendConfig'(config) {
+      const alias = config.resolve?.alias
+      const entry = { find: '#app-manifest', replacement: appManifestStub }
+      if (Array.isArray(alias)) {
+        alias.push(entry)
+      } else if (alias && typeof alias === 'object') {
+        ;(alias as Record<string, string>)['#app-manifest'] = appManifestStub
+      } else {
+        config.resolve = config.resolve ?? {}
+        config.resolve.alias = [entry]
+      }
+    },
+  },
   runtimeConfig: {
     // Cle privee serveur uniquement pour operations admin (ex: suppression compte).
     supabaseServiceRoleKey: '',
