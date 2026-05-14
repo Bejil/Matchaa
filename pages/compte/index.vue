@@ -787,9 +787,10 @@ watch(totalFavoritePages, (total) => {
   }
 })
 
-function onLogout() {
+async function onLogout() {
+  await auth.signOut()
   siteStore.logout()
-  router.push('/profil')
+  await router.push('/profil')
 }
 
 function onSaveSettings() {

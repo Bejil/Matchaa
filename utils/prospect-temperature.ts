@@ -23,6 +23,16 @@ export type ProspectTemperatureResult = {
   score: number
   similarity: number
   reasons: string[]
+  breakdown: {
+    similarityPercent: number
+    engagementPercent: number
+    recencyPercent: number
+    behaviorDelta: -1 | 0 | 1
+    intentionDelta: -1 | 0 | 1
+    recencyDelta: -1 | 0 | 1
+    boosts: string[]
+    blockers: string[]
+  }
 }
 
 type Thresholds = {
@@ -146,6 +156,8 @@ export function evaluateProspectTemperature(
   thresholds: Thresholds = DEFAULT_THRESHOLDS,
 ): ProspectTemperatureResult {
   const reasons: string[] = []
+  const boosts: string[] = []
+  const blockers: string[] = []
   const similarity = adaptiveSimilarity(clamp01(input.similarity), input.diversity)
   const baseLevel = heatFromSimilarity(similarity, thresholds)
   reasons.push(`Similarite contextuelle ${Math.round(similarity * 100)}%`)
@@ -157,13 +169,30 @@ export function evaluateProspectTemperature(
   reasons.push(behavior.reason)
   reasons.push(intention.reason)
   reasons.push(recency.reason)
+  if (behavior.delta > 0) {
+    boosts.push(behavior.reason)
+  } else if (behavior.delta < 0) {
+    blockers.push(behavior.reason)
+  }
+  if (intention.delta > 0) {
+    boosts.push(intention.reason)
+  } else if (intention.delta < 0) {
+    blockers.push(intention.reason)
+  }
+  if (recency.delta > 0) {
+    boosts.push(recency.reason)
+  } else if (recency.delta < 0) {
+    blockers.push(recency.reason)
+  }
 
   let finalLevel = baseLevel
 
   // La similarite domine : en dessous du seuil critique, on reste Froid.
   if (similarity < thresholds.coldLockSimilarity) {
     finalLevel = 'cold'
-    reasons.push('Similarite insuffisante pour monter en temperature')
+    const lockReason = 'Similarite insuffisante pour monter en temperature'
+    reasons.push(lockReason)
+    blockers.push(lockReason)
   } else {
     finalLevel = shiftHeat(finalLevel, behavior.delta)
     finalLevel = shiftHeat(finalLevel, intention.delta)
@@ -175,14 +204,18 @@ export function evaluateProspectTemperature(
     const days = (Date.now() - new Date(input.lastActivityAt).getTime()) / (1000 * 60 * 60 * 24)
     if (days > 30) {
       finalLevel = 'cold'
-      reasons.push('Rafraichissement force : inactivite > 30 jours')
+      const staleReason = 'Rafraichissement force : inactivite > 30 jours'
+      reasons.push(staleReason)
+      blockers.push(staleReason)
     }
   }
 
   // Durcissement du niveau "Chaud": necessite une similarite forte.
   if (finalLevel === 'hot' && similarity < thresholds.hotSimilarity) {
     finalLevel = 'warm'
-    reasons.push('Seuil chaud non atteint: similarite insuffisante pour rester en priorite maximale')
+    const capReason = 'Seuil chaud non atteint: similarite insuffisante pour rester en priorite maximale'
+    reasons.push(capReason)
+    blockers.push(capReason)
   }
 
   const engagementRaw =
@@ -202,5 +235,15 @@ export function evaluateProspectTemperature(
     score,
     similarity,
     reasons,
+    breakdown: {
+      similarityPercent: Math.round(similarity * 100),
+      engagementPercent: Math.round(engagement * 100),
+      recencyPercent: Math.round(recencyComponent * 100),
+      behaviorDelta: behavior.delta,
+      intentionDelta: intention.delta,
+      recencyDelta: recency.delta,
+      boosts,
+      blockers,
+    },
   }
 }

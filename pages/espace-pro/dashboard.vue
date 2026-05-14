@@ -1,10 +1,10 @@
 <template>
   <div class="profil-page espace-pro-page">
-    <section class="hero hero--profil hero--espace-pro" aria-label="Tableau de bord professionnel">
+    <section class="hero hero--profil hero--espace-pro" aria-label="Cockpit d’appétence professionnel">
       <div class="espace-pro-dashboard">
         <header class="espace-pro-dashboard__head">
-          <p class="profil-auth__eyebrow">Espace Pro</p>
-          <h1 class="profil-auth__title">Tableau de bord</h1>
+          <p class="profil-auth__eyebrow">Pilotage pro</p>
+          <h1 class="profil-auth__title">Cockpit d’appétence</h1>
           <p v-if="pro" class="profil-auth__lead">
             <span class="espace-pro-dashboard__contact">
               {{ pro.name }} · {{ pro.email }}
@@ -26,22 +26,22 @@
           </div>
           <div class="annonces-save__text">
             <h2 id="pro-dash-overview-title" class="annonces-save__title">
-              Activité prospects &amp; mise en relation
+              Priorités commerciales du moment
             </h2>
             <p class="annonces-save__desc">
-              Cette vue résume l’intérêt des visiteurs (recherches, favoris, messages) et vous oriente vers les actions utiles :
-              répondre aux messages, prioriser les prospects chauds, publier ou ajuster vos annonces.
+              Cette vue condense les signaux d’intention remontés par vos annonces et vous oriente vers l’action utile :
+              qualifier, relancer, répondre ou ajuster vos biens.
             </p>
           </div>
           <NuxtLink to="/espace-pro/prospects" class="annonces-save__btn">
-            Voir les prospects
+            Ouvrir les prospects
           </NuxtLink>
         </aside>
 
         <!-- KPI principaux : scan vertical rapide, cibles larges au clic -->
         <section class="pro-dash-section" aria-labelledby="pro-dash-kpi-title">
           <div class="pro-dash-section__head">
-            <h2 id="pro-dash-kpi-title" class="pro-dash-section__title">Indicateurs du jour</h2>
+            <h2 id="pro-dash-kpi-title" class="pro-dash-section__title">Priorités du jour</h2>
             <p class="pro-dash-section__hint">Cliquez pour ouvrir la page correspondante</p>
           </div>
           <div class="pro-dash-kpi-grid">
@@ -62,7 +62,7 @@
                     </svg>
                   </span>
                 </div>
-                <p class="pro-dash-kpi__label">Prospects suivis</p>
+                <p class="pro-dash-kpi__label">Signaux détectés</p>
                 <p class="pro-dash-kpi__meta">
                   <span class="pro-dash-heat pro-dash-heat--hot">{{ prospectStats.hot }} chaud{{ prospectStats.hot === 1 ? '' : 's' }}</span>
                   <span aria-hidden="true"> · </span>
@@ -94,7 +94,7 @@
                     </svg>
                   </span>
                 </div>
-                <p class="pro-dash-kpi__label">À prioriser</p>
+                <p class="pro-dash-kpi__label">À activer</p>
                 <p class="pro-dash-kpi__meta">
                   Non vus, forte proximité avec vos critères (&gt; 75&nbsp;%).
                 </p>
@@ -394,7 +394,7 @@ function formatRelative(iso: string): string {
 }
 
 useHead({
-  title: 'Tableau de bord Pro — Matchaa',
+  title: 'Cockpit d’appétence — Espace Pro Matchaa',
 })
 </script>
 

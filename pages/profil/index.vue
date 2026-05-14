@@ -233,7 +233,7 @@ async function onLoginSubmit() {
     }
     const { data: profile } = await supabase
       .from('profiles')
-      .select('account_kind, display_name')
+      .select('account_kind, display_name, contact_phone, contact_opt_in_phone, contact_opt_in_email')
       .eq('id', uid)
       .maybeSingle()
     if (profile?.account_kind === 'pro') {
@@ -244,6 +244,9 @@ async function onLoginSubmit() {
     siteStore.setCurrentUserForSession({
       name: (profile?.display_name || session.user.email || 'Utilisateur Matchaa').trim(),
       email,
+      contactPhone: typeof profile?.contact_phone === 'string' ? profile.contact_phone : '',
+      contactOptInPhone: profile?.contact_opt_in_phone === true,
+      contactOptInEmail: profile?.contact_opt_in_email === true,
     })
     feedback.value = `Bienvenue ${siteStore.currentUser?.name}. Redirection...`
     await router.push('/compte')

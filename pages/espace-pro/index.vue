@@ -280,7 +280,7 @@ async function onProLoginSubmit() {
       return
     }
     feedback.value = `Bienvenue, ${siteStore.currentProUser?.companyName}. Redirection…`
-    await router.push('/espace-pro/dashboard')
+    await router.push('/espace-pro/prospects')
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Connexion impossible.'
     feedback.value = `Connexion échouée : ${message}`
@@ -328,7 +328,7 @@ async function onProRegisterSubmit() {
     })
     if (hasAgency) {
       feedback.value = 'Compte pro créé et invitation acceptée. Redirection...'
-      await router.push('/espace-pro/dashboard')
+      await router.push('/espace-pro/prospects')
       return
     }
     feedback.value = 'Compte pro créé. Renseignez votre agence dans les réglages pour activer les fonctionnalités pro.'
@@ -348,7 +348,7 @@ onMounted(async () => {
   siteStore.hydrateProSession()
   if (siteStore.currentProUser) {
     if ((siteStore.currentProUser.agencyId || '').trim()) {
-      await router.replace('/espace-pro/dashboard')
+      await router.replace('/espace-pro/prospects')
     } else {
       await router.replace('/espace-pro/compte')
     }

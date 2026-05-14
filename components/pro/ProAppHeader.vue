@@ -1,7 +1,7 @@
 <template>
   <header class="pro-header" role="banner">
     <div class="pro-header__inner">
-      <NuxtLink :to="proHomeLink" class="pro-header__brand" aria-label="Matchaa Pro — accueil espace professionnel">
+      <NuxtLink :to="proHomeLink" class="pro-header__brand" aria-label="Matchaa Pro — pilotage des prospects et de l’appétence">
         <img :src="logoSrc" class="pro-header__logo-mark" alt="" width="40" height="28" decoding="async">
         <span class="pro-header__wordmark">Matchaa</span>
         <span class="pro-header__badge">Pro</span>
@@ -9,11 +9,28 @@
 
       <nav class="pro-header__nav pro-header__nav--primary" aria-label="Navigation métier">
         <NuxtLink
-          to="/espace-pro/agence"
-          class="pro-header__link"
+          to="/espace-pro/prospects"
+          class="pro-header__link pro-header__link--prospects"
           active-class="is-active"
         >
-          Agence
+          <span class="pro-header__link-text">Prospects</span>
+          <span
+            class="pro-header__prospect-total-badge"
+            :title="totalProspectsTitle"
+            role="status"
+            :aria-label="totalProspectsTitle"
+          >
+            <span class="pro-header__prospect-total-badge__n" aria-hidden="true">{{ totalProspectsLabel }}</span>
+          </span>
+          <span
+            v-if="newProspectsBadgeCount > 0"
+            class="pro-header__prospect-badge"
+            :title="badgeTitle"
+            role="status"
+            :aria-label="badgeTitle"
+          >
+            <span class="pro-header__prospect-badge__n" aria-hidden="true">{{ badgeLabel }}</span>
+          </span>
         </NuxtLink>
         <NuxtLink
           to="/espace-pro/annonces"
@@ -47,28 +64,11 @@
           </span>
         </NuxtLink>
         <NuxtLink
-          to="/espace-pro/prospects"
-          class="pro-header__link pro-header__link--prospects"
+          to="/espace-pro/agence"
+          class="pro-header__link"
           active-class="is-active"
         >
-          <span class="pro-header__link-text">Prospects</span>
-          <span
-            class="pro-header__prospect-total-badge"
-            :title="totalProspectsTitle"
-            role="status"
-            :aria-label="totalProspectsTitle"
-          >
-            <span class="pro-header__prospect-total-badge__n" aria-hidden="true">{{ totalProspectsLabel }}</span>
-          </span>
-          <span
-            v-if="newProspectsBadgeCount > 0"
-            class="pro-header__prospect-badge"
-            :title="badgeTitle"
-            role="status"
-            :aria-label="badgeTitle"
-          >
-            <span class="pro-header__prospect-badge__n" aria-hidden="true">{{ badgeLabel }}</span>
-          </span>
+          Agence
         </NuxtLink>
       </nav>
 
@@ -104,8 +104,8 @@ const proUnreadMessagesCount = computed(() => siteStore.proUnreadMessagesCount)
 
 const badgeTitle = computed(() =>
   newProspectsBadgeCount.value === 1
-    ? '1 nouveau prospect (non vu, forte proximité)'
-    : `${newProspectsBadgeCount.value} nouveaux prospects (non vus, forte proximité)`,
+    ? '1 nouveau signal à fort potentiel'
+    : `${newProspectsBadgeCount.value} nouveaux signaux à fort potentiel`,
 )
 
 const badgeLabel = computed(() =>
@@ -120,8 +120,8 @@ const totalProspectsCount = computed(() => {
 
 const totalProspectsTitle = computed(() =>
   totalProspectsCount.value === 1
-    ? '1 prospect au total'
-    : `${totalProspectsCount.value} prospects au total`,
+    ? '1 prospect détecté'
+    : `${totalProspectsCount.value} prospects détectés`,
 )
 
 const totalProspectsLabel = computed(() =>
@@ -145,7 +145,7 @@ const annoncesBadgeLabel = computed(() =>
 const currentProUser = computed(() => siteStore.currentProUser)
 
 const proHomeLink = computed(() =>
-  currentProUser.value ? '/espace-pro/dashboard' : '/espace-pro',
+  currentProUser.value ? '/espace-pro/prospects' : '/espace-pro',
 )
 
 const monCompteLink = computed(() =>

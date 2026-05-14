@@ -1,12 +1,12 @@
 <template>
   <div class="profil-page espace-pro-page">
-    <section class="hero hero--profil hero--espace-pro" aria-label="Prospects">
+    <section class="hero hero--profil hero--espace-pro" aria-label="Prospects et appétence">
       <div class="espace-pro-dashboard">
         <header class="espace-pro-dashboard__head">
-          <p class="profil-auth__eyebrow">Espace Pro</p>
-          <h1 class="profil-auth__title">Prospects</h1>
+          <p class="profil-auth__eyebrow">Pilotage pro</p>
+          <h1 class="profil-auth__title">Prospects &amp; appétence</h1>
           <p class="profil-auth__lead">
-            CRM V1 : identifiez les utilisateurs les plus pertinents selon vos annonces et leur activité.
+            Votre tour de contrôle commerciale : qui montre un signal exploitable, sur quels biens, avec quel niveau d’intention et quelle prochaine action.
           </p>
         </header>
 
@@ -33,40 +33,40 @@
                 </svg>
               </span>
             </div>
-            <h2 class="prospect-kpi-card__title">Tous</h2>
+            <h2 class="prospect-kpi-card__title">Vue complète</h2>
             <p class="prospect-kpi-card__desc">
-              Tous les prospects correspondant aux critères de la barre de recherche.
+              Toute la base de signaux détectés, filtrable par critères, activité, score et annonce de référence.
             </p>
           </button>
           <button
             type="button"
             class="espace-pro-dashboard__card prospect-kpi-card prospect-kpi-card--new"
-            :class="{ 'prospect-kpi-card--active': prospectKpiFilter === 'new' }"
-            :aria-pressed="prospectKpiFilter === 'new'"
-            @click="prospectKpiFilter = 'new'"
+            :class="{ 'prospect-kpi-card--active': prospectKpiFilter === 'ready' }"
+            :aria-pressed="prospectKpiFilter === 'ready'"
+            @click="prospectKpiFilter = 'ready'"
           >
             <div class="prospect-kpi-card__value-row">
-              <p class="prospect-kpi-card__value">{{ newProspectsCount }}</p>
+              <p class="prospect-kpi-card__value">{{ readyProspectsCount }}</p>
               <span class="prospect-kpi-card__ic prospect-kpi-card__ic--new" aria-hidden="true">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M12 2l1.8 5.5h5.7l-4.6 3.4 1.8 5.5-4.7-3.4-4.7 3.4 1.8-5.5-4.6-3.4h5.7L12 2z" />
                 </svg>
               </span>
             </div>
-            <h2 class="prospect-kpi-card__title">Nouveaux prospects</h2>
+            <h2 class="prospect-kpi-card__title">À contacter maintenant</h2>
             <p class="prospect-kpi-card__desc">
-              Non lus et non traités, proximité &gt; 75&nbsp;% (alignée sur le pourcentage affiché dans la liste).
+              Prospects chauds, récents, non traités et déjà activables par téléphone, e-mail ou messagerie.
             </p>
           </button>
           <button
             type="button"
             class="espace-pro-dashboard__card prospect-kpi-card prospect-kpi-card--hot"
-            :class="{ 'prospect-kpi-card--active': prospectKpiFilter === 'potential' }"
-            :aria-pressed="prospectKpiFilter === 'potential'"
-            @click="prospectKpiFilter = 'potential'"
+            :class="{ 'prospect-kpi-card--active': prospectKpiFilter === 'fresh' }"
+            :aria-pressed="prospectKpiFilter === 'fresh'"
+            @click="prospectKpiFilter = 'fresh'"
           >
             <div class="prospect-kpi-card__value-row">
-              <p class="prospect-kpi-card__value">{{ potentialProspectsCount }}</p>
+              <p class="prospect-kpi-card__value">{{ freshProspectsCount }}</p>
               <span class="prospect-kpi-card__ic prospect-kpi-card__ic--hot" aria-hidden="true">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
@@ -74,9 +74,52 @@
                 </svg>
               </span>
             </div>
-            <h2 class="prospect-kpi-card__title">Prospects potentiels</h2>
+            <h2 class="prospect-kpi-card__title">Nouveaux signaux</h2>
             <p class="prospect-kpi-card__desc">
-              Non lus et non traités, score &gt; 70&nbsp;/&nbsp;100.
+              Signaux non lus et non traités avec une appétence déjà crédible (&ge; 70&nbsp;/&nbsp;100).
+            </p>
+          </button>
+          <button
+            type="button"
+            class="espace-pro-dashboard__card prospect-kpi-card prospect-kpi-card--fav"
+            :class="{ 'prospect-kpi-card--active': prospectKpiFilter === 'revive' }"
+            :aria-pressed="prospectKpiFilter === 'revive'"
+            @click="prospectKpiFilter = 'revive'"
+          >
+            <div class="prospect-kpi-card__value-row">
+              <p class="prospect-kpi-card__value">{{ reviveProspectsCount }}</p>
+              <span class="prospect-kpi-card__ic prospect-kpi-card__ic--fav" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 2v6h-6" />
+                  <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+                  <path d="M3 22v-6h6" />
+                  <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+                </svg>
+              </span>
+            </div>
+            <h2 class="prospect-kpi-card__title">À relancer</h2>
+            <p class="prospect-kpi-card__desc">
+              Le prospect regarde, revient, compare, mais n’a pas encore déclenché de prise de contact.
+            </p>
+          </button>
+          <button
+            type="button"
+            class="espace-pro-dashboard__card prospect-kpi-card prospect-kpi-card--treated"
+            :class="{ 'prospect-kpi-card--active': prospectKpiFilter === 'contactable' }"
+            :aria-pressed="prospectKpiFilter === 'contactable'"
+            @click="prospectKpiFilter = 'contactable'"
+          >
+            <div class="prospect-kpi-card__value-row">
+              <p class="prospect-kpi-card__value">{{ contactableProspectsCount }}</p>
+              <span class="prospect-kpi-card__ic prospect-kpi-card__ic--treated" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.86 19.86 0 0 1-3.08-8.65A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                </svg>
+              </span>
+            </div>
+            <h2 class="prospect-kpi-card__title">Contactables</h2>
+            <p class="prospect-kpi-card__desc">
+              Prospects non traités avec au moins un canal activable immédiatement.
             </p>
           </button>
           <button
@@ -96,7 +139,7 @@
             </div>
             <h2 class="prospect-kpi-card__title">Favoris</h2>
             <p class="prospect-kpi-card__desc">
-              Marqués comme favoris depuis le détail (stockés sur cet appareil pour votre compte pro).
+              Votre shortlist commerciale personnelle, conservée dans le CRM pro.
             </p>
           </button>
           <button
@@ -114,9 +157,9 @@
                 </svg>
               </span>
             </div>
-            <h2 class="prospect-kpi-card__title">Prospects traités</h2>
+            <h2 class="prospect-kpi-card__title">Traités</h2>
             <p class="prospect-kpi-card__desc">
-              Marqués comme traités depuis le détail prospect.
+              Opportunités déjà qualifiées, appelées ou sorties de votre priorité immédiate.
             </p>
           </button>
         </div>
@@ -125,16 +168,16 @@
           <div ref="listingCriteriaPickerRef" class="prospects-listing-picker">
             <div class="prospects-listing-picker__head">
               <p class="prospects-listing-picker__lead">
-                Appliquer automatiquement les critères d’une annonce
+                Basculer sur le matching d’une annonce
               </p>
               <button
                 type="button"
                 class="prospects-listing-picker__trigger"
                 :aria-expanded="listingCriteriaPickerOpen"
-                aria-label="Rechercher une annonce pour appliquer ses critères"
+                aria-label="Choisir une annonce pour ouvrir son matching prospects"
                 @click.stop="toggleListingCriteriaPicker"
               >
-                Rechercher une annonce
+                Choisir une annonce
               </button>
             </div>
             <div v-if="selectedListingCriteria" class="prospects-listing-picker__selected" role="status">
@@ -163,7 +206,7 @@
             </div>
             <div v-if="listingCriteriaPickerOpen" class="prospects-listing-picker__popover" role="dialog" @click.stop>
               <label class="prospects-listing-picker__search-label" for="prospects-listing-criteria-search">
-                Choisir une annonce
+                Choisir le bien de référence
               </label>
               <input
                 id="prospects-listing-criteria-search"
@@ -232,10 +275,10 @@
             <label class="prospects-list-toolbar__sort">
               <span class="prospects-list-toolbar__sort-label">Trier par</span>
               <select v-model="prospectSort" class="annonces-sort__select" aria-label="Trier la liste des prospects">
-                <option value="proximity">Proximité critères</option>
+                <option value="score">Score d’appétence</option>
                 <option value="temperature">Température</option>
-                <option value="recency">Fraîcheur d’activité</option>
-                <option value="score">Score</option>
+                <option value="proximity">Adéquation critères</option>
+                <option value="recency">Fraîcheur du signal</option>
                 <option value="engagement">Engagement</option>
               </select>
             </label>
@@ -250,7 +293,7 @@
               class="profil-account__btn profil-account__btn--ghost"
               @click="prospectKpiFilter = 'all'"
             >
-              Afficher tous les prospects
+              Revenir à la vue complète
             </button>
           </div>
 
@@ -278,27 +321,27 @@
                 </li>
                 <li
                   v-for="p in paginatedProspects"
-                  :key="p.email"
+                  :key="prospectUiKey(p)"
                   class="pro-members-list__item prospect-list-card"
                   :class="{
-                    'is-active': selectedProspect?.email === p.email,
+                    'is-active': selectedProspectKey === prospectUiKey(p),
                     'is-seen': isProspectSeen(p),
                     'is-crm-favorite': isProspectCrmFavorite(p),
-                    'is-selected': isProspectSelected(p.email),
+                    'is-selected': isProspectSelected(p),
                   }"
                   role="button"
                   tabindex="0"
-                  @click="selectedProspectEmail = p.email"
-                  @keydown.enter.prevent="selectedProspectEmail = p.email"
-                  @keydown.space.prevent="selectedProspectEmail = p.email"
+                  @click="selectedProspectKey = prospectUiKey(p)"
+                  @keydown.enter.prevent="selectedProspectKey = prospectUiKey(p)"
+                  @keydown.space.prevent="selectedProspectKey = prospectUiKey(p)"
                 >
                   <label class="pro-listing__select" @click.stop>
                     <input
                       class="pro-listing__select-input"
                       type="checkbox"
-                      :checked="isProspectSelected(p.email)"
+                      :checked="isProspectSelected(p)"
                       :aria-label="`Sélectionner le prospect ${displayProspectName(p)}`"
-                      @click="onProspectCheckboxClick(p.email, $event)"
+                      @click="onProspectCheckboxClick(p, $event)"
                     >
                   </label>
                   <div class="pro-listing__content">
@@ -436,6 +479,12 @@
                         {{ heatLabelForProspect(selectedProspect) }} · {{ formatTemperatureScore(selectedProspect.score) }}
                       </span>
                     </p>
+                    <p class="prospect-detail-hero__score">
+                      Score d’appétence : {{ formatTemperatureScore(selectedProspect.score) }}
+                    </p>
+                    <p class="prospect-detail-hero__hint">
+                      {{ scoreBreakdownSummary(selectedProspect) }}
+                    </p>
                     <div class="prospect-detail-hero__legend">
                       <p class="prospect-detail-hero__legend-line prospect-detail-hero__legend-line--accent">
                         {{ temperatureMeaningForProspect(selectedProspect) }}
@@ -506,6 +555,30 @@
                   <h3 class="prospect-section-title">Pourquoi ce prospect ?</h3>
                   <ul class="prospect-why-list">
                     <li v-for="reason in whyProspectBullets(selectedProspect)" :key="`${selectedProspect.email}-why-${reason}`">{{ reason }}</li>
+                  </ul>
+                </section>
+
+                <section class="prospect-interaction-section prospect-detail-section prospect-detail-section--score">
+                  <h3 class="prospect-section-title">Score d’appétence expliqué</h3>
+                  <details class="prospect-score-details" open>
+                    <summary>Voir la décomposition du score</summary>
+                    <ul class="prospect-score-breakdown">
+                      <li
+                        v-for="row in scoreBreakdownRows(selectedProspect)"
+                        :key="`${selectedProspect.email}-score-${row.label}`"
+                      >
+                        <span>{{ row.label }}</span>
+                        <strong>{{ row.value }}</strong>
+                      </li>
+                    </ul>
+                  </details>
+                  <ul v-if="scoreBreakdownHighlights(selectedProspect).length" class="prospect-why-list">
+                    <li
+                      v-for="line in scoreBreakdownHighlights(selectedProspect)"
+                      :key="`${selectedProspect.email}-score-highlight-${line}`"
+                    >
+                      {{ line }}
+                    </li>
                   </ul>
                 </section>
 
@@ -1106,14 +1179,14 @@ import {
 import { normalizeProspectIdentityId } from '~/utils/prospect-identity-id'
 import { replaceProNewProspectsBadgeCrmMapsFromSnapshots, syncProNewProspectsBadgeCrmMaps } from '~/composables/useProNewProspectsBadgeCount'
 
-type ProspectKpiFilter = 'all' | 'new' | 'potential' | 'favorite' | 'treated'
+type ProspectKpiFilter = 'all' | 'ready' | 'fresh' | 'revive' | 'contactable' | 'favorite' | 'treated'
 
 definePageMeta({ layout: 'pro' })
 
 useProRouteGuard()
 
 useHead({
-  title: 'Prospects — Espace Pro Matchaa',
+  title: 'Prospects & appétence — Espace Pro Matchaa',
 })
 
 const siteStore = useSiteStore()
@@ -1754,24 +1827,52 @@ async function toggleProspectTreated(prospect: ProspectMatchRow) {
   await updateProspectCrmState(prospect, { isTreated: !isTreated })
 }
 
-function prospectMatchesNewSegment(p: ProspectMatchRow): boolean {
-  return !isProspectSeen(p) && !isProspectTreated(p) && p.maxProximity > 0.75
+function daysSinceProspectActivity(prospect: ProspectMatchRow): number {
+  if (!prospect.lastActivityAt) {
+    return Number.POSITIVE_INFINITY
+  }
+  return Math.floor((Date.now() - new Date(prospect.lastActivityAt).getTime()) / (1000 * 60 * 60 * 24))
 }
 
-function prospectMatchesPotentialSegment(p: ProspectMatchRow): boolean {
-  return !isProspectSeen(p) && !isProspectTreated(p) && p.score > 70
+function hasDirectContactChannel(prospect: ProspectMatchRow): boolean {
+  return prospect.hasCallConsent || prospect.hasEmailConsent || prospect.hasAccount
+}
+
+function prospectMatchesReadySegment(p: ProspectMatchRow): boolean {
+  return !isProspectTreated(p)
+    && p.heatLevel === 'hot'
+    && p.score >= 78
+    && hasDirectContactChannel(p)
+    && daysSinceProspectActivity(p) <= 7
+}
+
+function prospectMatchesFreshSegment(p: ProspectMatchRow): boolean {
+  return !isProspectSeen(p) && !isProspectTreated(p) && p.score >= 70
+}
+
+function prospectMatchesReviveSegment(p: ProspectMatchRow): boolean {
+  return !isProspectTreated(p)
+    && p.heatLevel !== 'cold'
+    && (p.activity.views >= 3 || p.activity.favorites >= 1)
+    && p.activity.leads === 0
+    && p.activity.phoneReveals === 0
+    && daysSinceProspectActivity(p) <= 21
+}
+
+function prospectMatchesContactableSegment(p: ProspectMatchRow): boolean {
+  return !isProspectTreated(p) && hasDirectContactChannel(p)
 }
 
 const prospectRowsBase = computed<ProspectMatchRow[]>(() => {
   void siteStore.prospectsDataVersion
   return buildProspectRows(criteriaFromParsed(parsed.value), siteStore)
 })
-const prospectSort = ref<ProspectListSortKey>('proximity')
+const prospectSort = ref<ProspectListSortKey>('score')
 const PROSPECT_SORT_PHRASES: Record<ProspectListSortKey, string> = {
-  proximity: 'triés par proximité avec vos critères',
+  proximity: 'triés par adéquation avec vos critères',
   temperature: 'triés par température (chaud d’abord)',
-  recency: 'triés par fraîcheur d’activité',
-  score: 'triés par score détaillé',
+  recency: 'triés par fraîcheur du signal',
+  score: 'triés par score d’appétence',
   engagement: 'triés par engagement (vues, favoris, contacts…)',
 }
 const prospectSortPhrase = computed(() => PROSPECT_SORT_PHRASES[prospectSort.value])
@@ -1789,8 +1890,10 @@ const prospectMembershipKey = computed(() =>
 
 const KPI_FILTER_SUFFIXES: Record<ProspectKpiFilter, string> = {
   all: '',
-  new: ' dans « Nouveaux »',
-  potential: ' dans « Potentiels »',
+  ready: ' dans « A contacter maintenant »',
+  fresh: ' dans « Nouveaux signaux »',
+  revive: ' dans « A relancer »',
+  contactable: ' dans « Contactables »',
   favorite: ' dans « Favoris »',
   treated: ' dans « Traités »',
 }
@@ -1800,10 +1903,14 @@ const totalProspectsCount = computed(() => prospects.value.length)
 const filteredProspects = computed(() => {
   const list = prospects.value
   switch (prospectKpiFilter.value) {
-    case 'new':
-      return list.filter(prospectMatchesNewSegment)
-    case 'potential':
-      return list.filter(prospectMatchesPotentialSegment)
+    case 'ready':
+      return list.filter(prospectMatchesReadySegment)
+    case 'fresh':
+      return list.filter(prospectMatchesFreshSegment)
+    case 'revive':
+      return list.filter(prospectMatchesReviveSegment)
+    case 'contactable':
+      return list.filter(prospectMatchesContactableSegment)
     case 'favorite':
       return list.filter((p) => isProspectCrmFavorite(p))
     case 'treated':
@@ -1815,17 +1922,15 @@ const filteredProspects = computed(() => {
 
 const prospectKpiFilterSuffix = computed(() => KPI_FILTER_SUFFIXES[prospectKpiFilter.value])
 
-/** Non vus dans le CRM + proximité affichée &gt; 75 % (maxProximity sur 0–1). */
-const newProspectsCount = computed(() => prospects.value.filter(prospectMatchesNewSegment).length)
+const readyProspectsCount = computed(() => prospects.value.filter(prospectMatchesReadySegment).length)
+const freshProspectsCount = computed(() => prospects.value.filter(prospectMatchesFreshSegment).length)
+const reviveProspectsCount = computed(() => prospects.value.filter(prospectMatchesReviveSegment).length)
+const contactableProspectsCount = computed(() => prospects.value.filter(prospectMatchesContactableSegment).length)
 const favoriteProspectsCount = computed(
   () => prospects.value.filter((p) => isProspectCrmFavorite(p)).length,
 )
 const treatedProspectsCount = computed(
   () => prospects.value.filter((p) => isProspectTreated(p)).length,
-)
-/** Non vus dans le CRM + score &gt; 70. */
-const potentialProspectsCount = computed(() =>
-  prospects.value.filter(prospectMatchesPotentialSegment).length,
 )
 
 const totalPages = computed(() => Math.max(1, Math.ceil(filteredProspects.value.length / PAGE_SIZE)))
@@ -1833,21 +1938,31 @@ const paginatedProspects = computed(() => {
   const start = (currentPage.value - 1) * PAGE_SIZE
   return filteredProspects.value.slice(start, start + PAGE_SIZE)
 })
-const selectedProspectEmails = ref<string[]>([])
-const lastSelectedProspectEmail = ref<string | null>(null)
+function prospectUiKey(prospect: ProspectMatchRow): string {
+  return normalizeProspectIdentityId(prospect.prospectIdentityId)
+    || [
+      prospect.email || 'no-email',
+      prospect.name || 'no-name',
+      prospect.lastActivityAt || 'no-activity',
+      String(prospect.score),
+    ].join('::')
+}
 
-const currentPageProspectEmails = computed(() => paginatedProspects.value.map((p) => p.email))
+const selectedProspectKeys = ref<string[]>([])
+const lastSelectedProspectKey = ref<string | null>(null)
+
+const currentPageProspectKeys = computed(() => paginatedProspects.value.map(prospectUiKey))
 
 const isAllCurrentPageProspectsSelected = computed(() => {
-  const emails = currentPageProspectEmails.value
-  if (!emails.length) {
+  const keys = currentPageProspectKeys.value
+  if (!keys.length) {
     return false
   }
-  return emails.every((e) => selectedProspectEmails.value.includes(e))
+  return keys.every((key) => selectedProspectKeys.value.includes(key))
 })
 
 const isSomeCurrentPageProspectsSelected = computed(() =>
-  currentPageProspectEmails.value.some((e) => selectedProspectEmails.value.includes(e)),
+  currentPageProspectKeys.value.some((key) => selectedProspectKeys.value.includes(key)),
 )
 
 const selectAllProspectsPageInputRef = ref<HTMLInputElement | null>(null)
@@ -1860,13 +1975,11 @@ watchEffect(() => {
   el.indeterminate =
     isSomeCurrentPageProspectsSelected.value && !isAllCurrentPageProspectsSelected.value
 })
-const selectedProspectsCount = computed(() => selectedProspectEmails.value.length)
+const selectedProspectsCount = computed(() => selectedProspectKeys.value.length)
 
 const bulkSelectedProspectRows = computed(() => {
-  const emails = new Set(selectedProspectEmails.value)
-  return prospects.value.filter(
-    (p) => emails.has(p.email) && Boolean(normalizeProspectIdentityId(p.prospectIdentityId)),
-  )
+  const keys = new Set(selectedProspectKeys.value)
+  return prospects.value.filter((p) => keys.has(prospectUiKey(p)))
 })
 
 /** Si au moins un non favori → true (tout passer en favori). Si tous favoris → false (tout retirer). */
@@ -1928,100 +2041,102 @@ const canBulkSendEmail = computed(() =>
   bulkSelectedProspectRows.value.some((p) => p.hasEmailConsent === true),
 )
 
-function isProspectSelected(email: string): boolean {
-  return selectedProspectEmails.value.includes(email)
+function isProspectSelected(prospect: ProspectMatchRow): boolean {
+  return selectedProspectKeys.value.includes(prospectUiKey(prospect))
 }
 
-function onToggleProspectSelection(email: string, checked: boolean) {
-  const next = new Set(selectedProspectEmails.value)
+function onToggleProspectSelection(prospect: ProspectMatchRow, checked: boolean) {
+  const key = prospectUiKey(prospect)
+  const next = new Set(selectedProspectKeys.value)
   if (checked) {
-    next.add(email)
+    next.add(key)
   } else {
-    next.delete(email)
+    next.delete(key)
   }
-  selectedProspectEmails.value = [...next]
+  selectedProspectKeys.value = [...next]
 }
 
-function onProspectCheckboxClick(email: string, event: MouseEvent) {
+function onProspectCheckboxClick(prospect: ProspectMatchRow, event: MouseEvent) {
   const target = event.target as HTMLInputElement | null
   if (!target) {
     return
   }
+  const key = prospectUiKey(prospect)
   const checked = target.checked
-  if (!event.shiftKey || !lastSelectedProspectEmail.value) {
-    onToggleProspectSelection(email, checked)
-    lastSelectedProspectEmail.value = email
+  if (!event.shiftKey || !lastSelectedProspectKey.value) {
+    onToggleProspectSelection(prospect, checked)
+    lastSelectedProspectKey.value = key
     return
   }
-  const orderedEmails = paginatedProspects.value.map((item) => item.email)
-  const start = orderedEmails.indexOf(lastSelectedProspectEmail.value)
-  const end = orderedEmails.indexOf(email)
+  const orderedKeys = paginatedProspects.value.map(prospectUiKey)
+  const start = orderedKeys.indexOf(lastSelectedProspectKey.value)
+  const end = orderedKeys.indexOf(key)
   if (start < 0 || end < 0) {
-    onToggleProspectSelection(email, checked)
-    lastSelectedProspectEmail.value = email
+    onToggleProspectSelection(prospect, checked)
+    lastSelectedProspectKey.value = key
     return
   }
   const [from, to] = start < end ? [start, end] : [end, start]
-  const next = new Set(selectedProspectEmails.value)
+  const next = new Set(selectedProspectKeys.value)
   for (let i = from; i <= to; i += 1) {
-    const currentEmail = orderedEmails[i]
+    const currentKey = orderedKeys[i]
     if (checked) {
-      next.add(currentEmail)
+      next.add(currentKey)
     } else {
-      next.delete(currentEmail)
+      next.delete(currentKey)
     }
   }
-  selectedProspectEmails.value = [...next]
-  lastSelectedProspectEmail.value = email
+  selectedProspectKeys.value = [...next]
+  lastSelectedProspectKey.value = key
 }
 
 function selectAllFilteredProspects() {
-  selectedProspectEmails.value = filteredProspects.value.map((item) => item.email)
+  selectedProspectKeys.value = filteredProspects.value.map(prospectUiKey)
 }
 
 function clearSelectedProspects() {
-  selectedProspectEmails.value = []
-  lastSelectedProspectEmail.value = null
+  selectedProspectKeys.value = []
+  lastSelectedProspectKey.value = null
 }
 
 function onToggleSelectAllProspectsCurrentPage(checked: boolean) {
-  const emails = currentPageProspectEmails.value
-  if (!emails.length) {
+  const keys = currentPageProspectKeys.value
+  if (!keys.length) {
     return
   }
-  const next = new Set(selectedProspectEmails.value)
+  const next = new Set(selectedProspectKeys.value)
   if (checked) {
-    for (const e of emails) {
-      next.add(e)
+    for (const key of keys) {
+      next.add(key)
     }
   } else {
-    for (const e of emails) {
-      next.delete(e)
+    for (const key of keys) {
+      next.delete(key)
     }
   }
-  selectedProspectEmails.value = [...next]
+  selectedProspectKeys.value = [...next]
 }
 
-const selectedProspectEmail = ref<string | null>(null)
+const selectedProspectKey = ref<string | null>(null)
 const selectedProspect = computed(() => {
   const list = paginatedProspects.value
   if (!list.length) {
     return null
   }
-  return list.find((p) => p.email === selectedProspectEmail.value) ?? list[0]
+  return list.find((p) => prospectUiKey(p) === selectedProspectKey.value) ?? list[0]
 })
 
 watch(prospectMembershipKey, () => {
   prospectKpiFilter.value = 'all'
   currentPage.value = 1
   const first = prospects.value[0]
-  selectedProspectEmail.value = first ? first.email : null
+  selectedProspectKey.value = first ? prospectUiKey(first) : null
 })
 
 watch(prospectKpiFilter, () => {
   currentPage.value = 1
   const first = filteredProspects.value[0]
-  selectedProspectEmail.value = first ? first.email : null
+  selectedProspectKey.value = first ? prospectUiKey(first) : null
 })
 
 watch(
@@ -2044,6 +2159,19 @@ watch(
   { immediate: true },
 )
 
+watch(
+  () => route.query.segment,
+  (rawSegment) => {
+    const segment = typeof rawSegment === 'string' ? rawSegment.trim().toLowerCase() : ''
+    if (segment === 'ready' || segment === 'fresh' || segment === 'revive' || segment === 'contactable' || segment === 'favorite' || segment === 'treated') {
+      prospectKpiFilter.value = segment
+      return
+    }
+    prospectKpiFilter.value = 'all'
+  },
+  { immediate: true },
+)
+
 watch(totalPages, (next) => {
   if (currentPage.value > next) {
     currentPage.value = next
@@ -2051,10 +2179,10 @@ watch(totalPages, (next) => {
 })
 
 watch(filteredProspects, (list) => {
-  const visibleEmails = new Set(list.map((item) => item.email))
-  selectedProspectEmails.value = selectedProspectEmails.value.filter((email) => visibleEmails.has(email))
-  if (lastSelectedProspectEmail.value && !visibleEmails.has(lastSelectedProspectEmail.value)) {
-    lastSelectedProspectEmail.value = null
+  const visibleKeys = new Set(list.map(prospectUiKey))
+  selectedProspectKeys.value = selectedProspectKeys.value.filter((key) => visibleKeys.has(key))
+  if (lastSelectedProspectKey.value && !visibleKeys.has(lastSelectedProspectKey.value)) {
+    lastSelectedProspectKey.value = null
   }
 })
 
@@ -2122,12 +2250,12 @@ function temperatureTitleForProspect(prospect: ProspectMatchRow): string {
 
 function temperatureMeaningForProspect(prospect: ProspectMatchRow): string {
   if (prospect.heatLevel === 'hot') {
-    return 'Lecture rapide : profil chaud, action immediate recommandee.'
+    return 'Lecture rapide : intention forte et exploitable, priorite commerciale elevee.'
   }
   if (prospect.heatLevel === 'warm') {
-    return 'Lecture rapide : profil tiede, bonne cible avec relance courte.'
+    return 'Lecture rapide : bon alignement, a activer avec une relance courte.'
   }
-  return 'Lecture rapide : profil froid, a nourrir mais non prioritaire.'
+  return 'Lecture rapide : signal faible ou trop large, a nourrir sans le prioriser.'
 }
 
 function temperatureReasonLines(prospect: ProspectMatchRow): string[] {
@@ -2146,7 +2274,7 @@ function displayProspectName(prospect: ProspectMatchRow): string {
     return prospect.name
   }
   if (!isAnonymousEmail(prospect.email)) {
-    return prospect.name
+    return 'Utilisateur connecté'
   }
   return `Utilisateur non connecté`
 }
@@ -2218,13 +2346,40 @@ function inferredPreferences(prospect: ProspectMatchRow): {
 }
 
 function nextActionRecommendation(prospect: ProspectMatchRow): string {
-  if (prospect.heatLevel === 'hot') {
+  if (prospectMatchesReadySegment(prospect)) {
     return "Appeler aujourd'hui et proposer une sélection de biens similaires."
+  }
+  if (prospectMatchesReviveSegment(prospect)) {
+    return 'Relancer avec 2 annonces tres proches de son historique avant que l’interet retombe.'
+  }
+  if (prospectMatchesFreshSegment(prospect)) {
+    return 'Qualifier ce nouveau signal sous 24 h avec un message court et contextualise.'
   }
   if (prospect.heatLevel === 'warm') {
     return 'Envoyer un message personnalisé puis relancer sous 3 jours.'
   }
-  return 'Lead froid : ne pas prioriser, garder en nurturing.'
+  return 'Conserver dans un nurturing leger et attendre un signal d’intention plus fort.'
+}
+
+function scoreBreakdownRows(prospect: ProspectMatchRow): Array<{ label: string; value: string }> {
+  const breakdown = prospect.temperatureBreakdown
+  return [
+    { label: 'Adequation aux criteres (72 % du score)', value: `${breakdown.similarityPercent}%` },
+    { label: 'Engagement observe (18 % du score)', value: `${breakdown.engagementPercent}%` },
+    { label: 'Fraicheur du signal (10 % du score)', value: `${breakdown.recencyPercent}%` },
+    { label: 'Score d appetence final', value: formatTemperatureScore(prospect.score) },
+  ]
+}
+
+function scoreBreakdownSummary(prospect: ProspectMatchRow): string {
+  const breakdown = prospect.temperatureBreakdown
+  return `Adequation ${breakdown.similarityPercent}% · Engagement ${breakdown.engagementPercent}% · Recence ${breakdown.recencyPercent}%`
+}
+
+function scoreBreakdownHighlights(prospect: ProspectMatchRow): string[] {
+  const boosts = prospect.temperatureBreakdown.boosts.map((line) => `Boost : ${line}`)
+  const blockers = prospect.temperatureBreakdown.blockers.map((line) => `Frein : ${line}`)
+  return [...boosts, ...blockers].slice(0, 6)
 }
 
 function mergedInteractionListings(prospect: ProspectMatchRow): Array<{

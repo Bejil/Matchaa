@@ -498,8 +498,66 @@ export const useSiteStore = defineStore('site', () => {
     return ensureAnonymousProspectEmail()
   }
 
+  function knownAnonymousProspectId(): string | null {
+    const fromRuntime = (runtimeAnonymousProspectId || '').trim()
+    if (fromRuntime) {
+      return fromRuntime
+    }
+    if (!import.meta.client) {
+      return null
+    }
+    try {
+      const stored = (localStorage.getItem(ANON_PROSPECT_ID_KEY) || '').trim()
+      if (stored) {
+        runtimeAnonymousProspectId = stored
+        return stored
+      }
+    } catch {
+      /* ignore */
+    }
+    return null
+  }
+
+  function readPreAuthIdentities(): string[] {
+    if (!import.meta.client) {
+      return []
+    }
+    try {
+      const raw = localStorage.getItem(PREAUTH_IDENTITIES_KEY)
+      if (!raw) {
+        return []
+      }
+      const parsed = JSON.parse(raw) as unknown
+      if (!Array.isArray(parsed)) {
+        return []
+      }
+      return parsed
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim().toLowerCase())
+        .filter(Boolean)
+    } catch {
+      return []
+    }
+  }
+
+  function writePreAuthIdentities(next: string[]) {
+    if (!import.meta.client) {
+      return
+    }
+    try {
+      localStorage.setItem(PREAUTH_IDENTITIES_KEY, JSON.stringify(next.slice(0, 12)))
+    } catch {
+      /* ignore */
+    }
+  }
+
   function rememberPreAuthIdentity(emailInput: string) {
-    void emailInput
+    const email = emailInput.trim().toLowerCase()
+    if (!import.meta.client || !email) {
+      return
+    }
+    const current = readPreAuthIdentities()
+    writePreAuthIdentities([email, ...current.filter((item) => item !== email)])
   }
 
   function mergePublicProfileFromAnonymousSource(targetEmail: string, sourceEmail: string) {
@@ -729,7 +787,49 @@ export const useSiteStore = defineStore('site', () => {
   }
 
   function mergeAnonymousProspectDataIntoEmail(targetEmailInput: string) {
-    void targetEmailInput
+    const targetEmail = targetEmailInput.trim().toLowerCase()
+    if (!import.meta.client || !targetEmail || isAnonymousProspectEmail(targetEmail)) {
+      bumpProspectsDataVersion()
+      return
+    }
+
+    const anonymousEmails = new Set(
+      readPreAuthIdentities().filter((email) => isAnonymousProspectEmail(email) && email !== targetEmail),
+    )
+    const anonId = knownAnonymousProspectId()
+    if (anonId) {
+      anonymousEmails.add(`anon-${anonId}@anonymous.matchaa`)
+    }
+
+    for (const anonymousEmail of anonymousEmails) {
+      mergePublicProfileFromAnonymousSource(targetEmail, anonymousEmail)
+    }
+    applyReconciledContactPrefsFromMergedMessages(targetEmail)
+    syncCurrentUserContactPrefsFromPublicProfile(targetEmail)
+
+    void (async () => {
+      const token = await resolveSupabaseAccessToken()
+      if (!token) {
+        return
+      }
+      try {
+        await $fetch('/api/prospects/reconcile', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: {
+            email: targetEmail,
+            anonymousId: anonId,
+          },
+        })
+        writePreAuthIdentities([
+          targetEmail,
+          ...readPreAuthIdentities().filter((email) => !isAnonymousProspectEmail(email)),
+        ])
+        bumpProspectsDataVersion()
+      } catch (error) {
+        console.warn('[Matchaa] prospects reconcile', error instanceof Error ? error.message : error)
+      }
+    })()
     bumpProspectsDataVersion()
   }
 
@@ -4312,6 +4412,7 @@ export const useSiteStore = defineStore('site', () => {
         contactOptInPhone: input.contactOptInPhone === true,
         contactOptInEmail: input.contactOptInEmail === true,
       }
+      mergeAnonymousProspectDataIntoEmail(nextEmail)
       if (import.meta.client && nextEmail) {
         localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser.value))
         useFavoritesStore().mergeGuestFavoritesIntoAccount(nextEmail)
